@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Generador de Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <script src="dashboard-template.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <nav class="topbar" aria-label="Navegación principal">
+        <a class="brand" href="#" aria-label="Dashboard Generator">
+          <span class="brand-mark"><i data-lucide="layout-dashboard"></i></span>
+          <span>Generador de Dashboard</span>
+        </a>
+        <div class="topbar-actions">
+          <span class="badge badge-success"><i data-lucide="shield-check"></i> Procesamiento local</span>
+        </div>
+      </nav>
+
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Panel de creación</p>
+          <h1>Crear dashboard de negociaciones</h1>
+          <p>Carga un Excel, valida su estructura y descarga un reporte ejecutivo listo para compartir.</p>
+        </div>
+      </header>
+
+      <main class="main-layout">
+        <section class="left-column">
+          <article class="card upload-card">
+            <div class="card-heading">
+              <div>
+                <p class="section-kicker">Entrada de datos</p>
+                <h2>Cargar Excel</h2>
+              </div>
+              <span id="uploadStateBadge" class="badge badge-muted">Sin archivo</span>
+            </div>
+
+            <div id="dropZone" class="dropzone" tabindex="0">
+              <input id="fileInput" type="file" accept=".xlsx,.xls" hidden>
+              <span class="dropzone-icon"><i data-lucide="file-spreadsheet"></i></span>
+              <div class="dropzone-copy">
+                <strong>Arrastra el archivo aquí o selecciónalo desde tu equipo.</strong>
+                <span>Formatos soportados: .xlsx y .xls</span>
+              </div>
+              <button id="selectFileButton" class="button button-primary" type="button">
+                <i data-lucide="upload"></i>
+                Seleccionar Excel
+              </button>
+            </div>
+
+            <div class="file-details">
+              <div>
+                <span class="label">Archivo</span>
+                <strong id="fileName">Ningún archivo cargado</strong>
+              </div>
+              <div>
+                <span class="label">Tamaño</span>
+                <strong id="fileSize">-</strong>
+              </div>
+              <div>
+                <span class="label">Extensión</span>
+                <strong id="fileExtension">-</strong>
+              </div>
+            </div>
+
+            <div id="sheetField" class="sheet-field is-hidden">
+              <label class="label" for="sheetSelect">Hoja del archivo</label>
+              <select id="sheetSelect" disabled>
+                <option value="">Sin hojas cargadas</option>
+              </select>
+            </div>
+          </article>
+
+          <article class="card validation-card">
+            <div class="card-heading">
+              <div>
+                <p class="section-kicker">Estructura</p>
+                <h2>Resumen de columnas</h2>
+              </div>
+              <span id="extraColumnsBadge" class="badge badge-muted">Sin archivo</span>
+            </div>
+            <div id="detectedColumns" class="structure-summary empty-state compact">
+              <i data-lucide="columns-3"></i>
+              <span>Aún no se ha leído ningún archivo.</span>
+            </div>
+          </article>
+
+          <article class="card validation-card">
+            <div class="card-heading">
+              <div>
+                <p class="section-kicker">Resultado de validación</p>
+                <h2>Validaciones</h2>
+              </div>
+              <span id="validationBadge" class="badge badge-muted">Pendiente</span>
+            </div>
+            <div id="validationDetails" class="validation-details empty-state compact">
+              <i data-lucide="clipboard-check"></i>
+              <span>Carga un archivo para ver columnas faltantes, extras y advertencias.</span>
+            </div>
+          </article>
+        </section>
+
+        <aside class="right-column">
+          <article class="card action-panel">
+            <div class="card-heading">
+              <div>
+                <p class="section-kicker">Flujo</p>
+                <h2>Progreso</h2>
+              </div>
+              <span id="flowBadge" class="badge badge-muted">Pendiente</span>
+            </div>
+
+            <ol id="stepper" class="stepper" aria-label="Progreso de generación">
+              <li class="step is-active" data-step="upload">
+                <span class="step-dot"><i data-lucide="file-up"></i></span>
+                <span><strong>Cargar archivo</strong><small>Selecciona el Excel</small></span>
+              </li>
+              <li class="step" data-step="validate">
+                <span class="step-dot"><i data-lucide="check-check"></i></span>
+                <span><strong>Validar estructura</strong><small>Columnas requeridas</small></span>
+              </li>
+              <li class="step" data-step="process">
+                <span class="step-dot"><i data-lucide="cpu"></i></span>
+                <span><strong>Procesar datos</strong><small>KPIs y calidad</small></span>
+              </li>
+              <li class="step" data-step="download">
+                <span class="step-dot"><i data-lucide="download"></i></span>
+                <span><strong>Descargar dashboard</strong><small>HTML compartible</small></span>
+              </li>
+            </ol>
+
+            <div id="statusMessage" class="alert alert-info">
+              <i data-lucide="info"></i>
+              <span>Carga un Excel para validar su estructura.</span>
+            </div>
+
+            <div class="actions">
+              <button id="processButton" class="button button-primary" type="button" disabled>
+                <span class="spinner" aria-hidden="true"></span>
+                <i data-lucide="play"></i>
+                Procesar archivo
+              </button>
+              <button id="downloadButton" class="button button-success" type="button" hidden>
+                <i data-lucide="download-cloud"></i>
+                Descargar dashboard
+              </button>
+              <button id="clearButton" class="button button-ghost" type="button">
+                <i data-lucide="rotate-ccw"></i>
+                Limpiar
+              </button>
+            </div>
+          </article>
+
+          <section class="status-grid" aria-label="Resumen del archivo">
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="file-check-2"></i></span>
+              <span>Archivo cargado</span>
+              <strong id="fileLoadedMetric">No</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="sheets"></i></span>
+              <span>Hojas detectadas</span>
+              <strong id="sheetsCount">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="rows-3"></i></span>
+              <span>Filas leídas</span>
+              <strong id="rowsRead">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="badge-check"></i></span>
+              <span>Filas válidas</span>
+              <strong id="validRows">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="columns-3"></i></span>
+              <span>Columnas detectadas</span>
+              <strong id="columnsCount">0</strong>
+            </article>
+            <article class="metric-card">
+              <span class="metric-icon"><i data-lucide="triangle-alert"></i></span>
+              <span>Advertencias</span>
+              <strong id="warningRows">0</strong>
+            </article>
+          </section>
+        </aside>
+      </main>
+
+      <section class="card data-quality-section">
+        <div class="card-heading">
+          <div>
+            <p class="section-kicker">Control</p>
+            <h2>Calidad de datos</h2>
+          </div>
+          <span id="qualityBadge" class="badge badge-muted">Sin procesar</span>
+        </div>
+        <div id="qualitySummary" class="data-quality-grid">
+          <div class="empty-state">
+            <i data-lucide="sparkles"></i>
+            <span>El resumen aparecerá después de procesar el archivo.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card preview-card">
+        <div class="preview-toolbar">
+          <div>
+            <p class="section-kicker">Resultado</p>
+            <h2>Vista previa del dashboard</h2>
+          </div>
+          <div class="preview-actions">
+            <span id="previewBadge" class="badge badge-muted">No disponible</span>
+            <button id="openPreviewButton" class="button button-ghost button-small" type="button" disabled>
+              <i data-lucide="external-link"></i>
+              Abrir vista previa
+            </button>
+          </div>
+        </div>
+        <div id="previewEmpty" class="preview-empty">
+          <span class="preview-empty-icon"><i data-lucide="panel-top"></i></span>
+          <strong>Vista previa no disponible</strong>
+          <p>Procesa un Excel válido para renderizar el dashboard ejecutivo interactivo.</p>
+        </div>
+        <div class="preview-window" id="previewWindow" hidden>
+          <div class="window-chrome">
+            <span></span><span></span><span></span>
+            <small>dashboard_negociacion.html</small>
+          </div>
+          <iframe id="previewFrame" class="preview-frame" title="Vista previa del dashboard generado" hidden></iframe>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>
