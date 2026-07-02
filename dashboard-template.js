@@ -1003,7 +1003,7 @@ function generateDashboardHtml(payload) {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Negociaciones</title>
+    <title>Dashb</title>
     <link rel="icon" type="image/png" href="${DASHBOARD_LOGO_DATA_URI}">
     <link rel="shortcut icon" type="image/png" href="${DASHBOARD_LOGO_DATA_URI}">
     <link rel="apple-touch-icon" href="${DASHBOARD_LOGO_DATA_URI}">
@@ -1019,7 +1019,7 @@ function generateDashboardHtml(payload) {
       <aside class="sidebar">
         <div class="sidebar-brand">
           <span class="sidebar-logo"><img src="${DASHBOARD_LOGO_DATA_URI}" alt="Negociaciones"></span>
-          <strong class="sidebar-label">Negociaciones</strong>
+          <strong class="sidebar-label">Dashboard</strong>
           <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Colapsar menú" aria-expanded="true">
             <i data-lucide="panel-left-close"></i>
           </button>
