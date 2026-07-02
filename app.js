@@ -58,6 +58,7 @@ const TEXT_COLUMNS = new Set([
 ]);
 
 const DATE_COLUMNS = new Set(["Fecha inicio", "Fecha fin"]);
+const THEME_KEY = "dashboardTheme";
 
 const state = {
   file: null,
@@ -77,6 +78,7 @@ const els = {};
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
+  initTheme();
   bindEvents();
   refreshIcons();
   updateStepper("upload");
@@ -114,7 +116,8 @@ function cacheElements() {
     previewBadge: document.getElementById("previewBadge"),
     previewEmpty: document.getElementById("previewEmpty"),
     previewWindow: document.getElementById("previewWindow"),
-    previewFrame: document.getElementById("previewFrame")
+    previewFrame: document.getElementById("previewFrame"),
+    themeToggle: document.getElementById("themeToggle")
   });
 }
 
@@ -174,6 +177,56 @@ function bindEvents() {
     window.setTimeout(() => URL.revokeObjectURL(url), 30000);
   });
   els.clearButton.addEventListener("click", resetState);
+  els.themeToggle?.addEventListener("click", toggleTheme);
+}
+
+function initTheme() {
+  applyTheme(getPreferredTheme(), false);
+}
+
+function getPreferredTheme() {
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    if (saved === "light" || saved === "dark") {
+      return saved;
+    }
+  } catch (error) {
+    console.warn("No se pudo leer la preferencia de tema.", error);
+  }
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getCurrentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+
+function applyTheme(theme, persist = true) {
+  const normalizedTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalizedTheme;
+  if (persist) {
+    try {
+      window.localStorage.setItem(THEME_KEY, normalizedTheme);
+    } catch (error) {
+      console.warn("No se pudo guardar la preferencia de tema.", error);
+    }
+  }
+  updateThemeToggle(normalizedTheme);
+}
+
+function toggleTheme() {
+  applyTheme(getCurrentTheme() === "dark" ? "light" : "dark");
+}
+
+function updateThemeToggle(theme) {
+  if (!els.themeToggle) {
+    return;
+  }
+  const nextTheme = theme === "dark" ? "light" : "dark";
+  const icon = theme === "dark" ? "sun" : "moon";
+  const label = theme === "dark" ? "Claro" : "Oscuro";
+  els.themeToggle.setAttribute("aria-label", `Cambiar a modo ${nextTheme === "dark" ? "oscuro" : "claro"}`);
+  els.themeToggle.innerHTML = `<i data-lucide="${icon}"></i><span>${label}</span>`;
+  refreshIcons();
 }
 
 async function handleFile(file) {
@@ -732,6 +785,7 @@ function buildMetadata() {
   return {
     sourceFileName: state.file ? state.file.name : "",
     generatedAt: state.quality ? state.quality.generatedAt : new Date().toISOString(),
+    initialTheme: getCurrentTheme(),
     processedRows: state.processedRows.length,
     detectedColumns: state.headers,
     extraColumns: state.validation ? state.validation.extras : [],
