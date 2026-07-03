@@ -1141,9 +1141,9 @@ function dashboardCss() {
   --red-soft: #fee2e2;
   --indigo: #4f46e5;
   --sky: #0284c7;
-  --shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+  --shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
   --radius: 18px;
-  --sidebar-bg: rgba(255, 255, 255, 0.76);
+  --sidebar-bg: #ffffff;
   --soft-bg: #f8fafc;
   --input-bg: #ffffff;
   --button-bg: #ffffff;
@@ -1172,8 +1172,8 @@ function dashboardCss() {
   --emerald-soft: rgba(16, 185, 129, 0.16);
   --amber-soft: rgba(245, 158, 11, 0.16);
   --red-soft: rgba(239, 68, 68, 0.16);
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.36);
-  --sidebar-bg: rgba(15, 23, 42, 0.86);
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  --sidebar-bg: #0f172a;
   --soft-bg: #111827;
   --input-bg: #0b1220;
   --button-bg: #111827;
@@ -1212,7 +1212,6 @@ body, .sidebar, .filter-panel, .kpi-card, .chart-card, .table-card, .button, .ba
   padding: 22px;
   border-right: 1px solid var(--line);
   background: var(--sidebar-bg);
-  backdrop-filter: blur(16px);
   overflow: hidden;
 }
 .sidebar-brand { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-bottom: 28px; font-weight: 800; }
@@ -1440,6 +1439,7 @@ const TABLE_COLUMNS = [
 const NUMERIC_FIELDS = new Set(["Año", "Año Mes", "Ventas cajas físicas mes (sin rep)", "Ventas acumuladas negociacion", "Objetivo cajas total", "Porcentaje descuento"]);
 const DASHBOARD_THEME_KEY = "negotiationsDashboardTheme";
 const chartInstances = {};
+const debouncedResizeCharts = debounce(resizeCharts, 160);
 const state = { filters: {}, filteredRows: [], search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas mes (sin rep)", sortDir: "desc" };
 document.addEventListener("DOMContentLoaded", initDashboard);
 
@@ -1450,7 +1450,7 @@ function initDashboard() {
   validateDashboardDataShape(DASHBOARD_DATA);
   populateFilters();
   bindEvents();
-  window.addEventListener("resize", resizeCharts);
+  window.addEventListener("resize", debouncedResizeCharts);
   waitForECharts(renderAll);
   refreshIcons();
 }
@@ -1735,6 +1735,14 @@ function renderChart(elementId, type, items, asPercent, horizontal) {
     renderNativeChart(element, type, chartItems, asPercent, horizontal);
     return;
   }
+  if (chartInstances[elementId]) {
+    try {
+      chartInstances[elementId].dispose();
+    } catch (error) {
+      console.warn("No se pudo destruir grafica previa", elementId, error);
+    }
+    delete chartInstances[elementId];
+  }
   element.innerHTML = "";
   try {
     const chart = window.echarts.init(element, null, { renderer: "canvas" });
@@ -1816,7 +1824,20 @@ function disposeCharts() {
     delete chartInstances[key];
   });
 }
+function debounce(fn, delay) {
+  let timeout;
+  return function () {
+    const args = arguments;
+    window.clearTimeout(timeout);
+    timeout = window.setTimeout(function () {
+      fn.apply(null, args);
+    }, delay || 150);
+  };
+}
 function resizeCharts() {
+  if (document.hidden) {
+    return;
+  }
   Object.keys(chartInstances).forEach(function (key) {
     try {
       chartInstances[key].resize();

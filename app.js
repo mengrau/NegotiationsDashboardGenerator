@@ -71,7 +71,8 @@ const state = {
   processedRows: [],
   quality: null,
   generatedHtml: "",
-  previewObjectUrl: ""
+  previewObjectUrl: "",
+  previewVisible: false
 };
 
 const els = {};
@@ -167,15 +168,7 @@ function bindEvents() {
     }
     downloadHtml(buildDashboardFilename(), state.generatedHtml);
   });
-  els.openPreviewButton?.addEventListener("click", () => {
-    if (!state.generatedHtml) {
-      return;
-    }
-    const blob = new Blob([state.generatedHtml], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener");
-    window.setTimeout(() => URL.revokeObjectURL(url), 30000);
-  });
+  els.openPreviewButton?.addEventListener("click", togglePreviewDashboard);
   els.clearButton.addEventListener("click", resetState);
   els.themeToggle?.addEventListener("click", toggleTheme);
 }
@@ -396,8 +389,10 @@ function processCurrentSheet() {
     return;
   }
 
+  state.generatedHtml = "";
+  closePreviewDashboard({ nextState: "loading" });
+  els.downloadButton.hidden = true;
   setStatus("info", "Procesando datos...");
-  setPreviewState("loading");
   updateStepper("process");
   els.processButton.disabled = true;
   els.processButton.classList.add("is-loading");
@@ -429,12 +424,12 @@ function processCurrentSheet() {
       });
 
       renderQualitySummary(state.quality);
-      renderPreviewDashboard(state.processedRows);
+      setPreviewState("ready");
       els.validRows.textContent = formatInteger(state.processedRows.length);
       els.warningRows.textContent = formatInteger(state.quality.rowsWithWarnings);
       els.downloadButton.hidden = false;
       updateStepper("download");
-      setStatus("success", "Dashboard procesado correctamente. Ya puedes descargar el HTML.");
+      setStatus("success", "Dashboard generado correctamente. Puedes descargarlo o abrir la vista previa.");
     } catch (error) {
       console.error(error);
       updateStepper("process", "error");
@@ -706,25 +701,64 @@ function applyFilters(rows, filters) {
   );
 }
 
-function renderPreviewDashboard(rows) {
-  const metadata = buildMetadata();
-  const html = generateDashboardHtml({
-    rows,
-    metadata,
-    quality: state.quality
-  });
+function togglePreviewDashboard() {
+  if (!state.generatedHtml) {
+    return;
+  }
+  if (state.previewVisible) {
+    closePreviewDashboard();
+    return;
+  }
+  renderPreviewDashboard();
+}
+
+function renderPreviewDashboard() {
+  if (!state.generatedHtml) {
+    setPreviewState("pending");
+    return;
+  }
   revokePreviewUrl();
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const blob = new Blob([state.generatedHtml], { type: "text/html;charset=utf-8" });
   state.previewObjectUrl = URL.createObjectURL(blob);
   els.previewFrame.removeAttribute("srcdoc");
   els.previewFrame.src = state.previewObjectUrl;
   els.previewFrame.hidden = false;
   els.previewWindow.hidden = false;
   els.previewEmpty.hidden = true;
-  els.openPreviewButton.disabled = false;
+  state.previewVisible = true;
+  updatePreviewToggle();
   els.previewBadge.textContent = "Interactivo";
   els.previewBadge.className = "badge badge-success";
   refreshIcons();
+}
+
+function closePreviewDashboard(options = {}) {
+  clearPreviewFrame();
+  revokePreviewUrl();
+  state.previewVisible = false;
+  els.previewWindow.hidden = true;
+  updatePreviewToggle();
+  setPreviewState(options.nextState || (state.generatedHtml ? "ready" : state.file ? "pending" : "initial"));
+}
+
+function clearPreviewFrame() {
+  els.previewFrame.hidden = true;
+  els.previewFrame.removeAttribute("srcdoc");
+  if (els.previewFrame.getAttribute("src")) {
+    els.previewFrame.src = "about:blank";
+  }
+  els.previewFrame.removeAttribute("src");
+}
+
+function updatePreviewToggle() {
+  if (!els.openPreviewButton) {
+    return;
+  }
+  const canPreview = Boolean(state.generatedHtml);
+  const isVisible = canPreview && state.previewVisible;
+  els.openPreviewButton.disabled = !canPreview;
+  els.openPreviewButton.setAttribute("aria-expanded", String(isVisible));
+  els.openPreviewButton.innerHTML = `<i data-lucide="${isVisible ? "eye-off" : "eye"}"></i>${isVisible ? "Ocultar vista previa" : "Ver vista previa"}`;
 }
 
 function downloadHtml(filename, htmlContent) {
@@ -859,19 +893,18 @@ function resetProcessedOutput() {
   state.processedRows = [];
   state.quality = null;
   state.generatedHtml = "";
+  state.previewVisible = false;
+  clearPreviewFrame();
   revokePreviewUrl();
   els.validRows.textContent = "0";
   els.warningRows.textContent = "0";
   els.downloadButton.hidden = true;
-  els.openPreviewButton.disabled = true;
+  updatePreviewToggle();
   els.qualityBadge.textContent = "Sin procesar";
   els.qualityBadge.className = "badge badge-muted";
   els.qualitySummary.innerHTML = '<div class="empty-state"><i data-lucide="sparkles"></i><span>El resumen aparecerá después de procesar el archivo.</span></div>';
   els.previewBadge.textContent = "No disponible";
   els.previewBadge.className = "badge badge-muted";
-  els.previewFrame.hidden = true;
-  els.previewFrame.removeAttribute("srcdoc");
-  els.previewFrame.removeAttribute("src");
   els.previewWindow.hidden = true;
   setPreviewState(state.file ? "pending" : "initial");
   refreshIcons();
@@ -891,8 +924,13 @@ function setPreviewState(mode) {
     },
     loading: {
       icon: "loader-2",
-      title: "Generando vista previa",
+      title: "Generando dashboard",
       text: "Estamos preparando KPIs, filtros, gráficas y tabla dentro del HTML final."
+    },
+    ready: {
+      icon: "circle-check",
+      title: "Dashboard generado correctamente",
+      text: "Puedes descargarlo o abrir la vista previa cuando lo necesites."
     },
     error: {
       icon: "circle-alert",
@@ -901,16 +939,26 @@ function setPreviewState(mode) {
     }
   };
   const content = contentByMode[mode] || contentByMode.initial;
-  els.previewFrame.hidden = true;
+  state.previewVisible = false;
+  clearPreviewFrame();
   els.previewWindow.hidden = true;
-  els.previewFrame.removeAttribute("src");
   els.previewEmpty.hidden = false;
   els.previewEmpty.innerHTML = `<span class="preview-empty-icon"><i data-lucide="${content.icon}"></i></span><strong>${escapeHtml(content.title)}</strong><p>${escapeHtml(content.text)}</p>`;
   els.previewEmpty.classList.toggle("is-loading-preview", mode === "loading");
-  if (mode !== "loading") {
-    revokePreviewUrl();
-    els.previewFrame.removeAttribute("srcdoc");
-    els.previewFrame.removeAttribute("src");
+  revokePreviewUrl();
+  updatePreviewToggle();
+  if (mode === "ready") {
+    els.previewBadge.textContent = "Generado";
+    els.previewBadge.className = "badge badge-success";
+  } else if (mode === "loading") {
+    els.previewBadge.textContent = "Preparando";
+    els.previewBadge.className = "badge badge-soft";
+  } else if (mode === "error") {
+    els.previewBadge.textContent = "No disponible";
+    els.previewBadge.className = "badge badge-bad";
+  } else {
+    els.previewBadge.textContent = "No disponible";
+    els.previewBadge.className = "badge badge-muted";
   }
   refreshIcons();
 }
