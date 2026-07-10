@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "test": "node tests/sales-information.test.js"
+  }
+}

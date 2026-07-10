@@ -61,7 +61,36 @@ const TEXT_COLUMNS = new Set([
 ]);
 
 const DATE_COLUMNS = new Set(["Fecha inicio", "Fecha fin"]);
+const SALES_INFORMATION_STATUS = {
+  WITHOUT_SALES_INFO: "SIN_INFORMACION_VENTA",
+  ZERO_SALE: "VENTA_CERO",
+  WITH_SALE: "CON_VENTA"
+};
+const SALES_VALUE_COLUMN = "Ventas cajas físicas (sin rep)";
+const PRESENTATION_ID_FIELDS = [
+  "Presentación AS400 de la venta - Texto",
+  "Presentación AS400 de la venta - Clave"
+];
+const NEGOTIATION_ID_FIELDS = [
+  "Cliente SAP - Clave",
+  "ID Actividad",
+  "Presentación AS400 de la venta - Clave"
+];
+const SALES_CONTEXT_FIELDS = [
+  "Año",
+  "Mes",
+  "Año Mes",
+  "Centro - Clave",
+  "Canal",
+  "Nit cliente - Clave",
+  "Región SAP",
+  "Tipología",
+  "Cliente AS400 - Texto",
+  "Cliente AS400 - Nombre negocio (Texto)"
+];
+const BLANK_TEXT_MARKERS = new Set(["", "-", "–", "—"]);
 const HEADER_ALIASES = new Map([
+  ["Categoría AS400 de la venta", ["Categoria AS400 de la venta", "Categoría AS400 de venta", "Categoria AS400 de venta", "Categoría AS400", "Categoria AS400", "Categoría", "Categoria"]],
   ["Ventas cajas físicas (sin rep)", ["Ventas cajas físicas mes (sin rep)"]],
   ["Objetivo mes ", ["Objetivo mes"]],
   ["TotalVentaMes", ["Total venta mes", "Total Venta Mes", "Total ventas mes", "Total Ventas Mes"]]
@@ -521,8 +550,8 @@ function parseNumber(value, column = "") {
     return null;
   }
 
-  let text = String(value).trim();
-  if (!text || text === "-") {
+  let text = normalizeCellText(value);
+  if (isBlankText(text)) {
     return null;
   }
 
@@ -591,8 +620,8 @@ function parseDate(value) {
     return null;
   }
 
-  const text = String(value).trim();
-  if (!text || text === "-") {
+  const text = normalizeCellText(value);
+  if (isBlankText(text)) {
     return null;
   }
 
@@ -652,7 +681,74 @@ function normalizeRow(row) {
   }
 
   normalized["Estado de vigencia"] = getVigenciaStatus(normalized["Fecha inicio"], normalized["Fecha fin"]);
+  normalized.estadoInformacionVenta = classifySalesInformation(normalized);
   return normalized;
+}
+
+function classifySalesInformation(row) {
+  const sales = numberForCalc(row[SALES_VALUE_COLUMN]);
+  if (sales > 0) {
+    return SALES_INFORMATION_STATUS.WITH_SALE;
+  }
+
+  const hasPresentation = PRESENTATION_ID_FIELDS.some((field) => hasUsableValue(row[field]));
+  const hasNegotiationReference = NEGOTIATION_ID_FIELDS.some((field) => hasUsableValue(row[field]));
+  const hasSalesContext = SALES_CONTEXT_FIELDS.some((field) => hasUsableValue(row[field]));
+
+  if (hasPresentation && hasNegotiationReference && !hasSalesContext) {
+    return SALES_INFORMATION_STATUS.WITHOUT_SALES_INFO;
+  }
+
+  return SALES_INFORMATION_STATUS.ZERO_SALE;
+}
+
+function isWithoutSalesInformation(row) {
+  return row && row.estadoInformacionVenta === SALES_INFORMATION_STATUS.WITHOUT_SALES_INFO;
+}
+
+function getNegotiatedPresentationKey(row, index = 0) {
+  const parts = NEGOTIATION_ID_FIELDS.map((field) => normalizeCellText(row[field])).filter(Boolean);
+  if (parts.length) {
+    return parts.join("||");
+  }
+  const fallback = [
+    normalizeCellText(row["Cliente AS400 - Texto"]),
+    normalizeCellText(row["Presentación AS400 de la venta - Texto"]),
+    normalizeCellText(row["Categoría AS400 de la venta"])
+  ].filter(Boolean);
+  return fallback.length ? fallback.join("||") : `fila-${index}`;
+}
+
+function uniqueRowsByKey(rows, keyGetter) {
+  const seen = new Set();
+  return rows.filter((row, index) => {
+    const key = keyGetter(row, index);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
+function getUniquePresentationsWithoutSales(rows) {
+  return uniqueRowsByKey(rows.filter(isWithoutSalesInformation), getNegotiatedPresentationKey);
+}
+
+function countUniquePresentationsWithoutSales(rows) {
+  return getUniquePresentationsWithoutSales(rows).length;
+}
+
+function groupPresentationsWithoutSalesByCategory(rows) {
+  const grouped = new Map();
+  getUniquePresentationsWithoutSales(rows).forEach((row) => {
+    const category = normalizeCellText(row["Categoría AS400 de la venta"]);
+    if (!category) {
+      return;
+    }
+    grouped.set(category, (grouped.get(category) || 0) + 1);
+  });
+  return Array.from(grouped, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
 }
 
 function buildDataQualityReport(rows, context = {}) {
@@ -665,6 +761,8 @@ function buildDataQualityReport(rows, context = {}) {
     rowsWithoutPresentation: rows.filter((row) => !row["Presentación AS400 de la venta - Clave"]).length,
     rowsWithoutObjective: rows.filter((row) => row["Objetivo mes "] === null).length,
     rowsWithoutSales: rows.filter((row) => row["Ventas cajas físicas (sin rep)"] === null).length,
+    rowsWithoutSalesInformation: rows.filter(isWithoutSalesInformation).length,
+    uniquePresentationsWithoutSales: countUniquePresentationsWithoutSales(rows),
     rowsWithWarnings: rows.filter((row) => row.__warnings.length).length,
     extraColumns: context.extraColumns || [],
     detectedColumns: context.detectedColumns || [],
@@ -701,7 +799,10 @@ function computeKpis(rows) {
 function groupBySum(rows, groupField, valueField) {
   const grouped = new Map();
   rows.forEach((row) => {
-    const key = normalizeCellText(row[groupField]) || "Sin dato";
+    const key = normalizeCellText(row[groupField]);
+    if (!key) {
+      return;
+    }
     grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField]));
   });
   return Array.from(grouped, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
@@ -884,6 +985,8 @@ function renderQualitySummary(quality) {
     ["Filas sin presentación", quality.rowsWithoutPresentation],
     ["Filas sin objetivo", quality.rowsWithoutObjective],
     ["Filas sin ventas", quality.rowsWithoutSales],
+    ["Filas sin información de venta", quality.rowsWithoutSalesInformation],
+    ["Presentaciones sin ventas", quality.uniquePresentationsWithoutSales],
     ["Columnas extra detectadas", quality.extraColumns.length],
     ["Fecha y hora de generación", new Date(quality.generatedAt).toLocaleString("es-CO")]
   ];
@@ -1135,7 +1238,20 @@ function getFileExtension(filename) {
 }
 
 function qualityIcon(index) {
-  const icons = ["rows-3", "trash-2", "calendar-x", "id-card", "badge-user", "package", "target", "chart-no-axes-column", "columns-3", "clock"];
+  const icons = [
+    "rows-3",
+    "trash-2",
+    "calendar-x",
+    "id-card",
+    "badge-user",
+    "package",
+    "target",
+    "chart-no-axes-column",
+    "file-question",
+    "package-x",
+    "columns-3",
+    "clock"
+  ];
   return `<i data-lucide="${icons[index] || "sparkles"}"></i>`;
 }
 
@@ -1143,11 +1259,20 @@ function normalizeCellText(value) {
   if (value === null || value === undefined) {
     return "";
   }
-  return String(value).replace(/\s+/g, " ").trim();
+  const text = String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  return isBlankText(text) ? "" : text;
 }
 
 function isEmptyCell(value) {
-  return value === null || value === undefined || String(value).trim() === "";
+  return value === null || value === undefined || isBlankText(String(value).replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function isBlankText(value) {
+  return BLANK_TEXT_MARKERS.has(String(value ?? "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim());
+}
+
+function hasUsableValue(value) {
+  return normalizeCellText(value) !== "";
 }
 
 function sumField(rows, field) {

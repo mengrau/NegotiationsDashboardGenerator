@@ -1,96 +1,5 @@
 "use strict";
 
-function generateDashboardHtml(payload) {
-  const rows = Array.isArray(payload.rows) ? payload.rows : [];
-  const metadata = payload.metadata || {};
-  const quality = payload.quality || {};
-  const dataJson = safeJson(rows);
-  const metadataJson = safeJson(metadata);
-  const qualityJson = safeJson(quality);
-
-  return `<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Negociaciones</title>
-    <style>
-${dashboardCss()}
-    </style>
-  </head>
-  <body>
-    <header class="dash-header">
-      <div>
-        <p class="eyebrow">Resumen Ejecutivo</p>
-        <h1>Negociaciones</h1>
-        <p>Resumen interactivo de negociaciones</p>
-      </div>
-      <dl class="header-meta">
-        <div><dt>Fuente</dt><dd id="sourceFileName">-</dd></div>
-        <div><dt>Fecha de generación</dt><dd id="generatedAt">-</dd></div>
-        <div><dt>Filas procesadas</dt><dd id="processedRows">0</dd></div>
-      </dl>
-    </header>
-
-    <main class="dashboard-shell">
-      <section class="filters-panel">
-        <div class="section-heading">
-          <h2>Filtros</h2>
-          <button id="clearFiltersButton" class="button ghost" type="button">Limpiar filtros</button>
-        </div>
-        <div id="filtersGrid" class="filters-grid"></div>
-      </section>
-
-      <section id="kpiGrid" class="kpi-grid" aria-label="Indicadores principales"></section>
-
-      <section class="charts-grid">
-        <article class="chart-card"><h2>Ventas por Región SAP</h2><div id="chartRegion" class="chart"></div></article>
-        <article class="chart-card"><h2>Ventas por Canal</h2><div id="chartCanal" class="chart"></div></article>
-        <article class="chart-card"><h2>Ventas por Categoría</h2><div id="chartCategoria" class="chart"></div></article>
-        <article class="chart-card"><h2>Top 10 clientes</h2><div id="chartClientes" class="chart"></div></article>
-        <article class="chart-card"><h2>Top 10 presentaciones</h2><div id="chartPresentaciones" class="chart"></div></article>
-        <article class="chart-card"><h2>Cumplimiento por Cedi</h2><div id="chartCedi" class="chart"></div></article>
-        <article class="chart-card wide"><h2>Ventas por Mes o Año Mes</h2><div id="chartMes" class="chart vertical-chart"></div></article>
-      </section>
-
-      <section class="table-panel">
-        <div class="section-heading">
-          <h2>Tabla de detalle</h2>
-          <button id="exportCsvButton" class="button primary" type="button">Exportar CSV</button>
-        </div>
-        <div class="table-tools">
-          <label>Buscar <input id="searchInput" type="search" placeholder="Buscar en datos filtrados"></label>
-          <label>Filas <select id="pageSizeSelect"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
-        </div>
-        <div class="table-wrap">
-          <table id="detailTable"></table>
-        </div>
-        <div class="pagination">
-          <button id="prevPageButton" class="button ghost" type="button">Anterior</button>
-          <span id="pageInfo">Página 1</span>
-          <button id="nextPageButton" class="button ghost" type="button">Siguiente</button>
-        </div>
-      </section>
-
-      <section class="quality-panel">
-        <div class="section-heading">
-          <h2>Calidad de datos</h2>
-          <span id="qualityGeneratedAt" class="pill">-</span>
-        </div>
-        <div id="qualityGrid" class="quality-grid"></div>
-      </section>
-    </main>
-
-    <script>
-const DASHBOARD_DATA = ${dataJson};
-const DASHBOARD_META = ${metadataJson};
-const DASHBOARD_QUALITY = ${qualityJson};
-${dashboardScript()}
-    <\/script>
-  </body>
-</html>`;
-}
-
 function safeJson(value) {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
@@ -99,898 +8,8 @@ function safeJson(value) {
     .replace(/\u2028/g, "\\u2028")
     .replace(/\u2029/g, "\\u2029");
 }
-
-function dashboardCss() {
-  return `
-:root {
-  --bg: #f3f6f8;
-  --panel: #ffffff;
-  --ink: #17212f;
-  --muted: #667085;
-  --line: #d9e2ea;
-  --brand: #0f766e;
-  --brand-dark: #115e59;
-  --blue: #2563eb;
-  --green: #16803c;
-  --amber: #b45309;
-  --red: #b42318;
-  --shadow: 0 14px 38px rgba(15, 23, 42, 0.08);
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
-}
-button, input, select { font: inherit; }
-.dash-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 480px);
-  gap: 24px;
-  align-items: end;
-  padding: 30px clamp(18px, 4vw, 48px);
-  background: #ffffff;
-  border-bottom: 1px solid var(--line);
-}
-.eyebrow {
-  margin: 0 0 8px;
-  color: var(--brand);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-h1, h2, p { margin-top: 0; }
-h1 {
-  margin-bottom: 10px;
-  font-size: clamp(2rem, 3.6vw, 3.2rem);
-  line-height: 1.05;
-}
-h2 {
-  margin-bottom: 0;
-  font-size: 1.03rem;
-}
-.dash-header p {
-  margin-bottom: 0;
-  color: var(--muted);
-}
-.header-meta {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f8fafc;
-}
-.header-meta div {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 10px;
-}
-.header-meta dt {
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.header-meta dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-weight: 800;
-}
-.dashboard-shell {
-  width: min(1500px, calc(100% - 36px));
-  margin: 24px auto 44px;
-}
-.filters-panel,
-.chart-card,
-.table-panel,
-.quality-panel,
-.kpi-card {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  box-shadow: var(--shadow);
-}
-.filters-panel,
-.table-panel,
-.quality-panel {
-  padding: 18px;
-}
-.section-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-}
-.filters-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-label {
-  display: grid;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-select,
-input {
-  width: 100%;
-  min-height: 40px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--ink);
-  text-transform: none;
-  font-weight: 600;
-}
-.button {
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 900;
-}
-.button.primary {
-  background: var(--brand);
-  color: #ffffff;
-}
-.button.ghost {
-  border-color: var(--line);
-  background: #ffffff;
-  color: var(--ink);
-}
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
-  margin: 18px 0;
-}
-.kpi-card {
-  min-height: 118px;
-  padding: 16px;
-}
-.kpi-card span {
-  display: block;
-  min-height: 34px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.kpi-card strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 1.65rem;
-  line-height: 1.1;
-}
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-.chart-card {
-  min-height: 330px;
-  padding: 18px;
-}
-.chart-card.wide {
-  grid-column: 1 / -1;
-}
-.chart {
-  display: grid;
-  gap: 10px;
-  min-height: 250px;
-  margin-top: 16px;
-}
-.bar-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 34%) minmax(0, 1fr) minmax(90px, auto);
-  gap: 10px;
-  align-items: center;
-}
-.bar-label {
-  overflow: hidden;
-  color: #344054;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.bar-track {
-  height: 18px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #e9eef3;
-}
-.bar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand), var(--blue));
-}
-.bar-value {
-  color: #344054;
-  font-variant-numeric: tabular-nums;
-  font-weight: 900;
-  text-align: right;
-}
-.vertical-chart {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  min-height: 310px;
-  padding-top: 22px;
-  overflow-x: auto;
-}
-.vbar {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
-  align-items: end;
-  width: max(44px, calc(100% / 18));
-  min-width: 44px;
-  height: 280px;
-}
-.vbar-fill {
-  width: 100%;
-  min-height: 2px;
-  border-radius: 8px 8px 0 0;
-  background: linear-gradient(180deg, var(--blue), var(--brand));
-}
-.vbar-label {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 900;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.table-panel {
-  margin-top: 18px;
-}
-.table-tools {
-  display: grid;
-  grid-template-columns: minmax(280px, 1fr) 140px;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.table-wrap {
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-table {
-  width: 100%;
-  min-width: 1300px;
-  border-collapse: collapse;
-}
-th,
-td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.88rem;
-  text-align: left;
-  vertical-align: top;
-}
-th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: #eef4f7;
-  color: #344054;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-tbody tr:hover {
-  background: #f8fafc;
-}
-.pagination {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  align-items: center;
-  margin-top: 14px;
-}
-.pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: #eef2f6;
-  color: #475467;
-  font-size: 0.78rem;
-  font-weight: 900;
-}
-.quality-panel {
-  margin-top: 18px;
-}
-.quality-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-.quality-item {
-  min-height: 86px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fbfdfe;
-}
-.quality-item span {
-  display: block;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-.quality-item strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 1.35rem;
-}
-.no-data {
-  display: grid;
-  place-items: center;
-  min-height: 180px;
-  border: 1px dashed var(--line);
-  border-radius: 8px;
-  color: var(--muted);
-  font-weight: 800;
-  text-align: center;
-}
-@media (max-width: 1100px) {
-  .dash-header,
-  .filters-grid,
-  .charts-grid {
-    grid-template-columns: 1fr;
-  }
-  .kpi-grid,
-  .quality-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 720px) {
-  .dashboard-shell {
-    width: calc(100% - 24px);
-  }
-  .kpi-grid,
-  .quality-grid,
-  .table-tools {
-    grid-template-columns: 1fr;
-  }
-  .header-meta div {
-    grid-template-columns: 1fr;
-  }
-}
-`;
-}
-
-function dashboardScript() {
-  return `
-const FILTER_FIELDS = [
-  { field: "Año", label: "Año" },
-  { field: "Mes", label: "Mes" },
-  { field: "Región SAP", label: "Región SAP" },
-  { field: "Canal", label: "Canal" },
-  { field: "Categoría AS400 de la venta", label: "Categoría" },
-  { field: "Cedi", label: "Cedi" },
-  { field: "Estado de vigencia", label: "Estado de vigencia" }
-];
-
-const TABLE_COLUMNS = [
-  "Año",
-  "Mes",
-  "Canal",
-  "Categoría AS400 de la venta",
-  "Región SAP",
-  "Cedi",
-  "Cliente SAP - Clave",
-  "Presentación AS400 de la venta - Texto",
-  "Ventas cajas físicas (sin rep)",
-  "Objetivo cajas total",
-  "Porcentaje descuento",
-  "Fecha inicio",
-  "Fecha fin",
-  "Estado de vigencia"
-];
-
-const NUMERIC_FIELDS = new Set([
-  "Año",
-  "Año Mes",
-  "Ventas cajas físicas (sin rep)",
-  "Objetivo cajas total",
-  "Porcentaje descuento"
-]);
-
-const state = {
-  filters: {},
-  filteredRows: [],
-  search: "",
-  page: 1,
-  pageSize: 10,
-  sortField: "Ventas cajas físicas (sin rep)",
-  sortDir: "desc"
-};
-
-document.addEventListener("DOMContentLoaded", initDashboard);
-
-function initDashboard() {
-  document.getElementById("sourceFileName").textContent = DASHBOARD_META.sourceFileName || "-";
-  document.getElementById("generatedAt").textContent = formatDateTime(DASHBOARD_META.generatedAt);
-  document.getElementById("processedRows").textContent = formatInteger(DASHBOARD_DATA.length);
-  populateFilters();
-  bindDashboardEvents();
-  renderQuality();
-  renderAll();
-}
-
-function bindDashboardEvents() {
-  document.getElementById("clearFiltersButton").addEventListener("click", function () {
-    state.filters = {};
-    document.querySelectorAll("[data-filter-field]").forEach(function (select) {
-      select.value = "";
-    });
-    state.page = 1;
-    renderAll();
-  });
-
-  document.getElementById("searchInput").addEventListener("input", function (event) {
-    state.search = event.target.value.trim().toLocaleLowerCase("es-CO");
-    state.page = 1;
-    renderTable();
-  });
-
-  document.getElementById("pageSizeSelect").addEventListener("change", function (event) {
-    state.pageSize = Number(event.target.value) || 10;
-    state.page = 1;
-    renderTable();
-  });
-
-  document.getElementById("prevPageButton").addEventListener("click", function () {
-    state.page = Math.max(1, state.page - 1);
-    renderTable();
-  });
-
-  document.getElementById("nextPageButton").addEventListener("click", function () {
-    const totalPages = getTotalPages(getTableRows());
-    state.page = Math.min(totalPages, state.page + 1);
-    renderTable();
-  });
-
-  document.getElementById("exportCsvButton").addEventListener("click", function () {
-    const csv = exportFilteredCsv(getTableRows());
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "datos_filtrados.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  });
-}
-
-function populateFilters() {
-  const container = document.getElementById("filtersGrid");
-  container.innerHTML = FILTER_FIELDS.map(function (item) {
-    const options = item.field === "Estado de vigencia"
-      ? ["Vigente", "No vigente", "Sin fechas"]
-      : getUniqueOptions(DASHBOARD_DATA, item.field);
-    return "<label>" + escapeHtml(item.label) +
-      "<select data-filter-field=\\"" + escapeHtml(item.field) + "\\">" +
-      "<option value=\\"\\">Todos</option>" +
-      options.map(function (option) {
-        return "<option value=\\"" + escapeHtml(option) + "\\">" + escapeHtml(option) + "</option>";
-      }).join("") +
-      "</select></label>";
-  }).join("");
-
-  container.querySelectorAll("select").forEach(function (select) {
-    select.addEventListener("change", function (event) {
-      const field = event.target.dataset.filterField;
-      state.filters[field] = event.target.value;
-      state.page = 1;
-      renderAll();
-    });
-  });
-}
-
-function renderAll() {
-  state.filteredRows = applySearch(applyFilters(DASHBOARD_DATA, state.filters));
-  renderKpis(state.filteredRows);
-  renderCharts(state.filteredRows);
-  renderTable();
-}
-
-function computeKpis(rows) {
-  const salesMonth = sumField(rows, "Ventas cajas físicas (sin rep)");
-  const objective = sumField(rows, "Objetivo cajas total");
-  const discounts = rows.map(function (row) {
-    return row["Porcentaje descuento"];
-  }).filter(function (value) {
-    return typeof value === "number" && Number.isFinite(value);
-  });
-
-  return {
-    salesMonth: salesMonth,
-    objective: objective,
-    compliance: objective ? salesMonth / objective : null,
-    missingBoxes: objective - salesMonth,
-    uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
-    uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
-    uniqueActivities: countUnique(rows, "ID Actividad"),
-    averageDiscount: discounts.length ? discounts.reduce(function (acc, value) { return acc + value; }, 0) / discounts.length : null,
-    activeNegotiations: rows.filter(function (row) { return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === "Vigente"; }).length
-  };
-}
-
-function renderKpis(rows) {
-  const kpis = computeKpis(rows);
-  const items = [
-    ["Total ventas cajas físicas", formatNumber(kpis.salesMonth)],
-    ["Total objetivo cajas", formatNumber(kpis.objective)],
-    ["Cumplimiento", kpis.compliance === null ? "N/A" : formatPercent(kpis.compliance)],
-    ["Cajas faltantes", formatNumber(kpis.missingBoxes)],
-    ["Clientes SAP únicos", formatInteger(kpis.uniqueClients)],
-    ["Presentaciones únicas", formatInteger(kpis.uniquePresentations)],
-    ["Actividades únicas", formatInteger(kpis.uniqueActivities)],
-    ["Descuento promedio", kpis.averageDiscount === null ? "N/A" : formatPercent(kpis.averageDiscount)],
-    ["Negociaciones vigentes", formatInteger(kpis.activeNegotiations)]
-  ];
-
-  document.getElementById("kpiGrid").innerHTML = items.map(function (item) {
-    return "<article class=\\"kpi-card\\"><span>" + escapeHtml(item[0]) + "</span><strong>" + escapeHtml(item[1]) + "</strong></article>";
-  }).join("");
-}
-
-function renderCharts(rows) {
-  renderBarChart("chartRegion", groupBySum(rows, "Región SAP", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
-  renderBarChart("chartCanal", groupBySum(rows, "Canal", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
-  renderBarChart("chartCategoria", groupBySum(rows, "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
-  renderBarChart("chartClientes", groupBySum(rows, "Cliente SAP - Clave", "Ventas cajas físicas (sin rep)").slice(0, 10), false);
-  renderBarChart("chartPresentaciones", groupBySum(rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas (sin rep)").slice(0, 10), false);
-  renderBarChart("chartCedi", complianceByField(rows, "Cedi").slice(0, 12), true);
-  renderVerticalChart("chartMes", salesByMonth(rows));
-}
-
-function renderBarChart(elementId, items, asPercent) {
-  const element = document.getElementById(elementId);
-  if (!items.length) {
-    element.innerHTML = "<div class=\\"no-data\\">No hay datos para mostrar con los filtros seleccionados.</div>";
-    return;
-  }
-
-  const max = Math.max.apply(null, items.map(function (item) { return Math.abs(item.value); })) || 1;
-  element.innerHTML = items.map(function (item) {
-    const width = Math.max(2, Math.min(100, Math.abs(item.value) / max * 100));
-    const valueText = asPercent ? formatPercent(item.value) : formatNumber(item.value);
-    return "<div class=\\"bar-row\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\">" +
-      "<div class=\\"bar-label\\">" + escapeHtml(item.label) + "</div>" +
-      "<div class=\\"bar-track\\"><div class=\\"bar-fill\\" style=\\"width:" + width.toFixed(2) + "%\\"></div></div>" +
-      "<div class=\\"bar-value\\">" + escapeHtml(valueText) + "</div>" +
-      "</div>";
-  }).join("");
-}
-
-function renderVerticalChart(elementId, items) {
-  const element = document.getElementById(elementId);
-  if (!items.length) {
-    element.innerHTML = "<div class=\\"no-data\\">No hay datos para mostrar con los filtros seleccionados.</div>";
-    return;
-  }
-
-  const max = Math.max.apply(null, items.map(function (item) { return item.value; })) || 1;
-  element.innerHTML = items.map(function (item) {
-    const height = Math.max(2, Math.min(100, item.value / max * 100));
-    const valueText = formatNumber(item.value);
-    return "<div class=\\"vbar\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\">" +
-      "<div class=\\"vbar-fill\\" style=\\"height:" + height.toFixed(2) + "%\\"></div>" +
-      "<div class=\\"vbar-label\\">" + escapeHtml(item.label) + "</div>" +
-      "</div>";
-  }).join("");
-}
-
-function renderTable() {
-  const table = document.getElementById("detailTable");
-  const rows = getTableRows();
-  const totalPages = getTotalPages(rows);
-  state.page = Math.min(state.page, totalPages);
-
-  const start = (state.page - 1) * state.pageSize;
-  const pageRows = rows.slice(start, start + state.pageSize);
-  const header = "<thead><tr>" + TABLE_COLUMNS.map(function (column) {
-    const marker = state.sortField === column ? (state.sortDir === "asc" ? " ▲" : " ▼") : "";
-    return "<th data-sort-field=\\"" + escapeHtml(column) + "\\">" + escapeHtml(column + marker) + "</th>";
-  }).join("") + "</tr></thead>";
-
-  const body = pageRows.length
-    ? "<tbody>" + pageRows.map(function (row) {
-        return "<tr>" + TABLE_COLUMNS.map(function (column) {
-          return "<td>" + escapeHtml(formatCell(row, column)) + "</td>";
-        }).join("") + "</tr>";
-      }).join("") + "</tbody>"
-    : "<tbody><tr><td colspan=\\"" + TABLE_COLUMNS.length + "\\">No hay datos para mostrar con los filtros seleccionados.</td></tr></tbody>";
-
-  table.innerHTML = header + body;
-  table.querySelectorAll("th").forEach(function (th) {
-    th.addEventListener("click", function () {
-      const field = th.dataset.sortField;
-      if (state.sortField === field) {
-        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-      } else {
-        state.sortField = field;
-        state.sortDir = NUMERIC_FIELDS.has(field) ? "desc" : "asc";
-      }
-      renderTable();
-    });
-  });
-
-  document.getElementById("pageInfo").textContent = "Página " + state.page + " de " + totalPages + " · " + formatInteger(rows.length) + " fila(s)";
-  document.getElementById("prevPageButton").disabled = state.page <= 1;
-  document.getElementById("nextPageButton").disabled = state.page >= totalPages;
-}
-
-function getTableRows() {
-  const searched = state.search
-    ? state.filteredRows.filter(function (row) {
-        return TABLE_COLUMNS.some(function (column) {
-          return normalizeText(formatCell(row, column)).toLocaleLowerCase("es-CO").includes(state.search);
-        });
-      })
-    : state.filteredRows.slice();
-
-  searched.sort(function (a, b) {
-    const aValue = valueForSort(a, state.sortField);
-    const bValue = valueForSort(b, state.sortField);
-    if (aValue < bValue) {
-      return state.sortDir === "asc" ? -1 : 1;
-    }
-    if (aValue > bValue) {
-      return state.sortDir === "asc" ? 1 : -1;
-    }
-    return 0;
-  });
-
-  return searched;
-}
-
-function applyFilters(rows, filters) {
-  return rows.filter(function (row) {
-    return Object.keys(filters).every(function (field) {
-      const selected = filters[field];
-      if (!selected) {
-        return true;
-      }
-      if (field === "Estado de vigencia") {
-        return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === selected;
-      }
-      return normalizeText(row[field]) === selected;
-    });
-  });
-}
-
-function groupBySum(rows, groupField, valueField) {
-  const grouped = new Map();
-  rows.forEach(function (row) {
-    const key = normalizeText(row[groupField]) || "Sin dato";
-    grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField]));
-  });
-  return Array.from(grouped, function (entry) {
-    return { label: entry[0], value: entry[1] };
-  }).sort(function (a, b) {
-    return b.value - a.value;
-  });
-}
-
-function getUniqueOptions(rows, field) {
-  return Array.from(new Set(rows.map(function (row) {
-    return normalizeText(row[field]);
-  }).filter(Boolean))).sort(function (a, b) {
-    return a.localeCompare(b, "es");
-  });
-}
-
-function complianceByField(rows, field) {
-  const grouped = new Map();
-  rows.forEach(function (row) {
-    const key = normalizeText(row[field]) || "Sin dato";
-    if (!grouped.has(key)) {
-      grouped.set(key, { sales: 0, objective: 0 });
-    }
-    const current = grouped.get(key);
-    current.sales += numberForCalc(row["Ventas cajas físicas (sin rep)"]);
-    current.objective += numberForCalc(row["Objetivo cajas total"]);
-  });
-  return Array.from(grouped, function (entry) {
-    return {
-      label: entry[0],
-      value: entry[1].objective ? entry[1].sales / entry[1].objective : 0
-    };
-  }).sort(function (a, b) {
-    return b.value - a.value;
-  });
-}
-
-function salesByMonth(rows) {
-  const field = rows.some(function (row) { return row["Año Mes"] !== null && row["Año Mes"] !== undefined; }) ? "Año Mes" : "Mes";
-  const grouped = groupBySum(rows, field, "Ventas cajas físicas (sin rep)");
-  return grouped.sort(function (a, b) {
-    const aNumber = Number(a.label);
-    const bNumber = Number(b.label);
-    if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) {
-      return aNumber - bNumber;
-    }
-    return String(a.label).localeCompare(String(b.label), "es");
-  });
-}
-
-function exportFilteredCsv(rows) {
-  const csvRows = [TABLE_COLUMNS.join(",")].concat(rows.map(function (row) {
-    return TABLE_COLUMNS.map(function (column) {
-      return "\\"" + String(formatCell(row, column)).replace(/"/g, "\\"\\"") + "\\"";
-    }).join(",");
-  }));
-  return csvRows.join("\\n");
-}
-
-function renderQuality() {
-  const items = [
-    ["Filas totales", DASHBOARD_QUALITY.totalRows || DASHBOARD_DATA.length],
-    ["Filas ignoradas por estar vacías", DASHBOARD_QUALITY.ignoredEmptyRows || 0],
-    ["Filas con fecha inválida", DASHBOARD_QUALITY.invalidDateRows || 0],
-    ["Filas sin NIT cliente", DASHBOARD_QUALITY.rowsWithoutNit || 0],
-    ["Filas sin cliente SAP", DASHBOARD_QUALITY.rowsWithoutSapClient || 0],
-    ["Filas sin presentación", DASHBOARD_QUALITY.rowsWithoutPresentation || 0],
-    ["Filas sin objetivo", DASHBOARD_QUALITY.rowsWithoutObjective || 0],
-    ["Filas sin ventas", DASHBOARD_QUALITY.rowsWithoutSales || 0],
-    ["Columnas extra detectadas", (DASHBOARD_QUALITY.extraColumns || []).length],
-    ["Fecha y hora de generación", formatDateTime(DASHBOARD_QUALITY.generatedAt || DASHBOARD_META.generatedAt)]
-  ];
-  document.getElementById("qualityGeneratedAt").textContent = formatDateTime(DASHBOARD_QUALITY.generatedAt || DASHBOARD_META.generatedAt);
-  document.getElementById("qualityGrid").innerHTML = items.map(function (item) {
-    return "<div class=\\"quality-item\\"><span>" + escapeHtml(item[0]) + "</span><strong>" + escapeHtml(String(item[1])) + "</strong></div>";
-  }).join("");
-}
-
-function getVigenciaStatus(fechaInicio, fechaFin) {
-  if (!fechaInicio || !fechaFin) {
-    return "Sin fechas";
-  }
-  const start = dateOnly(fechaInicio);
-  const end = dateOnly(fechaFin);
-  if (!start || !end) {
-    return "Sin fechas";
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today >= start && today <= end ? "Vigente" : "No vigente";
-}
-
-function formatCell(row, column) {
-  if (column === "Estado de vigencia") {
-    return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]);
-  }
-  const value = row[column];
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (NUMERIC_FIELDS.has(column)) {
-    if (column === "Porcentaje descuento") {
-      return formatPercent(value);
-    }
-    return formatNumber(value);
-  }
-  return String(value);
-}
-
-function valueForSort(row, field) {
-  if (field === "Estado de vigencia") {
-    return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]);
-  }
-  const value = row[field];
-  if (NUMERIC_FIELDS.has(field)) {
-    return typeof value === "number" && Number.isFinite(value) ? value : -Number.MAX_VALUE;
-  }
-  return normalizeText(value);
-}
-
-function getTotalPages(rows) {
-  return Math.max(1, Math.ceil(rows.length / state.pageSize));
-}
-
-function sumField(rows, field) {
-  return rows.reduce(function (acc, row) {
-    return acc + numberForCalc(row[field]);
-  }, 0);
-}
-
-function countUnique(rows, field) {
-  return new Set(rows.map(function (row) {
-    return normalizeText(row[field]);
-  }).filter(Boolean)).size;
-}
-
-function numberForCalc(value) {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function dateOnly(value) {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(value))) {
-    return null;
-  }
-  const parts = String(value).split("-").map(Number);
-  const date = new Date(parts[0], parts[1] - 1, parts[2]);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function normalizeText(value) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  return String(value).replace(/\\s+/g, " ").trim();
-}
-
-function formatInteger(value) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value || 0);
-}
-
-function formatNumber(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "0";
-  }
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(value);
-}
-
-function formatPercent(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return "N/A";
-  }
-  const displayValue = Math.abs(value) > 1 ? value / 100 : value;
-  return new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(displayValue);
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleString("es-CO");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-`;
-}
-
-const DASHBOARD_LOGO_DATA_URI = "data:image/png;base64,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";
-
 const DASHBOARD_FAVICON_DATA_URI = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f766e'/%3E%3Cpath d='M17 45h30M21 37V27m11 10V18m11 19V24' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Cpath d='M41 17h7v7' fill='none' stroke='%23ccfbf1' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E";
 
-/* Executive redesign overrides. The functions below intentionally replace the first version above. */
 function generateDashboardHtml(payload) {
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
   const metadata = payload.metadata || {};
@@ -1000,7 +19,7 @@ function generateDashboardHtml(payload) {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dashb</title>
+    <title>Negociaciones</title>
     <link rel="icon" type="image/svg+xml" href="${DASHBOARD_FAVICON_DATA_URI}">
     <link rel="shortcut icon" type="image/svg+xml" href="${DASHBOARD_FAVICON_DATA_URI}">
     <link rel="apple-touch-icon" href="${DASHBOARD_FAVICON_DATA_URI}">
@@ -1080,6 +99,7 @@ function generateDashboardHtml(payload) {
           <article class="chart-card"><div><h2>Top 10 presentaciones</h2><p>Presentaciones más relevantes por volumen.</p></div><div id="chartPresentaciones" class="chart"></div></article>
           <article class="chart-card"><div><h2>Cumplimiento por Cedi</h2><p>Total venta último mes frente a objetivo mes.</p></div><div id="chartCedi" class="chart"></div></article>
           <article class="chart-card chart-wide"><div><h2>Ventas por Mes / Año Mes</h2><p>Evolución temporal de total venta mes.</p></div><div id="chartMes" class="chart"></div></article>
+          <article class="chart-card chart-wide"><div><h2>Presentaciones sin ventas por categoría</h2><p>Presentaciones negociadas para las que no se encontraron ventas dentro del periodo analizado.</p><p class="chart-action-hint"><i data-lucide="mouse-pointer-click"></i> Haz clic en una categoría para ver el detalle.</p></div><div id="chartSinVentasCategoria" class="chart"></div></article>
         </section>
 
         <section id="detail" class="table-card">
@@ -1104,6 +124,21 @@ function generateDashboardHtml(payload) {
           </div>
         </section>
       </main>
+    </div>
+    <div id="detailExplorerOverlay" class="detail-explorer-overlay" hidden>
+      <section id="detailExplorerDialog" class="detail-explorer-dialog" role="dialog" aria-modal="true" aria-labelledby="detailExplorerTitle" tabindex="-1">
+        <header class="detail-explorer-header">
+          <div>
+            <p id="detailExplorerSubtitle" class="eyebrow">Exploración</p>
+            <h2 id="detailExplorerTitle">Detalle</h2>
+          </div>
+          <button id="detailExplorerClose" class="icon-button" type="button" aria-label="Cerrar detalle"><i data-lucide="x"></i></button>
+        </header>
+        <div id="detailExplorerSelectionMessage" class="detail-selection-message" hidden></div>
+        <div id="detailExplorerSummary" class="detail-summary"></div>
+        <div id="detailExplorerToolbar" class="detail-toolbar"></div>
+        <div id="detailExplorerBody" class="detail-body"></div>
+      </section>
     </div>
 
     <script>
@@ -1310,6 +345,11 @@ input:focus-visible {
 .badge-muted { border-color: var(--line); background: var(--badge-muted-bg); color: var(--badge-muted-text); }
 .badge-warn { border-color: rgba(245, 158, 11, 0.32); background: var(--amber-soft); color: var(--amber); }
 .badge-danger { border-color: rgba(239, 68, 68, 0.32); background: var(--red-soft); color: var(--red); }
+.icon-button {
+  display: inline-grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--panel); color: var(--muted); cursor: pointer; transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.icon-button:hover { background: var(--primary-soft); color: var(--primary); transform: translateY(-1px); }
 .filter-panel, .kpi-card, .chart-card, .table-card {
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow);
 }
@@ -1332,6 +372,8 @@ select, input[type="search"] {
 .filter-chip { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; padding: 0 9px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.78rem; font-weight: 800; }
 .kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
 .kpi-card { min-width: 0; padding: 16px; }
+.kpi-card.kpi-attention { border-color: rgba(245, 158, 11, 0.42); background: linear-gradient(135deg, var(--panel), var(--amber-soft)); }
+.kpi-card.kpi-attention .kpi-icon { background: var(--amber-soft); color: var(--amber); }
 .kpi-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 18px; }
 .kpi-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; background: var(--primary-soft); color: var(--primary); }
 .kpi-value { display: block; margin-bottom: 6px; overflow-wrap: anywhere; font-size: clamp(1.35rem, 2vw, 1.85rem); font-weight: 800; letter-spacing: -0.04em; }
@@ -1339,6 +381,7 @@ select, input[type="search"] {
 .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
 .chart-card { min-width: 0; min-height: 390px; padding: 18px; }
 .chart-card p { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
+.chart-action-hint { display: inline-flex; gap: 6px; align-items: center; font-weight: 800; color: var(--primary) !important; }
 .chart-wide { grid-column: 1 / -1; }
 .chart { width: 100%; min-height: 320px; height: 320px; margin-top: 14px; }
 .no-data {
@@ -1351,6 +394,10 @@ select, input[type="search"] {
 .native-track { height: 17px; overflow: hidden; border-radius: 999px; background: var(--chart-grid); }
 .native-fill { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary), #2563eb); }
 .native-row strong { color: var(--ink); font-size: 0.84rem; font-variant-numeric: tabular-nums; text-align: right; }
+.native-row[role="button"], .native-column[role="button"], .native-donut-item[role="button"] { cursor: pointer; }
+.native-row[role="button"]:focus-visible, .native-column[role="button"]:focus-visible, .native-donut-item[role="button"]:focus-visible {
+  outline: 3px solid rgba(13, 148, 136, 0.32); outline-offset: 3px;
+}
 .native-vertical { display: flex; gap: 10px; align-items: end; min-height: 305px; padding-top: 18px; overflow-x: auto; }
 .native-column { display: grid; grid-template-rows: 1fr auto; gap: 8px; align-items: end; width: max(42px, calc(100% / 16)); min-width: 42px; height: 285px; }
 .native-column-fill { display: block; width: 100%; min-height: 3px; border-radius: 9px 9px 0 0; background: linear-gradient(180deg, #2563eb, var(--primary)); }
@@ -1372,7 +419,7 @@ select, input[type="search"] {
 .table-tools { display: flex; gap: 10px; align-items: end; }
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
 table { width: 100%; min-width: 1400px; border-collapse: separate; border-spacing: 0; }
-th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); font-size: 0.86rem; text-align: left; vertical-align: top; }
+th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); font-size: 0.86rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 th {
   position: sticky; top: 0; z-index: 1; background: var(--soft-bg); color: var(--muted); cursor: pointer; font-size: 0.73rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
 }
@@ -1384,6 +431,47 @@ tbody tr:hover { background: var(--primary-soft); }
 .status-no-vigente { background: var(--soft-bg); color: var(--muted); }
 .status-sin-fechas { background: var(--amber-soft); color: var(--amber); }
 .pagination { display: flex; justify-content: flex-end; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font-weight: 800; }
+.detail-explorer-overlay {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 22px;
+  background: rgba(15, 23, 42, 0.48); backdrop-filter: blur(4px);
+}
+.detail-explorer-overlay[hidden] { display: none; }
+.detail-explorer-dialog {
+  display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr); width: min(1120px, 100%); max-height: min(86vh, 860px);
+  overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 28px 70px rgba(15, 23, 42, 0.26);
+  animation: detailDialogIn 0.16s ease-out;
+}
+@keyframes detailDialogIn { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
+.detail-explorer-header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.detail-explorer-header h2 { margin: 4px 0 0; font-size: 1.2rem; }
+.detail-selection-message { margin: 14px 20px 0; padding: 12px 14px; border: 1px solid rgba(245, 158, 11, 0.32); border-radius: 12px; background: var(--amber-soft); color: var(--amber); font-weight: 800; }
+.detail-summary { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 20px 0; color: var(--muted); }
+.detail-metric { min-width: 0; padding-right: 14px; border-right: 1px solid var(--line); }
+.detail-metric:last-child { border-right: 0; }
+.detail-metric span { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-metric strong { display: block; margin-top: 3px; color: var(--ink); font-size: 0.98rem; overflow-wrap: anywhere; }
+.detail-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) 170px auto auto auto; gap: 8px; align-items: end; padding: 12px 20px; }
+.detail-toolbar .quick-search { margin: 0; min-height: 40px; }
+.detail-toolbar label { min-width: 0; }
+.detail-body { min-height: 0; padding: 0 20px 20px; overflow: auto; }
+.detail-table-wrap { overflow: auto; max-height: min(48vh, 460px); border: 1px solid var(--line); border-radius: 14px; }
+.detail-table { min-width: 760px; }
+.detail-table tbody tr { cursor: pointer; }
+.detail-table tbody tr:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: -3px; }
+.detail-footer { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 12px; color: var(--muted); font-weight: 800; }
+.detail-card-list { display: none; gap: 10px; }
+.detail-card { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); cursor: pointer; }
+.detail-card:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: 3px; }
+.detail-card strong { color: var(--ink); }
+.detail-card span { color: var(--muted); font-size: 0.82rem; font-weight: 800; }
+.presentation-detail { display: grid; gap: 14px; }
+.detail-back-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.detail-section { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
+.detail-section h3 { margin: 0; font-size: 0.92rem; }
+.detail-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; }
+.detail-field { min-width: 0; }
+.detail-field span { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.detail-field strong { display: block; margin-top: 5px; color: var(--ink); overflow-wrap: anywhere; }
 .extra-columns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .extra-chip { display: inline-flex; min-height: 28px; align-items: center; padding: 0 9px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 0.78rem; font-weight: 800; }
 @media (max-width: 1180px) {
@@ -1406,6 +494,11 @@ tbody tr:hover { background: var(--primary-soft); }
   .executive-header, .panel-heading { display: grid; }
   .header-actions, .active-filters { justify-content: flex-start; max-width: none; }
   .filters-grid, .charts-grid, .sidebar-nav { grid-template-columns: 1fr; }
+  .detail-explorer-overlay { padding: 8px; place-items: stretch; }
+  .detail-explorer-dialog { width: 100%; max-height: calc(100vh - 16px); border-radius: 16px; }
+  .detail-toolbar { grid-template-columns: 1fr; }
+  .detail-table-wrap { display: none; }
+  .detail-card-list { display: grid; }
 }
 @media (max-width: 560px) {
   .kpi-grid { grid-template-columns: 1fr; }
@@ -1424,17 +517,72 @@ const FILTER_FIELDS = [
   { field: "Cedi", label: "Cedi" },
   { field: "Estado de vigencia", label: "Estado de vigencia" }
 ];
+const SALES_INFORMATION_STATUS = {
+  WITHOUT_SALES_INFO: "SIN_INFORMACION_VENTA",
+  ZERO_SALE: "VENTA_CERO",
+  WITH_SALE: "CON_VENTA"
+};
 const TABLE_COLUMNS = [
   "Año", "Mes", "Canal", "Categoría AS400 de la venta", "Región SAP", "Cedi",
   "Cliente SAP - Clave", "Presentación AS400 de la venta - Texto",
   "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes ", "Objetivo cajas total",
   "Porcentaje descuento", "Fecha inicio", "Fecha fin", "Estado de vigencia"
 ];
+const WITHOUT_SALES_DETAIL_COLUMNS = [
+  "Cliente SAP - Clave",
+  "Cliente AS400 - Nombre negocio (Texto)",
+  "Cliente AS400 - Texto",
+  "ID Actividad",
+  "Categoría AS400 de la venta",
+  "Presentación AS400 de la venta - Texto",
+  "Presentación AS400 de la venta - Clave",
+  "Objetivo mes ",
+  "Objetivo cajas total",
+  "Tipo descuento",
+  "Porcentaje descuento",
+  "Fecha inicio",
+  "Fecha fin",
+  "Cedi"
+];
+const NO_SALES_EXPLORER_COLUMNS = [
+  { id: "presentation", label: "Presentación" },
+  { id: "client", label: "Cliente" },
+  { id: "activity", label: "Actividad" },
+  { id: "objectiveMonth", label: "Objetivo mes", numeric: true },
+  { id: "endDate", label: "Fecha fin" }
+];
+const NO_SALES_EXPLORER_SORT_OPTIONS = [
+  { field: "presentation", label: "Presentación", dir: "asc" },
+  { field: "objectiveMonth", label: "Objetivo mes", dir: "desc" },
+  { field: "objectiveTotal", label: "Objetivo total", dir: "desc" },
+  { field: "endDate", label: "Fecha fin", dir: "asc" }
+];
+const DETAIL_EXPLORER_VISIBLE_STEP = 60;
+const DETAIL_EXPLORER_FOCUSABLE = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
+const SEARCH_FIELDS = Array.from(new Set(TABLE_COLUMNS.concat(WITHOUT_SALES_DETAIL_COLUMNS)));
 const NUMERIC_FIELDS = new Set(["Año", "Año Mes", "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes ", "Objetivo cajas total", "Porcentaje descuento"]);
+const CATEGORY_FIELDS = [
+  "Categoría AS400 de la venta",
+  "Categoria AS400 de la venta",
+  "Categoría AS400 de venta",
+  "Categoria AS400 de venta",
+  "Categoría AS400",
+  "Categoria AS400",
+  "Categoría",
+  "Categoria"
+];
 const DASHBOARD_THEME_KEY = "negotiationsDashboardTheme";
+const NO_SALES_WITHOUT_CATEGORY_MESSAGE = "Hay presentaciones sin ventas, pero no tienen una categoría disponible para realizar la agrupación.";
 const chartInstances = {};
 const debouncedResizeCharts = debounce(resizeCharts, 160);
-const state = { filters: {}, filteredRows: [], search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc" };
+const state = { filters: {}, filteredRows: [], noSalesAnalysis: getEmptyNoSalesAnalysis(), detailExplorer: getEmptyDetailExplorerState(), search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc" };
+const chartDrilldowns = {
+  noSalesByCategory: {
+    open: function (category, sourceElement, analysis) {
+      openNoSalesCategoryDetail(category, analysis || state.noSalesAnalysis, sourceElement);
+    }
+  }
+};
 document.addEventListener("DOMContentLoaded", initDashboard);
 
 function initDashboard() {
@@ -1445,6 +593,7 @@ function initDashboard() {
   populateFilters();
   bindEvents();
   window.addEventListener("resize", debouncedResizeCharts);
+  window.addEventListener("beforeunload", disposeCharts);
   waitForECharts(renderAll);
   refreshIcons();
 }
@@ -1480,7 +629,7 @@ function applyTheme(theme, persist) {
 }
 function toggleTheme() {
   applyTheme(getCurrentTheme() === "dark" ? "light" : "dark");
-  if (state.filteredRows.length) renderCharts(state.filteredRows);
+  if (state.filteredRows.length) renderCharts(state.filteredRows, state.noSalesAnalysis);
   refreshIcons();
 }
 function updateThemeToggle(theme) {
@@ -1549,7 +698,7 @@ function validateDashboardDataShape(rows) {
     console.warn("DASHBOARD_DATA no contiene filas.");
     return false;
   }
-  const requiredFields = ["Región SAP", "Canal", "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes "];
+  const requiredFields = ["Región SAP", "Canal", "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes ", "estadoInformacionVenta"];
   requiredFields.forEach(function (field) {
     if (!(field in rows[0])) {
       console.warn("Campo no encontrado en DASHBOARD_DATA:", field);
@@ -1560,6 +709,7 @@ function validateDashboardDataShape(rows) {
 function bindEvents() {
   const themeToggle = document.getElementById("themeToggle");
   if (themeToggle) themeToggle.addEventListener("click", toggleTheme);
+  bindDetailExplorerEvents();
   document.getElementById("clearFiltersButton").addEventListener("click", clearFilters);
   document.getElementById("globalSearchInput").addEventListener("input", function (event) {
     state.search = event.target.value.trim().toLocaleLowerCase("es-CO");
@@ -1607,8 +757,14 @@ function getRegionContext(rows) {
 }
 function populateFilters() {
   const container = document.getElementById("filtersGrid");
-  container.innerHTML = FILTER_FIELDS.map(function (item) {
-    const options = item.field === "Estado de vigencia" ? ["Vigente", "No vigente", "Sin fechas"] : getUniqueOptions(DASHBOARD_DATA, item.field);
+  const filterConfigs = FILTER_FIELDS.map(function (item) {
+    return { item: item, options: getUniqueOptions(DASHBOARD_DATA, item.field) };
+  }).filter(function (config) {
+    return config.options.length > 0;
+  });
+  container.innerHTML = filterConfigs.map(function (config) {
+    const item = config.item;
+    const options = config.options;
     return "<label>" + escapeHtml(item.label) + "<select data-filter-field=\\"" + escapeHtml(item.field) + "\\"><option value=\\"\\">Todos</option>" + options.map(function (option) {
       return "<option value=\\"" + escapeHtml(option) + "\\">" + escapeHtml(option) + "</option>";
     }).join("") + "</select></label>";
@@ -1631,10 +787,12 @@ function clearFilters() {
 }
 function renderAll() {
   state.filteredRows = applySearch(applyFilters(DASHBOARD_DATA, state.filters));
+  state.noSalesAnalysis = getNoSalesAnalysis(state.filteredRows);
   renderActiveFilters();
-  renderKpis(state.filteredRows);
-  renderCharts(state.filteredRows);
+  renderKpis(state.filteredRows, state.noSalesAnalysis);
+  renderCharts(state.filteredRows, state.noSalesAnalysis);
   renderTable();
+  syncOpenDetailExplorer();
   refreshIcons();
 }
 function renderActiveFilters() {
@@ -1656,12 +814,14 @@ function applyChartFilter(field, value) {
   state.page = 1;
   renderAll();
 }
-function computeKpis(rows) {
+function computeKpis(rows, noSalesAnalysis) {
   const salesPeriod = sumUniqueTotalSalesMonth(rows);
   const latestMonthRows = getLatestYearMonthRows(rows);
   const salesMonth = sumUniqueTotalSalesMonth(latestMonthRows);
   const objective = sumUniqueActivityObjective(rows);
   const discounts = rows.map(function (row) { return row["Porcentaje descuento"]; }).filter(isFiniteNumber);
+  const analysis = noSalesAnalysis || getNoSalesAnalysis(rows);
+  const negotiatedPresentationCount = countUniqueBy(rows.filter(hasNegotiatedPresentationReference), getNegotiatedPresentationKey);
   return {
     salesPeriod: salesPeriod,
     salesMonth: salesMonth,
@@ -1672,17 +832,23 @@ function computeKpis(rows) {
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
     averageDiscount: discounts.length ? discounts.reduce(function (acc, value) { return acc + value; }, 0) / discounts.length : null,
-    activeNegotiations: rows.filter(function (row) { return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === "Vigente"; }).length
+    activeNegotiations: rows.filter(function (row) { return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === "Vigente"; }).length,
+    presentationsWithoutSales: analysis.presentationCount,
+    percentPresentationsWithoutSales: negotiatedPresentationCount ? analysis.presentationCount / negotiatedPresentationCount : null,
+    affectedActivities: analysis.activityCount || null,
+    affectedClients: analysis.clientCount || null
   };
 }
-function renderKpis(rows) {
-  const k = computeKpis(rows);
+function renderKpis(rows, noSalesAnalysis) {
+  const k = computeKpis(rows, noSalesAnalysis);
+  const withoutSalesDescription = buildWithoutSalesKpiDescription(k);
   const items = [
     ["shopping-bag", "Total ventas periodo", formatNumber(k.salesPeriod), "Cliente SAP y Año Mes del periodo"],
     ["calendar-days", "Total venta último mes", formatNumber(k.salesMonth), "Último Año Mes filtrado"],
     ["target", "Objetivo mes", formatNumber(k.objective), "Una vez por actividad"],
     ["gauge", "Cumplimiento", k.compliance === null ? "N/A" : formatRatioPercent(k.compliance), "Avance sobre objetivo"],
     ["package-minus", "Cajas faltantes", formatNumber(k.missingBoxes), "Objetivo mes menos total venta último mes"],
+    ["package-x", "Presentaciones sin ventas en el periodo", formatInteger(k.presentationsWithoutSales), withoutSalesDescription, "kpi-attention"],
     ["users", "Clientes SAP únicos", formatInteger(k.uniqueClients), "Cliente SAP distintos"],
     ["boxes", "Presentaciones únicas", formatInteger(k.uniquePresentations), "Claves de presentación"],
     ["badge-check", "Actividades únicas", formatInteger(k.uniqueActivities), "ID Actividad distintos"],
@@ -1690,10 +856,24 @@ function renderKpis(rows) {
     ["calendar-check", "Negociaciones vigentes", formatInteger(k.activeNegotiations), "Filas activas hoy"]
   ];
   document.getElementById("kpis").innerHTML = items.map(function (item) {
-    return "<article class=\\"kpi-card\\"><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-lucide=\\"" + item[0] + "\\"></i></span><span class=\\"badge badge-muted\\">Filtrado</span></div><span class=\\"kpi-label\\">" + escapeHtml(item[1]) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item[2]) + "</strong><p class=\\"kpi-description\\">" + escapeHtml(item[3]) + "</p></article>";
+    const className = item[4] ? "kpi-card " + item[4] : "kpi-card";
+    return "<article class=\\"" + className + "\\"><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-lucide=\\"" + item[0] + "\\"></i></span><span class=\\"badge badge-muted\\">Filtrado</span></div><span class=\\"kpi-label\\">" + escapeHtml(item[1]) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item[2]) + "</strong><p class=\\"kpi-description\\">" + escapeHtml(item[3]) + "</p></article>";
   }).join("");
 }
-function renderCharts(rows) {
+function buildWithoutSalesKpiDescription(kpi) {
+  const details = [];
+  if (isFiniteNumber(kpi.percentPresentationsWithoutSales)) {
+    details.push(formatRatioPercent(kpi.percentPresentationsWithoutSales) + " de presentaciones negociadas");
+  }
+  if (kpi.affectedActivities) {
+    details.push(formatInteger(kpi.affectedActivities) + " actividad(es)");
+  }
+  if (kpi.affectedClients) {
+    details.push(formatInteger(kpi.affectedClients) + " cliente(s)");
+  }
+  return details.length ? details.join(" · ") : "Sin ventas encontradas dentro del periodo analizado";
+}
+function renderCharts(rows, noSalesAnalysis) {
   disposeCharts();
   if (!rows.length) {
     renderAllChartEmptyStates("No hay datos para mostrar con los filtros seleccionados.");
@@ -1707,6 +887,24 @@ function renderCharts(rows) {
   renderChartFromFields("chartPresentaciones", "bar", rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas (sin rep)", false, true, 10);
   renderChart("chartCedi", "bar", groupComplianceByCedi(rows).slice(0, 12), true, true, "Cedi");
   renderChart("chartMes", "line", salesByMonth(rows), false, false, monthField);
+  renderNoSalesCategoryChart(noSalesAnalysis || getNoSalesAnalysis(rows));
+}
+function renderNoSalesCategoryChart(noSalesAnalysis) {
+  const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
+  if (analysis.presentationCount > 0 && !analysis.byCategory.length) {
+    renderChartMessage("chartSinVentasCategoria", NO_SALES_WITHOUT_CATEGORY_MESSAGE);
+    return;
+  }
+  renderChart("chartSinVentasCategoria", "bar", analysis.byCategory, false, true, null, {
+    showLabels: true,
+    integerValues: true,
+    includePercentTooltip: true,
+    tooltipNote: "Sin ventas significa que no se encontraron ventas dentro del periodo analizado.",
+    onClick: function (category, eventInfo) {
+      chartDrilldowns.noSalesByCategory.open(category, eventInfo && eventInfo.sourceElement, analysis);
+    },
+    actionLabel: "Ver presentaciones sin ventas de"
+  });
 }
 function renderChartFromFields(elementId, type, rows, groupField, valueField, asPercent, horizontal, limit) {
   if (!hasField(rows, groupField) || !hasField(rows, valueField)) {
@@ -1728,7 +926,7 @@ function renderChartMessage(elementId, message) {
     console.warn("No se encontró el contenedor de gráfica:", elementId);
   }
 }
-function renderChart(elementId, type, items, asPercent, horizontal, filterField) {
+function renderChart(elementId, type, items, asPercent, horizontal, filterField, options) {
   const element = document.getElementById(elementId);
   if (!element) {
     console.warn("No se encontró el contenedor de gráfica:", elementId);
@@ -1741,7 +939,7 @@ function renderChart(elementId, type, items, asPercent, horizontal, filterField)
   }
   if (!window.echarts) {
     console.warn("ECharts no está disponible. Se usa renderizado nativo para", elementId);
-    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField);
+    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField, options || {});
     return;
   }
   if (chartInstances[elementId]) {
@@ -1755,8 +953,16 @@ function renderChart(elementId, type, items, asPercent, horizontal, filterField)
   element.innerHTML = "";
   try {
     const chart = window.echarts.init(element, null, { renderer: "canvas" });
-    chart.setOption(buildEChartOption(type, chartItems, asPercent, horizontal), true);
-    if (filterField) {
+    chart.setOption(buildEChartOption(type, chartItems, asPercent, horizontal, options || {}), true);
+    if (chart.off) chart.off("click");
+    if (options && typeof options.onClick === "function") {
+      element.style.cursor = "pointer";
+      chart.on("click", function (params) {
+        if (!params || !params.name) return;
+        if (params.componentType && params.componentType !== "series") return;
+        options.onClick(String(params.name), { params: params, sourceElement: element });
+      });
+    } else if (filterField) {
       element.style.cursor = "pointer";
       chart.on("click", function (params) {
         if (params && params.name) applyChartFilter(filterField, String(params.name));
@@ -1768,7 +974,7 @@ function renderChart(elementId, type, items, asPercent, horizontal, filterField)
   } catch (error) {
     console.warn("Error renderizando gráfica con ECharts. Se usa renderizado nativo para", elementId, error);
     delete chartInstances[elementId];
-    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField);
+    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField, options || {});
   }
 }
 function getChartThemeColors() {
@@ -1783,9 +989,11 @@ function getChartThemeColors() {
     colors: isDark ? ["#2dd4bf", "#60a5fa", "#34d399", "#a78bfa", "#38bdf8", "#5eead4"] : ["#0d9488", "#2563eb", "#059669", "#4f46e5", "#0284c7", "#14b8a6"]
   };
 }
-function buildEChartOption(type, items, asPercent, horizontal) {
+function buildEChartOption(type, items, asPercent, horizontal, options) {
+  options = options || {};
   const labels = items.map(function (item) { return item.label; });
-  const values = items.map(function (item) { return roundNumber(item.value); });
+  const values = items.map(function (item) { return roundChartValue(item.value, options); });
+  const total = values.reduce(function (acc, value) { return acc + Math.max(0, numberForCalc(value)); }, 0);
   const theme = getChartThemeColors();
   const colors = theme.colors;
   const tooltip = {
@@ -1793,10 +1001,11 @@ function buildEChartOption(type, items, asPercent, horizontal) {
     borderColor: theme.tooltipBorder,
     textStyle: { color: theme.tooltipText, fontWeight: 700 }
   };
+  const valueFormatter = function (value) { return formatChartValue(value, asPercent, options); };
   if (type === "donut") {
     return {
       color: colors,
-      tooltip: Object.assign({ trigger: "item", valueFormatter: function (value) { return formatNumber(value); } }, tooltip),
+      tooltip: Object.assign({ trigger: "item", valueFormatter: valueFormatter }, tooltip),
       legend: { type: "scroll", bottom: 0, textStyle: { color: theme.muted, fontWeight: 700 } },
       series: [{
         type: "pie",
@@ -1811,16 +1020,33 @@ function buildEChartOption(type, items, asPercent, horizontal) {
   if (type === "line") {
     return {
       color: colors,
-      tooltip: Object.assign({ trigger: "axis", valueFormatter: function (value) { return formatNumber(value); } }, tooltip),
+      tooltip: Object.assign({ trigger: "axis", valueFormatter: valueFormatter }, tooltip),
       grid: { left: 18, right: 18, top: 28, bottom: 42, containLabel: true },
       xAxis: { type: "category", data: labels, axisLabel: { color: theme.muted, fontWeight: 700 }, axisLine: { lineStyle: { color: theme.grid } } },
       yAxis: { type: "value", axisLabel: { color: theme.muted, formatter: compactNumber }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } },
       series: [{ type: "line", smooth: true, symbolSize: 7, areaStyle: { opacity: 0.16 }, lineStyle: { width: 3 }, data: values }]
     };
   }
+  const barTooltip = options.includePercentTooltip
+    ? {
+        trigger: "axis",
+        axisPointer: { type: "shadow" },
+        formatter: function (params) {
+          const point = Array.isArray(params) ? params[0] : params;
+          const value = numberForCalc(point && point.value);
+          const percent = total ? value / total : 0;
+          const label = point && point.name ? point.name : "";
+          const note = options.tooltipNote ? "<br><span style=\\"font-weight:600;color:" + theme.muted + "\\">" + escapeHtml(options.tooltipNote) + "</span>" : "";
+          return "<strong>" + escapeHtml(label) + "</strong><br>Cantidad: " + escapeHtml(formatChartValue(value, asPercent, options)) + "<br>Porcentaje: " + escapeHtml(formatRatioPercent(percent)) + note;
+        }
+      }
+    : { trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: valueFormatter };
+  const barLabel = options.showLabels
+    ? { show: true, position: horizontal ? "right" : "top", color: theme.text, fontWeight: 800, formatter: function (params) { return formatChartValue(params.value, asPercent, options); } }
+    : undefined;
   return {
     color: colors,
-    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: function (value) { return asPercent ? formatRatioPercent(value) : formatNumber(value); } }, tooltip),
+    tooltip: Object.assign(barTooltip, tooltip),
     grid: { left: 18, right: 18, top: 24, bottom: 28, containLabel: true },
     xAxis: horizontal
       ? { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatRatioPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } }
@@ -1828,7 +1054,7 @@ function buildEChartOption(type, items, asPercent, horizontal) {
     yAxis: horizontal
       ? { type: "category", data: labels.slice().reverse(), axisLabel: { color: theme.muted, fontWeight: 700, width: 120, overflow: "truncate" }, axisLine: { lineStyle: { color: theme.grid } } }
       : { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatRatioPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } },
-    series: [{ type: "bar", barMaxWidth: 28, itemStyle: { borderRadius: horizontal ? [0, 8, 8, 0] : [8, 8, 0, 0] }, data: horizontal ? values.slice().reverse() : values }]
+    series: [{ type: "bar", barMaxWidth: 28, label: barLabel, itemStyle: { borderRadius: horizontal ? [0, 8, 8, 0] : [8, 8, 0, 0] }, data: horizontal ? values.slice().reverse() : values }]
   };
 }
 function disposeCharts() {
@@ -1864,7 +1090,7 @@ function resizeCharts() {
   });
 }
 function renderAllChartEmptyStates(message) {
-  ["chartRegion", "chartCanal", "chartCategoria", "chartClientes", "chartPresentaciones", "chartCedi", "chartMes"].forEach(function (id) {
+  ["chartRegion", "chartCanal", "chartCategoria", "chartClientes", "chartPresentaciones", "chartCedi", "chartMes", "chartSinVentasCategoria"].forEach(function (id) {
     const element = document.getElementById(id);
     if (element) element.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(message) + "</div>";
   });
@@ -1873,12 +1099,12 @@ function normalizeChartItems(items) {
   return (items || [])
     .map(function (item) {
       return {
-        label: normalizeText(item.label) || "Sin dato",
+        label: normalizeText(item.label),
         value: numberForCalc(item.value)
       };
     })
     .filter(function (item) {
-      return Number.isFinite(item.value);
+      return item.label && Number.isFinite(item.value);
     });
 }
 function hasRenderableChartData(items) {
@@ -1886,44 +1112,553 @@ function hasRenderableChartData(items) {
     return Math.abs(item.value) > 0;
   });
 }
-function renderNativeChart(element, type, items, asPercent, horizontal, filterField) {
+function renderNativeChart(element, type, items, asPercent, horizontal, filterField, options) {
+  options = options || {};
   if (type === "donut") {
-    renderNativeDonutChart(element, items, asPercent, filterField);
-    bindNativeChartFilters(element);
+    renderNativeDonutChart(element, items, asPercent, filterField, options);
+    bindNativeChartInteractions(element, options);
     return;
   }
-  renderNativeBarChart(element, items, asPercent, horizontal, filterField);
-  bindNativeChartFilters(element);
+  renderNativeBarChart(element, items, asPercent, horizontal, filterField, options);
+  bindNativeChartInteractions(element, options);
 }
-function renderNativeBarChart(element, items, asPercent, horizontal, filterField) {
+function renderNativeBarChart(element, items, asPercent, horizontal, filterField, options) {
+  options = options || {};
   const max = Math.max.apply(null, items.map(function (item) { return Math.abs(item.value); })) || 1;
+  const total = items.reduce(function (acc, item) { return acc + Math.max(0, item.value); }, 0);
   element.innerHTML = "<div class=\\"native-chart " + (horizontal ? "native-horizontal" : "native-vertical") + "\\">" + items.map(function (item) {
     const size = Math.max(3, Math.min(100, Math.abs(item.value) / max * 100));
-    const valueText = asPercent ? formatRatioPercent(item.value) : formatNumber(item.value);
-    const filterAttrs = filterField ? " data-chart-filter-field=\\"" + escapeHtml(filterField) + "\\" data-chart-filter-value=\\"" + escapeHtml(item.label) + "\\"" : "";
+    const valueText = formatChartValue(item.value, asPercent, options);
+    const percentText = options.includePercentTooltip && total ? " · " + formatRatioPercent(item.value / total) : "";
+    const titleText = item.label + ": " + valueText + percentText + (options.tooltipNote ? ". " + options.tooltipNote : "");
+    const interactionAttrs = buildNativeChartInteractionAttrs(filterField, item.label, options);
     if (horizontal) {
-      return "<div class=\\"native-row\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"" + filterAttrs + "><span class=\\"native-label\\">" + escapeHtml(item.label) + "</span><span class=\\"native-track\\"><span class=\\"native-fill\\" style=\\"width:" + size.toFixed(2) + "%\\"></span></span><strong>" + escapeHtml(valueText) + "</strong></div>";
+      return "<div class=\\"native-row\\" title=\\"" + escapeHtml(titleText) + "\\"" + interactionAttrs + "><span class=\\"native-label\\">" + escapeHtml(item.label) + "</span><span class=\\"native-track\\"><span class=\\"native-fill\\" style=\\"width:" + size.toFixed(2) + "%\\"></span></span><strong>" + escapeHtml(valueText) + "</strong></div>";
     }
-    return "<div class=\\"native-column\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"" + filterAttrs + "><span class=\\"native-column-fill\\" style=\\"height:" + size.toFixed(2) + "%\\"></span><small>" + escapeHtml(item.label) + "</small></div>";
+    return "<div class=\\"native-column\\" title=\\"" + escapeHtml(titleText) + "\\"" + interactionAttrs + "><span class=\\"native-column-fill\\" style=\\"height:" + size.toFixed(2) + "%\\"></span><small>" + escapeHtml(item.label) + "</small></div>";
   }).join("") + "</div>";
 }
-function renderNativeDonutChart(element, items, asPercent, filterField) {
+function renderNativeDonutChart(element, items, asPercent, filterField, options) {
+  options = options || {};
   const total = items.reduce(function (acc, item) { return acc + Math.max(0, item.value); }, 0);
   const topItems = items.slice(0, 6);
   element.innerHTML = "<div class=\\"native-donut\\"><div class=\\"native-donut-center\\"><strong>" + escapeHtml(formatNumber(total)) + "</strong><span>Total</span></div><div class=\\"native-donut-list\\">" + topItems.map(function (item, index) {
-    const valueText = asPercent ? formatRatioPercent(item.value) : formatNumber(item.value);
+    const valueText = formatChartValue(item.value, asPercent, options);
     const percent = total ? Math.max(0, item.value) / total * 100 : 0;
-    const filterAttrs = filterField ? " data-chart-filter-field=\\"" + escapeHtml(filterField) + "\\" data-chart-filter-value=\\"" + escapeHtml(item.label) + "\\"" : "";
-    return "<div class=\\"native-donut-item\\"" + filterAttrs + "><span class=\\"native-swatch swatch-" + index + "\\"></span><span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(valueText) + "</strong><small>" + percent.toFixed(1) + "%</small></div>";
+    const interactionAttrs = buildNativeChartInteractionAttrs(filterField, item.label, options);
+    return "<div class=\\"native-donut-item\\"" + interactionAttrs + "><span class=\\"native-swatch swatch-" + index + "\\"></span><span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(valueText) + "</strong><small>" + percent.toFixed(1) + "%</small></div>";
   }).join("") + "</div></div>";
 }
-function bindNativeChartFilters(element) {
-  element.querySelectorAll("[data-chart-filter-field]").forEach(function (node) {
-    node.style.cursor = "pointer";
-    node.addEventListener("click", function () {
-      applyChartFilter(node.dataset.chartFilterField, node.dataset.chartFilterValue);
+function buildNativeChartInteractionAttrs(filterField, value, options) {
+  const label = normalizeText(value);
+  if (options && typeof options.onClick === "function") {
+    const actionLabel = options.actionLabel || "Ver detalle de";
+    return " role=\\"button\\" tabindex=\\"0\\" aria-label=\\"" + escapeHtml(actionLabel + " " + label) + "\\" data-chart-drilldown-value=\\"" + escapeHtml(label) + "\\"";
+  }
+  return filterField ? " role=\\"button\\" tabindex=\\"0\\" aria-label=\\"Filtrar por " + escapeHtml(label) + "\\" data-chart-filter-field=\\"" + escapeHtml(filterField) + "\\" data-chart-filter-value=\\"" + escapeHtml(label) + "\\"" : "";
+}
+function bindNativeChartInteractions(element, options) {
+  element.querySelectorAll("[data-chart-filter-field], [data-chart-drilldown-value]").forEach(function (node) {
+    const activate = function () {
+      if (node.dataset.chartDrilldownValue && options && typeof options.onClick === "function") {
+        options.onClick(node.dataset.chartDrilldownValue, { sourceElement: node });
+      } else if (node.dataset.chartFilterField) {
+        applyChartFilter(node.dataset.chartFilterField, node.dataset.chartFilterValue);
+      }
+    };
+    node.addEventListener("click", activate);
+    node.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        activate();
+      }
     });
   });
+}
+function getEmptyDetailExplorerState() {
+  return {
+    isOpen: false,
+    type: "",
+    category: "",
+    config: null,
+    allRows: [],
+    query: "",
+    sortField: "presentation",
+    sortDir: "asc",
+    visibleCount: DETAIL_EXPLORER_VISIBLE_STEP,
+    selectedKey: "",
+    selectedRow: null,
+    opener: null,
+    message: ""
+  };
+}
+function getDetailExplorerState() {
+  return state.detailExplorer;
+}
+function setDetailExplorerQuery(query) {
+  if (!state.detailExplorer.isOpen) return;
+  state.detailExplorer.query = query || "";
+  state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+  state.detailExplorer.selectedKey = "";
+  state.detailExplorer.selectedRow = null;
+  renderDetailExplorer();
+}
+function setDetailExplorerSort(field, dir) {
+  if (!state.detailExplorer.isOpen) return;
+  state.detailExplorer.sortField = field || state.detailExplorer.sortField;
+  state.detailExplorer.sortDir = dir === "desc" ? "desc" : "asc";
+  renderDetailExplorer();
+}
+function bindDetailExplorerEvents() {
+  const overlay = document.getElementById("detailExplorerOverlay");
+  if (!overlay) return;
+  const closeButton = document.getElementById("detailExplorerClose");
+  if (closeButton) closeButton.addEventListener("click", closeDetailExplorer);
+  overlay.addEventListener("mousedown", function (event) {
+    if (event.target === overlay) closeDetailExplorer();
+  });
+  overlay.addEventListener("input", function (event) {
+    if (event.target && event.target.id === "detailExplorerSearch") {
+      state.detailExplorer.query = event.target.value;
+      state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+      state.detailExplorer.selectedKey = "";
+      state.detailExplorer.selectedRow = null;
+      renderDetailExplorer();
+    }
+  });
+  overlay.addEventListener("change", function (event) {
+    if (event.target && event.target.id === "detailExplorerSort") {
+      const option = getDetailExplorerSortOption(event.target.value);
+      state.detailExplorer.sortField = option.field;
+      state.detailExplorer.sortDir = option.dir;
+      state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+      renderDetailExplorer();
+    }
+  });
+  overlay.addEventListener("click", handleDetailExplorerClick);
+  overlay.addEventListener("keydown", handleDetailExplorerKeydown);
+  document.addEventListener("keydown", handleDetailExplorerDocumentKeydown);
+}
+function handleDetailExplorerClick(event) {
+  const target = event.target && event.target.closest ? event.target.closest("[data-detail-action], [data-detail-row-key]") : null;
+  if (!target) return;
+  const action = target.dataset.detailAction;
+  if (action === "clear-search") {
+    state.detailExplorer.query = "";
+    state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+    renderDetailExplorer();
+    return;
+  }
+  if (action === "show-more") {
+    state.detailExplorer.visibleCount += DETAIL_EXPLORER_VISIBLE_STEP;
+    renderDetailExplorer();
+    return;
+  }
+  if (action === "back-list") {
+    state.detailExplorer.selectedKey = "";
+    state.detailExplorer.selectedRow = null;
+    renderDetailExplorer();
+    return;
+  }
+  if (action === "sort-dir") {
+    state.detailExplorer.sortDir = state.detailExplorer.sortDir === "asc" ? "desc" : "asc";
+    renderDetailExplorer();
+    return;
+  }
+  if (action === "export-csv") {
+    exportDetailExplorerCsv();
+    return;
+  }
+  const rowKey = target.dataset.detailRowKey;
+  if (rowKey) selectDetailExplorerRow(rowKey);
+}
+function handleDetailExplorerKeydown(event) {
+  const target = event.target && event.target.closest ? event.target.closest("[data-detail-row-key]") : null;
+  if (target && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    selectDetailExplorerRow(target.dataset.detailRowKey);
+  }
+}
+function handleDetailExplorerDocumentKeydown(event) {
+  if (!state.detailExplorer.isOpen) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeDetailExplorer();
+    return;
+  }
+  if (event.key === "Tab") trapDetailExplorerFocus(event);
+}
+function openNoSalesCategoryDetail(category, noSalesAnalysis, opener, options) {
+  const config = buildNoSalesCategoryDetailConfig(category, noSalesAnalysis || state.noSalesAnalysis);
+  openDetailExplorer(config, opener || document.activeElement, options);
+}
+function syncOpenDetailExplorer() {
+  if (!state.detailExplorer.isOpen || state.detailExplorer.type !== "noSalesCategory") return;
+  const category = state.detailExplorer.category;
+  const config = buildNoSalesCategoryDetailConfig(category, state.noSalesAnalysis);
+  const message = config.rows.length ? "" : "La selección anterior ya no tiene datos con los filtros actuales.";
+  openDetailExplorer(config, state.detailExplorer.opener, { preserveState: true, skipFocus: true, message: message });
+}
+function openDetailExplorer(config, opener, options) {
+  options = options || {};
+  const previous = state.detailExplorer;
+  const preserve = options.preserveState && previous.isOpen && previous.type === config.type && previous.category === config.category;
+  state.detailExplorer = {
+    isOpen: true,
+    type: config.type,
+    category: config.category || "",
+    config: config,
+    allRows: (config.rows || []).slice(),
+    query: preserve ? previous.query : "",
+    sortField: preserve ? previous.sortField : config.defaultSortField,
+    sortDir: preserve ? previous.sortDir : config.defaultSortDir,
+    visibleCount: preserve ? previous.visibleCount : DETAIL_EXPLORER_VISIBLE_STEP,
+    selectedKey: preserve ? previous.selectedKey : "",
+    selectedRow: preserve ? previous.selectedRow : null,
+    opener: opener || previous.opener || null,
+    message: options.message || ""
+  };
+  if (state.detailExplorer.selectedKey) {
+    state.detailExplorer.selectedRow = state.detailExplorer.allRows.find(function (row, index) {
+      return config.rowKey(row, index) === state.detailExplorer.selectedKey;
+    }) || null;
+    if (!state.detailExplorer.selectedRow) state.detailExplorer.selectedKey = "";
+  }
+  renderDetailExplorer();
+  const overlay = document.getElementById("detailExplorerOverlay");
+  const dialog = document.getElementById("detailExplorerDialog");
+  if (overlay) overlay.hidden = false;
+  if (!options.skipFocus && dialog && dialog.focus) dialog.focus();
+  refreshIcons();
+}
+function closeDetailExplorer() {
+  const opener = state.detailExplorer.opener;
+  state.detailExplorer = getEmptyDetailExplorerState();
+  const overlay = document.getElementById("detailExplorerOverlay");
+  if (overlay) overlay.hidden = true;
+  ["detailExplorerSummary", "detailExplorerToolbar", "detailExplorerBody", "detailExplorerSelectionMessage"].forEach(function (id) {
+    const element = document.getElementById(id);
+    if (element) element.innerHTML = "";
+  });
+  if (opener && opener.focus) opener.focus();
+}
+function renderDetailExplorer() {
+  const explorer = state.detailExplorer;
+  if (!explorer.isOpen || !explorer.config) return;
+  const title = document.getElementById("detailExplorerTitle");
+  const subtitle = document.getElementById("detailExplorerSubtitle");
+  const message = document.getElementById("detailExplorerSelectionMessage");
+  if (title) title.textContent = explorer.config.title;
+  if (subtitle) subtitle.textContent = explorer.config.subtitle || "Exploración";
+  if (message) {
+    message.hidden = !explorer.message;
+    message.textContent = explorer.message;
+  }
+  renderDetailExplorerSummary();
+  renderDetailExplorerToolbar();
+  if (explorer.selectedRow) renderDetailExplorerPresentationDetail();
+  else renderDetailExplorerList();
+  refreshIcons();
+}
+function renderDetailExplorerSummary() {
+  const container = document.getElementById("detailExplorerSummary");
+  if (!container) return;
+  const summary = state.detailExplorer.config.summary || [];
+  container.innerHTML = summary.map(function (item) {
+    return "<article class=\\"detail-metric\\"><span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(item.value) + "</strong></article>";
+  }).join("");
+}
+function renderDetailExplorerToolbar() {
+  const container = document.getElementById("detailExplorerToolbar");
+  if (!container) return;
+  if (state.detailExplorer.selectedRow) {
+    container.innerHTML = "";
+    return;
+  }
+  const config = state.detailExplorer.config;
+  const sortOptions = (config.sortOptions || []).map(function (option) {
+    return "<option value=\\"" + escapeHtml(option.field) + "\\"" + (option.field === state.detailExplorer.sortField ? " selected" : "") + ">" + escapeHtml(option.label) + "</option>";
+  }).join("");
+  const directionIcon = state.detailExplorer.sortDir === "asc" ? "arrow-up-a-z" : "arrow-down-z-a";
+  const directionLabel = state.detailExplorer.sortDir === "asc" ? "Ascendente" : "Descendente";
+  container.innerHTML =
+    "<div class=\\"quick-search\\"><i data-lucide=\\"search\\"></i><input id=\\"detailExplorerSearch\\" type=\\"search\\" value=\\"" + escapeHtml(state.detailExplorer.query) + "\\" placeholder=\\"" + escapeHtml(config.searchPlaceholder || "Buscar") + "\\"></div>" +
+    "<label>Ordenar<select id=\\"detailExplorerSort\\">" + sortOptions + "</select></label>" +
+    "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"sort-dir\\"><i data-lucide=\\"" + directionIcon + "\\"></i> " + directionLabel + "</button>" +
+    "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"clear-search\\"><i data-lucide=\\"x-circle\\"></i> Limpiar</button>" +
+    "<button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"export-csv\\"><i data-lucide=\\"download\\"></i> CSV</button>";
+}
+function renderDetailExplorerList() {
+  const body = document.getElementById("detailExplorerBody");
+  if (!body) return;
+  const rows = getDetailExplorerSortedRows();
+  const visibleRows = rows.slice(0, state.detailExplorer.visibleCount);
+  const config = state.detailExplorer.config;
+  if (!rows.length) {
+    body.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(config.emptyMessage || "No hay datos para mostrar.") + "</div>";
+    return;
+  }
+  const header = "<thead><tr>" + config.columns.map(function (column) {
+    return "<th data-detail-sort-field=\\"" + escapeHtml(column.id) + "\\">" + escapeHtml(column.label) + "</th>";
+  }).join("") + "</tr></thead>";
+  const tableRows = visibleRows.map(function (row, index) {
+    const rowKey = config.rowKey(row, index);
+    return "<tr tabindex=\\"0\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\">" + config.columns.map(function (column) {
+      const numeric = column.numeric ? " numeric" : "";
+      return "<td class=\\"" + numeric.trim() + "\\">" + escapeHtml(getDetailExplorerCellDisplay(row, column.id)) + "</td>";
+    }).join("") + "</tr>";
+  }).join("");
+  const cards = visibleRows.map(function (row, index) {
+    const rowKey = config.rowKey(row, index);
+    const title = getDetailExplorerCellDisplay(row, "presentation");
+    const code = getDetailExplorerCellDisplay(row, "presentationCode");
+    const client = getDetailExplorerCellDisplay(row, "client");
+    return "<article class=\\"detail-card\\" tabindex=\\"0\\" role=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\"><strong>" + escapeHtml(title) + "</strong><span>" + escapeHtml(code ? "Código: " + code : "") + "</span><span>" + escapeHtml(client ? "Cliente: " + client : "") + "</span></article>";
+  }).join("");
+  const footer = "<div class=\\"detail-footer\\"><span>Mostrando " + formatInteger(visibleRows.length) + " de " + formatInteger(rows.length) + " presentación(es)</span>" + (visibleRows.length < rows.length ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"show-more\\">Ver más</button>" : "") + "</div>";
+  body.innerHTML = "<div class=\\"detail-table-wrap\\"><table class=\\"detail-table\\">" + header + "<tbody>" + tableRows + "</tbody></table></div><div class=\\"detail-card-list\\">" + cards + "</div>" + footer;
+}
+function renderDetailExplorerPresentationDetail() {
+  const body = document.getElementById("detailExplorerBody");
+  if (!body) return;
+  const row = state.detailExplorer.selectedRow;
+  const sections = getNoSalesPresentationDetailFields(row);
+  body.innerHTML = "<div class=\\"presentation-detail\\"><div class=\\"detail-back-row\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"back-list\\"><i data-lucide=\\"chevron-left\\"></i> Volver al listado</button><span class=\\"badge badge-muted\\">Detalle de presentación</span></div>" + sections.map(function (section) {
+    return "<section class=\\"detail-section\\"><h3>" + escapeHtml(section.title) + "</h3><div class=\\"detail-fields\\">" + section.fields.map(function (field) {
+      return "<article class=\\"detail-field\\"><span>" + escapeHtml(field.label) + "</span><strong>" + escapeHtml(field.value) + "</strong></article>";
+    }).join("") + "</div></section>";
+  }).join("") + "</div>";
+}
+function selectDetailExplorerRow(rowKey) {
+  const config = state.detailExplorer.config;
+  const row = state.detailExplorer.allRows.find(function (candidate, index) {
+    return config.rowKey(candidate, index) === rowKey;
+  });
+  if (!row) return;
+  state.detailExplorer.selectedKey = rowKey;
+  state.detailExplorer.selectedRow = row;
+  renderDetailExplorer();
+}
+function getDetailExplorerSortOption(field) {
+  const options = state.detailExplorer.config && state.detailExplorer.config.sortOptions ? state.detailExplorer.config.sortOptions : NO_SALES_EXPLORER_SORT_OPTIONS;
+  return options.find(function (option) { return option.field === field; }) || options[0];
+}
+function getDetailExplorerSortedRows() {
+  const config = state.detailExplorer.config;
+  const query = normalizeText(state.detailExplorer.query).toLocaleLowerCase("es-CO");
+  const rows = state.detailExplorer.allRows.filter(function (row) {
+    if (!query) return true;
+    return config.searchFields.some(function (field) {
+      return normalizeText(getDetailExplorerRawValue(row, field)).toLocaleLowerCase("es-CO").includes(query);
+    });
+  });
+  rows.sort(function (a, b) {
+    const aValue = getDetailExplorerSortValue(a, state.detailExplorer.sortField);
+    const bValue = getDetailExplorerSortValue(b, state.detailExplorer.sortField);
+    if (aValue < bValue) return state.detailExplorer.sortDir === "asc" ? -1 : 1;
+    if (aValue > bValue) return state.detailExplorer.sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+  return rows;
+}
+function getDetailExplorerCellDisplay(row, field) {
+  const value = getDetailExplorerRawValue(row, field);
+  if (field === "objectiveMonth" && row.__monthlyTargetConflict) return "Revisar";
+  if (field === "objectiveTotal" && row.__totalTargetConflict) return "Revisar";
+  if (value === null || value === undefined || value === "") return "";
+  if (field === "objectiveMonth" || field === "objectiveTotal") return isFiniteNumber(value) ? formatNumber(value) : "";
+  if (field === "discount") return isFiniteNumber(value) ? formatPercent(value) : "";
+  return String(value);
+}
+function getDetailExplorerRawValue(row, field) {
+  if (field === "category") {
+    const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : state.noSalesAnalysis;
+    return getResolvedCategory(row, analysis.categoryLookup);
+  }
+  if (field === "presentation") return normalizeText(row["Presentación AS400 de la venta - Texto"]);
+  if (field === "presentationCode") return normalizeText(row["Presentación AS400 de la venta - Clave"]);
+  if (field === "client") return normalizeText(row["Cliente SAP - Clave"]);
+  if (field === "clientName") return normalizeText(row["Cliente AS400 - Nombre negocio (Texto)"]) || normalizeText(row["Cliente AS400 - Texto"]);
+  if (field === "activity") return normalizeText(row["ID Actividad"]);
+  if (field === "objectiveMonth") return isFiniteNumber(row["Objetivo mes "]) ? row["Objetivo mes "] : null;
+  if (field === "objectiveTotal") return isFiniteNumber(row["Objetivo cajas total"]) ? row["Objetivo cajas total"] : null;
+  if (field === "discount") return isFiniteNumber(row["Porcentaje descuento"]) ? row["Porcentaje descuento"] : null;
+  if (field === "startDate") return normalizeText(row["Fecha inicio"]);
+  if (field === "endDate") return normalizeText(row["Fecha fin"]);
+  if (field === "discountType") return normalizeText(row["Tipo descuento"]);
+  if (field === "period") return normalizeText(row["Periodo negociacion"]);
+  if (field === "cedi") return normalizeText(row["Cedi"]);
+  return normalizeText(row[field]);
+}
+function getDetailExplorerSortValue(row, field) {
+  if (field === "objectiveTotal" || field === "objectiveMonth" || field === "discount") {
+    const value = getDetailExplorerRawValue(row, field);
+    return isFiniteNumber(value) ? value : -Number.MAX_VALUE;
+  }
+  if (field === "endDate" || field === "startDate") {
+    const date = dateOnly(getDetailExplorerRawValue(row, field));
+    return date ? date.getTime() : Number.MAX_VALUE;
+  }
+  return normalizeText(getDetailExplorerRawValue(row, field)).toLocaleLowerCase("es-CO");
+}
+function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
+  const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
+  const rows = getNoSalesRowsForCategory(category, analysis);
+  return {
+    type: "noSalesCategory",
+    category: category,
+    analysis: analysis,
+    title: "Presentaciones sin ventas — " + category,
+    subtitle: "Seguimiento comercial",
+    rows: rows,
+    columns: NO_SALES_EXPLORER_COLUMNS,
+    exportColumns: [
+      { id: "presentation", label: "Presentación" },
+      { id: "presentationCode", label: "Código de presentación" },
+      { id: "client", label: "Cliente SAP" },
+      { id: "clientName", label: "Nombre del cliente" },
+      { id: "activity", label: "ID actividad" },
+      { id: "category", label: "Categoría" },
+      { id: "objectiveMonth", label: "Objetivo mes" },
+      { id: "objectiveTotal", label: "Objetivo cajas total" },
+      { id: "period", label: "Periodo negociación" },
+      { id: "discountType", label: "Tipo descuento" },
+      { id: "discount", label: "Porcentaje descuento" },
+      { id: "startDate", label: "Fecha inicio" },
+      { id: "endDate", label: "Fecha fin" },
+      { id: "cedi", label: "CEDI" }
+    ],
+    sortOptions: NO_SALES_EXPLORER_SORT_OPTIONS,
+    defaultSortField: "presentation",
+    defaultSortDir: "asc",
+    searchFields: ["presentation", "presentationCode", "client", "clientName", "activity"],
+    searchPlaceholder: "Buscar presentación, código o cliente",
+    emptyMessage: "No hay presentaciones disponibles para esta categoría con los filtros actuales.",
+    summary: buildNoSalesCategorySummary(category, rows, analysis),
+    rowKey: getNoSalesExplorerRowKey
+  };
+}
+function getNoSalesRowsForCategory(category, noSalesAnalysis) {
+  const selected = normalizeText(category);
+  const lookup = noSalesAnalysis && noSalesAnalysis.categoryLookup ? noSalesAnalysis.categoryLookup : buildCategoryLookup(noSalesAnalysis ? noSalesAnalysis.uniquePresentations : []);
+  return (noSalesAnalysis && noSalesAnalysis.uniquePresentations ? noSalesAnalysis.uniquePresentations : []).filter(function (row, index) {
+    return normalizeText(getResolvedCategory(row, lookup, index)) === selected;
+  });
+}
+function buildNoSalesCategorySummary(category, rows, noSalesAnalysis) {
+  const objectiveTotal = sumField(rows, "Objetivo cajas total");
+  const participation = noSalesAnalysis && noSalesAnalysis.presentationCount ? rows.length / noSalesAnalysis.presentationCount : null;
+  const summary = [
+    { label: "Presentaciones", value: formatInteger(rows.length) },
+    { label: "Clientes", value: formatInteger(countUniqueFromRows(rows, "Cliente SAP - Clave")) },
+    { label: "Actividades", value: formatInteger(countUniqueFromRows(rows, "ID Actividad")) }
+  ];
+  if (objectiveTotal > 0) summary.push({ label: "Objetivo total", value: formatNumber(objectiveTotal) });
+  if (isFiniteNumber(participation)) summary.push({ label: "Participación", value: formatRatioPercent(participation) });
+  return summary;
+}
+function getNoSalesExplorerRowKey(row, index) {
+  return getNegotiatedPresentationKey(row, index);
+}
+function getNoSalesPresentationDetailFields(row) {
+  const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : state.noSalesAnalysis;
+  const sections = [
+    {
+      title: "Identificación",
+      fields: [
+        ["Presentación", getDetailExplorerRawValue(row, "presentation")],
+        ["Código", getDetailExplorerRawValue(row, "presentationCode")],
+        ["Categoría", getResolvedCategory(row, analysis.categoryLookup)],
+        ["Cliente SAP", getDetailExplorerRawValue(row, "client")],
+        ["Nombre del cliente", getDetailExplorerRawValue(row, "clientName")],
+        ["ID actividad", getDetailExplorerRawValue(row, "activity")]
+      ]
+    },
+    {
+      title: "Objetivos",
+      fields: [
+        ["Objetivo mes", getDetailExplorerCellDisplay(row, "objectiveMonth")],
+        ["Objetivo cajas total", getDetailExplorerCellDisplay(row, "objectiveTotal")],
+        ["Periodo de negociación", getDetailExplorerRawValue(row, "period")],
+        ["Filas fuente", row.__sourceRowCount > 1 ? formatInteger(row.__sourceRowCount) : ""],
+        ["Valores objetivo mes", row.__monthlyTargetConflict ? row.__monthlyTargetValues.map(formatNumber).join(" / ") : ""]
+      ]
+    },
+    {
+      title: "Negociación",
+      fields: [
+        ["Tipo descuento", getDetailExplorerRawValue(row, "discountType")],
+        ["Porcentaje descuento", getDetailExplorerCellDisplay(row, "discount")],
+        ["Fecha inicio", getDetailExplorerRawValue(row, "startDate")],
+        ["Fecha fin", getDetailExplorerRawValue(row, "endDate")],
+        ["CEDI", getDetailExplorerRawValue(row, "cedi")]
+      ]
+    }
+  ];
+  const status = getReliableVigenciaStatus(row);
+  const daysRemaining = getDaysRemainingText(row);
+  if (status) sections[2].fields.push(["Estado de vigencia", status]);
+  if (daysRemaining) sections[2].fields.push(["Días restantes", daysRemaining]);
+  return sections.map(function (section) {
+    return {
+      title: section.title,
+      fields: section.fields.map(function (field) {
+        return { label: field[0], value: field[1] };
+      }).filter(function (field) {
+        return hasUsefulDisplayValue(field.value);
+      })
+    };
+  }).filter(function (field) {
+    return field.fields.length;
+  });
+}
+function getReliableVigenciaStatus(row) {
+  return dateOnly(row["Fecha inicio"]) && dateOnly(row["Fecha fin"]) ? getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) : "";
+}
+function getDaysRemainingText(row) {
+  const end = dateOnly(row["Fecha fin"]);
+  if (!end || getReliableVigenciaStatus(row) !== "Vigente") return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.ceil((end.getTime() - today.getTime()) / 86400000);
+  return days >= 0 ? formatInteger(days) + " día(s)" : "";
+}
+function hasUsefulDisplayValue(value) {
+  const text = normalizeText(value);
+  return Boolean(text) && ["N/A", "NaN"].indexOf(text) === -1;
+}
+function exportDetailExplorerCsv() {
+  const config = state.detailExplorer.config;
+  if (!config) return;
+  const rows = getDetailExplorerSortedRows();
+  const columns = config.exportColumns || config.columns;
+  const header = columns.map(function (column) { return column.label; });
+  const body = rows.map(function (row) {
+    return columns.map(function (column) {
+      return "\\"" + String(getDetailExplorerCellDisplay(row, column.id)).replace(/"/g, "\\"\\"") + "\\"";
+    }).join(",");
+  });
+  downloadCsv(header.join(",") + "\\n" + body.join("\\n"), "presentaciones_sin_ventas_" + normalizeFilenamePart(state.detailExplorer.category) + ".csv");
+}
+function normalizeFilenamePart(value) {
+  return normalizeText(value).toLocaleLowerCase("es-CO").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "detalle";
+}
+function trapDetailExplorerFocus(event) {
+  const dialog = document.getElementById("detailExplorerDialog");
+  if (!dialog || !dialog.querySelectorAll) return;
+  const focusable = Array.from(dialog.querySelectorAll(DETAIL_EXPLORER_FOCUSABLE)).filter(function (node) {
+    return !node.disabled && node.offsetParent !== null;
+  });
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 function renderTable() {
   const table = document.getElementById("detailTable");
@@ -1971,7 +1706,7 @@ function getTableRows() {
 function applySearch(rows) {
   if (!state.search) return rows;
   return rows.filter(function (row) {
-    return TABLE_COLUMNS.some(function (column) {
+    return SEARCH_FIELDS.some(function (column) {
       return normalizeText(formatCell(row, column)).toLocaleLowerCase("es-CO").includes(state.search);
     });
   });
@@ -1980,18 +1715,23 @@ function applyFilters(rows, filters) {
   return rows.filter(function (row) {
     return Object.keys(filters).every(function (field) {
       const selected = filters[field];
-      if (!selected) return true;
-      if (field === "Estado de vigencia") return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === selected;
-      const rowValue = normalizeText(row[field]);
-      return selected === "Sin dato" ? !rowValue : rowValue === selected;
+      if (field === "Estado de vigencia") return matchesFilter(getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]), selected);
+      return matchesFilter(row[field], selected);
     });
   });
+}
+function matchesFilter(rowValue, selected) {
+  const selectedValues = (Array.isArray(selected) ? selected : [selected]).map(normalizeText).filter(Boolean);
+  if (!selectedValues.length) return true;
+  const normalizedValue = normalizeText(rowValue);
+  if (!normalizedValue) return false;
+  return selectedValues.indexOf(normalizedValue) !== -1;
 }
 function groupBySum(rows, groupField, valueField, limit) {
   const grouped = new Map();
   rows.forEach(function (row) {
-    const rawKey = row[groupField];
-    const key = rawKey === null || rawKey === undefined || String(rawKey).trim() === "" ? "Sin dato" : String(rawKey).trim();
+    const key = normalizeText(row[groupField]);
+    if (!key) return;
     grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField], valueField));
   });
   let result = Array.from(grouped, function (entry) {
@@ -2014,8 +1754,8 @@ function groupByUniqueField(rows, groupField, uniqueKeyGetter, valueField, limit
   const grouped = new Map();
   const seen = new Set();
   rows.forEach(function (row, index) {
-    const rawKey = row[groupField];
-    const groupKey = rawKey === null || rawKey === undefined || String(rawKey).trim() === "" ? "Sin dato" : String(rawKey).trim();
+    const groupKey = normalizeText(row[groupField]);
+    if (!groupKey) return;
     const uniqueKey = groupKey + "||" + uniqueKeyGetter(row, index);
     if (seen.has(uniqueKey)) return;
     seen.add(uniqueKey);
@@ -2031,6 +1771,182 @@ function groupByUniqueField(rows, groupField, uniqueKeyGetter, valueField, limit
   if (limit) result = result.slice(0, limit);
   return result;
 }
+function isWithoutSalesInformation(row) {
+  return row && row.estadoInformacionVenta === SALES_INFORMATION_STATUS.WITHOUT_SALES_INFO;
+}
+function hasNegotiatedPresentationReference(row) {
+  return Boolean(
+    normalizeText(row["Presentación AS400 de la venta - Clave"]) ||
+      normalizeText(row["Presentación AS400 de la venta - Texto"])
+  );
+}
+function getNegotiatedPresentationKey(row, index) {
+  const parts = [
+    normalizeText(row["Cliente SAP - Clave"]),
+    normalizeText(row["ID Actividad"]),
+    normalizeText(row["Presentación AS400 de la venta - Clave"])
+  ].filter(Boolean);
+  if (parts.length) return parts.join("||");
+  const fallback = [
+    normalizeText(row["Nit cliente - Clave"]),
+    normalizeText(row["Cliente AS400 - Texto"]),
+    normalizeText(row["Presentación AS400 de la venta - Texto"]),
+    normalizeText(row["Categoría AS400 de la venta"])
+  ].filter(Boolean);
+  return fallback.length ? fallback.join("||") : "fila-" + index;
+}
+function uniqueRowsByKey(rows, keyGetter) {
+  const seen = new Set();
+  return rows.filter(function (row, index) {
+    const key = keyGetter(row, index);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function groupRowsByKey(rows, keyGetter) {
+  const grouped = new Map();
+  rows.forEach(function (row, index) {
+    const key = keyGetter(row, index);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+  return grouped;
+}
+function uniqueResolvedNoSalesPresentations(rows) {
+  const grouped = groupRowsByKey(rows, getNegotiatedPresentationKey);
+  return Array.from(grouped, function (entry) {
+    return buildResolvedNoSalesPresentation(entry[1]);
+  });
+}
+function buildResolvedNoSalesPresentation(rows) {
+  const base = Object.assign({}, rows[0]);
+  const monthlyResolution = resolveUniqueNumericField(rows, "Objetivo mes ");
+  const totalResolution = resolveUniqueNumericField(rows, "Objetivo cajas total");
+  base["Objetivo mes "] = monthlyResolution.value;
+  base["Objetivo cajas total"] = totalResolution.value;
+  base.__sourceRowCount = rows.length;
+  base.__monthlyTargetConflict = monthlyResolution.conflict;
+  base.__monthlyTargetValues = monthlyResolution.values;
+  base.__totalTargetConflict = totalResolution.conflict;
+  base.__totalTargetValues = totalResolution.values;
+  return base;
+}
+function resolveUniqueNumericField(rows, field) {
+  const values = [];
+  rows.forEach(function (row) {
+    const rawValue = row[field];
+    const value = isFiniteNumber(rawValue) ? rawValue : parseNumberLike(rawValue, field);
+    if (!isFiniteNumber(value)) return;
+    if (values.indexOf(value) === -1) values.push(value);
+  });
+  if (!values.length) return { value: null, values: [], conflict: false };
+  if (values.length === 1) return { value: values[0], values: values, conflict: false };
+  return { value: null, values: values, conflict: true };
+}
+function getEmptyNoSalesAnalysis() {
+  return {
+    rows: [],
+    uniquePresentations: [],
+    byCategory: [],
+    categoryLookup: new Map(),
+    presentationCount: 0,
+    activityCount: 0,
+    clientCount: 0,
+    presentationsWithoutCategory: 0
+  };
+}
+function getNoSalesAnalysis(filteredRows) {
+  const sourceRows = filteredRows || [];
+  const rows = sourceRows.filter(isWithoutSalesInformation);
+  const uniquePresentations = uniqueResolvedNoSalesPresentations(rows.filter(hasNegotiatedPresentationReference));
+  const categoryLookup = buildCategoryLookup(sourceRows);
+  const byCategory = groupNoSalesPresentationsByCategory(uniquePresentations, categoryLookup);
+  const groupedPresentationCount = byCategory.reduce(function (acc, item) {
+    return acc + numberForCalc(item.value);
+  }, 0);
+  return {
+    rows: rows,
+    uniquePresentations: uniquePresentations,
+    byCategory: byCategory,
+    categoryLookup: categoryLookup,
+    presentationCount: uniquePresentations.length,
+    activityCount: countUniqueFromRows(uniquePresentations, "ID Actividad"),
+    clientCount: countUniqueFromRows(uniquePresentations, "Cliente SAP - Clave"),
+    presentationsWithoutCategory: Math.max(0, uniquePresentations.length - groupedPresentationCount)
+  };
+}
+function getUniquePresentationsWithoutSales(rows) {
+  return getNoSalesAnalysis(rows).uniquePresentations;
+}
+function countUniqueBy(rows, keyGetter) {
+  return uniqueRowsByKey(rows, keyGetter).length;
+}
+function countUniqueFromRows(rows, field) {
+  return new Set(rows.map(function (row) { return normalizeText(row[field]); }).filter(Boolean)).size;
+}
+function groupNoSalesPresentationsByCategory(uniquePresentations, categoryLookup) {
+  const grouped = new Map();
+  const lookup = categoryLookup || buildCategoryLookup(uniquePresentations);
+  uniquePresentations.forEach(function (row, index) {
+    const category = getResolvedCategory(row, lookup, index);
+    if (!category) return;
+    grouped.set(category, (grouped.get(category) || 0) + 1);
+  });
+  return Array.from(grouped, function (entry) {
+    return { label: entry[0], value: entry[1] };
+  }).sort(function (a, b) {
+    return b.value - a.value;
+  });
+}
+function groupPresentationsWithoutSalesByCategory(rows) {
+  return getNoSalesAnalysis(rows).byCategory;
+}
+function buildCategoryLookup(rows) {
+  const lookup = new Map();
+  (rows || []).forEach(function (row, index) {
+    const category = getDirectCategory(row);
+    if (!category) return;
+    getCategoryLookupKeys(row, index).forEach(function (key) {
+      if (!lookup.has(key)) lookup.set(key, category);
+    });
+  });
+  return lookup;
+}
+function getResolvedCategory(row, categoryLookup, index) {
+  const directCategory = getDirectCategory(row);
+  if (directCategory) return directCategory;
+  const lookup = categoryLookup || new Map();
+  const keys = getCategoryLookupKeys(row, index);
+  for (let i = 0; i < keys.length; i += 1) {
+    const category = normalizeText(lookup.get(keys[i]));
+    if (category) return category;
+  }
+  return "";
+}
+function getDirectCategory(row) {
+  for (let i = 0; i < CATEGORY_FIELDS.length; i += 1) {
+    const value = normalizeText(row[CATEGORY_FIELDS[i]]);
+    if (value) return value;
+  }
+  return "";
+}
+function getCategoryLookupKeys(row, index) {
+  const keys = [];
+  const client = normalizeText(row["Cliente SAP - Clave"]);
+  const activity = normalizeText(row["ID Actividad"]);
+  const presentationKey = normalizeText(row["Presentación AS400 de la venta - Clave"]);
+  const presentationText = normalizeText(row["Presentación AS400 de la venta - Texto"]);
+  const negotiationKey = getNegotiatedPresentationKey(row, index);
+  if (negotiationKey) keys.push("negotiation:" + negotiationKey);
+  if (client && presentationKey) keys.push("client-presentation-key:" + client + "||" + presentationKey);
+  if (client && presentationText) keys.push("client-presentation-text:" + client + "||" + presentationText);
+  if (activity && presentationKey) keys.push("activity-presentation-key:" + activity + "||" + presentationKey);
+  if (activity && presentationText) keys.push("activity-presentation-text:" + activity + "||" + presentationText);
+  if (presentationKey) keys.push("presentation-key:" + presentationKey);
+  if (presentationText) keys.push("presentation-text:" + presentationText);
+  return keys;
+}
 function getUniqueOptions(rows, field) {
   return Array.from(new Set(rows.map(function (row) { return field === "Estado de vigencia" ? getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) : normalizeText(row[field]); }).filter(Boolean))).sort(function (a, b) { return a.localeCompare(b, "es"); });
 }
@@ -2040,7 +1956,8 @@ function groupComplianceByCedi(rows) {
   const seenSales = new Set();
   const seenObjectives = new Set();
   latestMonthRows.forEach(function (row, index) {
-    const key = normalizeText(row["Cedi"]) || "Sin dato";
+    const key = normalizeText(row["Cedi"]);
+    if (!key) return;
     if (!grouped.has(key)) grouped.set(key, { sales: 0, objective: 0 });
     const current = grouped.get(key);
     const salesKey = key + "||" + getClientMonthKey(row, index);
@@ -2050,7 +1967,8 @@ function groupComplianceByCedi(rows) {
     }
   });
   rows.forEach(function (row, index) {
-    const key = normalizeText(row["Cedi"]) || "Sin dato";
+    const key = normalizeText(row["Cedi"]);
+    if (!key) return;
     if (!grouped.has(key)) grouped.set(key, { sales: 0, objective: 0 });
     const current = grouped.get(key);
     const objectiveKey = key + "||" + getActivityKey(row, index);
@@ -2071,7 +1989,7 @@ function salesByMonth(rows) {
   });
 }
 function getMonthChartField(rows) {
-  return rows.some(function (row) { return row["Año Mes"] !== null && row["Año Mes"] !== undefined; }) ? "Año Mes" : "Mes";
+  return rows.some(function (row) { return normalizeText(row["Año Mes"]); }) ? "Año Mes" : "Mes";
 }
 function exportFilteredCsv(rows) {
   return [TABLE_COLUMNS.join(",")].concat(rows.map(function (row) {
@@ -2160,8 +2078,8 @@ function numberForCalc(value, field) {
 }
 function isFiniteNumber(value) { return typeof value === "number" && Number.isFinite(value); }
 function parseNumberLike(value, field) {
-  let text = String(value).trim();
-  if (!text || text === "-") return null;
+  let text = normalizeText(value);
+  if (!text) return null;
   text = text.replace(/\\s/g, "").replace(/[^0-9,.-]/g, "");
   text = field === "TotalVentaMes" ? normalizeFlexibleDecimalNumberText(text) : normalizeNumberText(text);
   const number = Number(text);
@@ -2194,8 +2112,23 @@ function dateOnly(value) {
   const date = new Date(parts[0], parts[1] - 1, parts[2]);
   return Number.isNaN(date.getTime()) ? null : date;
 }
-function normalizeText(value) { return value === null || value === undefined ? "" : String(value).replace(/\\s+/g, " ").trim(); }
+function normalizeText(value) {
+  if (value === null || value === undefined) return "";
+  const text = String(value).replace(/\\u00a0/g, " ").replace(/\\s+/g, " ").trim();
+  return isBlankText(text) ? "" : text;
+}
+function isBlankText(value) {
+  return ["", "-", "–", "—"].indexOf(String(value || "").replace(/\\u00a0/g, " ").replace(/\\s+/g, " ").trim()) !== -1;
+}
 function roundNumber(value) { return Math.round(numberForCalc(value) * 100) / 100; }
+function roundChartValue(value, options) {
+  return options && options.integerValues ? Math.round(numberForCalc(value)) : roundNumber(value);
+}
+function formatChartValue(value, asPercent, options) {
+  if (asPercent) return formatRatioPercent(value);
+  if (options && options.integerValues) return formatInteger(value);
+  return formatNumber(value);
+}
 function compactNumber(value) { return new Intl.NumberFormat("es-CO", { notation: "compact", maximumFractionDigits: 1 }).format(numberForCalc(value)); }
 function formatInteger(value) { return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(numberForCalc(value)); }
 function formatNumber(value) { return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(numberForCalc(value)); }
