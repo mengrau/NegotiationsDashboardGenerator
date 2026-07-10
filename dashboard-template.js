@@ -461,7 +461,7 @@ tbody tr:hover { background: var(--primary-soft); }
 }
 .detail-explorer-overlay[hidden] { display: none; }
 .detail-explorer-dialog {
-  display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr); width: min(1120px, 100%); max-height: min(86vh, 860px);
+  display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr); width: min(1180px, 100%); max-height: min(86vh, 860px);
   overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 28px 70px rgba(15, 23, 42, 0.26);
   animation: detailDialogIn 0.16s ease-out;
 }
@@ -477,9 +477,18 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) 170px auto auto auto; gap: 8px; align-items: end; padding: 12px 20px; }
 .detail-toolbar .quick-search { margin: 0; min-height: 40px; }
 .detail-toolbar label { min-width: 0; }
-.detail-body { min-height: 0; padding: 0 20px 20px; overflow: auto; }
-.detail-table-wrap { overflow: auto; max-height: min(48vh, 460px); border: 1px solid var(--line); border-radius: 14px; }
-.detail-table { min-width: 760px; }
+.detail-body { min-height: 0; padding: 2px 20px 20px; overflow: auto; }
+.detail-table-wrap { overflow: auto; max-height: min(52vh, 500px); border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.detail-table { min-width: 940px; table-layout: fixed; }
+.detail-table th, .detail-table td { padding: 14px 18px; line-height: 1.4; }
+.detail-table th { white-space: normal; }
+.detail-table th:nth-child(1), .detail-table td:nth-child(1) { width: 34%; }
+.detail-table th:nth-child(2), .detail-table td:nth-child(2) { width: 19%; }
+.detail-table th:nth-child(3), .detail-table td:nth-child(3) { width: 14%; }
+.detail-table th:nth-child(4), .detail-table td:nth-child(4) { width: 16%; }
+.detail-table th:nth-child(5), .detail-table td:nth-child(5) { width: 17%; }
+.detail-table td:first-child { color: var(--ink); font-weight: 800; }
+.detail-table td:nth-child(n+2) { white-space: nowrap; }
 .detail-table tbody tr { cursor: pointer; }
 .detail-table tbody tr:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: -3px; }
 .detail-footer { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 12px; color: var(--muted); font-weight: 800; }
