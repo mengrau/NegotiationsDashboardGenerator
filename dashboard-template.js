@@ -445,8 +445,8 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-explorer-header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
 .detail-explorer-header h2 { margin: 4px 0 0; font-size: 1.2rem; }
 .detail-selection-message { margin: 14px 20px 0; padding: 12px 14px; border: 1px solid rgba(245, 158, 11, 0.32); border-radius: 12px; background: var(--amber-soft); color: var(--amber); font-weight: 800; }
-.detail-summary { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 20px 0; color: var(--muted); }
-.detail-metric { min-width: 0; padding-right: 14px; border-right: 1px solid var(--line); }
+.detail-summary { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; padding: 12px 20px 0; color: var(--muted); text-align: center; }
+.detail-metric { min-width: 118px; padding: 0 16px; border-right: 1px solid var(--line); }
 .detail-metric:last-child { border-right: 0; }
 .detail-metric span { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
 .detail-metric strong { display: block; margin-top: 3px; color: var(--ink); font-size: 0.98rem; overflow-wrap: anywhere; }
@@ -1546,14 +1546,14 @@ function getNoSalesRowsForCategory(category, noSalesAnalysis) {
   });
 }
 function buildNoSalesCategorySummary(category, rows, noSalesAnalysis) {
-  const objectiveTotal = sumField(rows, "Objetivo cajas total");
+  const objectiveMonth = sumField(rows, "Objetivo mes ");
   const participation = noSalesAnalysis && noSalesAnalysis.presentationCount ? rows.length / noSalesAnalysis.presentationCount : null;
   const summary = [
     { label: "Presentaciones", value: formatInteger(rows.length) },
     { label: "Clientes", value: formatInteger(countUniqueFromRows(rows, "Cliente SAP - Clave")) },
     { label: "Actividades", value: formatInteger(countUniqueFromRows(rows, "ID Actividad")) }
   ];
-  if (objectiveTotal > 0) summary.push({ label: "Objetivo total", value: formatNumber(objectiveTotal) });
+  if (objectiveMonth > 0) summary.push({ label: "Objetivo mes", value: formatNumber(objectiveMonth) });
   if (isFiniteNumber(participation)) summary.push({ label: "Participación", value: formatRatioPercent(participation) });
   return summary;
 }
