@@ -330,6 +330,37 @@ function runSyntheticTests() {
   ]);
   assert.strictEqual(noSalesByClient.uniquePresentations.length, noSalesByClient.presentationCount);
 
+  const positiveKpi = dashboard.computeKpis([
+    normalizeKpiRow({ sales: "120", objectiveMonth: "100", yearMonth: "202607" })
+  ]);
+  assert.strictEqual(positiveKpi.objectiveDifference, 20);
+  assert.strictEqual(dashboard.getObjectiveDifferenceState(positiveKpi.objectiveDifference).label, "Por encima del objetivo");
+  assert.strictEqual(dashboard.formatSignedNumber(positiveKpi.objectiveDifference), "+20");
+
+  const negativeKpi = dashboard.computeKpis([
+    normalizeKpiRow({ sales: "80", objectiveMonth: "100", yearMonth: "202607" })
+  ]);
+  assert.strictEqual(negativeKpi.objectiveDifference, -20);
+  assert.strictEqual(dashboard.getObjectiveDifferenceState(negativeKpi.objectiveDifference).label, "Por debajo del objetivo");
+  assert.strictEqual(dashboard.formatSignedNumber(negativeKpi.objectiveDifference), "-20");
+
+  const neutralKpi = dashboard.computeKpis([
+    normalizeKpiRow({ sales: "100", objectiveMonth: "100", yearMonth: "202607" })
+  ]);
+  assert.strictEqual(neutralKpi.objectiveDifference, 0);
+  assert.strictEqual(dashboard.getObjectiveDifferenceState(neutralKpi.objectiveDifference).label, "En objetivo");
+
+  const kpiElement = makeElement();
+  withDashboardElement("kpis", kpiElement, () => {
+    dashboard.renderKpis([normalizeKpiRow({ sales: "120", objectiveMonth: "100", yearMonth: "202607" })]);
+  });
+  assert(kpiElement.innerHTML.includes("Ventas del período"));
+  assert(kpiElement.innerHTML.includes("Diferencia frente al objetivo"));
+  assert(kpiElement.innerHTML.includes("Por encima del objetivo"));
+  assert(!kpiElement.innerHTML.includes("Cajas faltantes"));
+  assert(!kpiElement.innerHTML.includes("Clientes SAP únicos"));
+  assert(!kpiElement.innerHTML.includes("Descuento promedio"));
+
   const withoutRegionFilter = dashboard.applyFilters(validCustomerRows, {});
   assert.strictEqual(dashboard.getNoSalesAnalysis(withoutRegionFilter).presentationCount, 2);
   const selectedRegionFilter = dashboard.applyFilters(validCustomerRows, { "Región SAP": "Antioquia" });
@@ -740,6 +771,31 @@ function normalizeNoSalesObjective(options = {}) {
     "Fecha fin": options.endDate || "2026-12-31",
     "Periodo negociacion": options.period || "12",
     "Ventas cajas físicas (sin rep)": "0"
+  });
+}
+
+function normalizeKpiRow(options = {}) {
+  return normalize({
+    "Año": "2026",
+    "Mes": "Julio",
+    "Año Mes": options.yearMonth || "202607",
+    "Centro - Clave": "001",
+    "Canal": "Tradicional",
+    "Región SAP": "Antioquia",
+    "Categoría AS400 de la venta": "Gaseosa",
+    "Nit cliente - Clave": options.nit || "900001",
+    "Cliente AS400 - Texto": options.clientAs400 || "Cliente prueba",
+    "Cliente SAP - Clave": options.clientId || "C-KPI",
+    "Cliente AS400 - Nombre negocio (Texto)": options.clientName || "Negocio KPI",
+    "Presentación AS400 de la venta - Texto": options.presentationName || "Cola KPI",
+    "Presentación AS400 de la venta - Clave": options.presentationCode || "P-KPI",
+    "ID Actividad": options.activityId || "A-KPI",
+    "Ventas cajas físicas (sin rep)": Object.prototype.hasOwnProperty.call(options, "sales") ? options.sales : "120",
+    "TotalVentaMes": Object.prototype.hasOwnProperty.call(options, "sales") ? options.sales : "120",
+    "Objetivo mes ": Object.prototype.hasOwnProperty.call(options, "objectiveMonth") ? options.objectiveMonth : "100",
+    "Objetivo cajas total": Object.prototype.hasOwnProperty.call(options, "objectiveTotal") ? options.objectiveTotal : "1200",
+    "Fecha inicio": options.startDate || "2026-01-01",
+    "Fecha fin": options.endDate || "2026-12-31"
   });
 }
 

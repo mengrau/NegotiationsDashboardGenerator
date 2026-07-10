@@ -370,13 +370,22 @@ select, input[type="search"] {
 }
 .active-filters { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; max-width: 55%; }
 .filter-chip { display: inline-flex; gap: 6px; align-items: center; min-height: 28px; padding: 0 9px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.78rem; font-weight: 800; }
-.kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
-.kpi-card { min-width: 0; padding: 16px; }
+.kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.kpi-card { min-width: 0; padding: 16px; border-left: 4px solid transparent; }
 .kpi-card.kpi-attention { border-color: rgba(245, 158, 11, 0.42); background: linear-gradient(135deg, var(--panel), var(--amber-soft)); }
 .kpi-card.kpi-attention .kpi-icon { background: var(--amber-soft); color: var(--amber); }
-.kpi-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 18px; }
+.kpi-card.kpi-positive { border-left-color: var(--emerald); background: linear-gradient(135deg, var(--panel), var(--emerald-soft)); }
+.kpi-card.kpi-positive .kpi-icon { background: var(--emerald-soft); color: var(--emerald); }
+.kpi-card.kpi-negative { border-left-color: var(--red); background: linear-gradient(135deg, var(--panel), var(--red-soft)); }
+.kpi-card.kpi-negative .kpi-icon { background: var(--red-soft); color: var(--red); }
+.kpi-card.kpi-neutral { border-left-color: var(--line); }
+.kpi-card.kpi-secondary { background: var(--soft-bg); box-shadow: none; }
+.kpi-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
 .kpi-icon { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; background: var(--primary-soft); color: var(--primary); }
 .kpi-value { display: block; margin-bottom: 6px; overflow-wrap: anywhere; font-size: clamp(1.35rem, 2vw, 1.85rem); font-weight: 800; letter-spacing: -0.04em; }
+.kpi-status { display: inline-flex; align-items: center; min-height: 24px; margin-bottom: 8px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 0.72rem; font-weight: 800; }
+.kpi-positive .kpi-status { border-color: rgba(16, 185, 129, 0.32); color: var(--emerald); background: var(--emerald-soft); }
+.kpi-negative .kpi-status { border-color: rgba(239, 68, 68, 0.32); color: var(--red); background: var(--red-soft); }
 .kpi-description { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.42; }
 .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
 .chart-card { min-width: 0; min-height: 390px; padding: 18px; }
@@ -827,7 +836,7 @@ function computeKpis(rows, noSalesAnalysis) {
     salesMonth: salesMonth,
     objective: objective,
     compliance: objective ? salesMonth / objective : null,
-    missingBoxes: objective - salesMonth,
+    objectiveDifference: salesMonth - objective,
     uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
@@ -842,23 +851,32 @@ function computeKpis(rows, noSalesAnalysis) {
 function renderKpis(rows, noSalesAnalysis) {
   const k = computeKpis(rows, noSalesAnalysis);
   const withoutSalesDescription = buildWithoutSalesKpiDescription(k);
+  const differenceState = getObjectiveDifferenceState(k.objectiveDifference);
+  const filterBadge = hasActiveDashboardFilters() ? "Filtros activos" : "Vista general";
   const items = [
-    ["shopping-bag", "Total ventas periodo", formatNumber(k.salesPeriod), "Cliente SAP y Año Mes del periodo"],
-    ["calendar-days", "Total venta último mes", formatNumber(k.salesMonth), "Último Año Mes filtrado"],
-    ["target", "Objetivo mes", formatNumber(k.objective), "Una vez por actividad"],
-    ["gauge", "Cumplimiento", k.compliance === null ? "N/A" : formatRatioPercent(k.compliance), "Avance sobre objetivo"],
-    ["package-minus", "Cajas faltantes", formatNumber(k.missingBoxes), "Objetivo mes menos total venta último mes"],
-    ["package-x", "Presentaciones sin ventas en el periodo", formatInteger(k.presentationsWithoutSales), withoutSalesDescription, "kpi-attention"],
-    ["users", "Clientes SAP únicos", formatInteger(k.uniqueClients), "Cliente SAP distintos"],
-    ["boxes", "Presentaciones únicas", formatInteger(k.uniquePresentations), "Claves de presentación"],
-    ["badge-check", "Actividades únicas", formatInteger(k.uniqueActivities), "ID Actividad distintos"],
-    ["percent", "Descuento promedio", k.averageDiscount === null ? "N/A" : formatPercent(k.averageDiscount), "Promedio válido"],
-    ["calendar-check", "Negociaciones vigentes", formatInteger(k.activeNegotiations), "Filas activas hoy"]
+    { icon: "shopping-bag", title: "Ventas del período", value: formatNumber(k.salesPeriod), description: "Ventas acumuladas dentro de los filtros actuales." },
+    { icon: "calendar-days", title: "Ventas del último mes", value: formatNumber(k.salesMonth), description: "Valor del último Año Mes disponible en la selección." },
+    { icon: "target", title: "Objetivo del mes", value: formatNumber(k.objective), description: "Meta mensual agregada una vez por actividad." },
+    { icon: "gauge", title: "Cumplimiento del objetivo", value: k.compliance === null ? "N/A" : formatRatioPercent(k.compliance), description: "Avance de la venta del último mes frente al objetivo." },
+    { icon: differenceState.icon, title: "Diferencia frente al objetivo", value: formatSignedNumber(k.objectiveDifference), description: "Ventas del último mes menos objetivo del mes.", className: differenceState.className, status: differenceState.label },
+    { icon: "package-x", title: "Presentaciones sin ventas", value: formatInteger(k.presentationsWithoutSales), description: withoutSalesDescription, className: "kpi-attention kpi-secondary" },
+    { icon: "calendar-check", title: "Negociaciones vigentes", value: formatInteger(k.activeNegotiations), description: "Registros con fechas vigentes a la fecha actual.", className: "kpi-secondary" }
   ];
   document.getElementById("kpis").innerHTML = items.map(function (item) {
-    const className = item[4] ? "kpi-card " + item[4] : "kpi-card";
-    return "<article class=\\"" + className + "\\"><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-lucide=\\"" + item[0] + "\\"></i></span><span class=\\"badge badge-muted\\">Filtrado</span></div><span class=\\"kpi-label\\">" + escapeHtml(item[1]) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item[2]) + "</strong><p class=\\"kpi-description\\">" + escapeHtml(item[3]) + "</p></article>";
+    const className = item.className ? "kpi-card " + item.className : "kpi-card";
+    const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
+    return "<article class=\\"" + className + "\\"><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-lucide=\\"" + item.icon + "\\"></i></span><span class=\\"badge badge-muted\\">" + escapeHtml(filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
+}
+function getObjectiveDifferenceState(value) {
+  if (value > 0) return { label: "Por encima del objetivo", className: "kpi-positive", icon: "trending-up" };
+  if (value < 0) return { label: "Por debajo del objetivo", className: "kpi-negative", icon: "trending-down" };
+  return { label: "En objetivo", className: "kpi-neutral", icon: "minus" };
+}
+function hasActiveDashboardFilters() {
+  return Object.keys(state.filters || {}).some(function (field) {
+    return normalizeText(state.filters[field]);
+  });
 }
 function buildWithoutSalesKpiDescription(kpi) {
   const details = [];
@@ -2132,6 +2150,13 @@ function formatChartValue(value, asPercent, options) {
 function compactNumber(value) { return new Intl.NumberFormat("es-CO", { notation: "compact", maximumFractionDigits: 1 }).format(numberForCalc(value)); }
 function formatInteger(value) { return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(numberForCalc(value)); }
 function formatNumber(value) { return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(numberForCalc(value)); }
+function formatSignedNumber(value) {
+  const number = numberForCalc(value);
+  const formatted = formatNumber(Math.abs(number));
+  if (number > 0) return "+" + formatted;
+  if (number < 0) return "-" + formatted;
+  return formatted;
+}
 function formatPercent(value) {
   if (!isFiniteNumber(value)) return "N/A";
   const displayValue = Math.abs(value) > 1 ? value / 100 : value;
