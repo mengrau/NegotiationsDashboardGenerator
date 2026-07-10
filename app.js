@@ -15,9 +15,9 @@ const REQUIRED_COLUMNS = [
   "Cliente AS400 - Texto",
   "Cliente SAP - Clave",
   "Cliente AS400 - Nombre negocio (Texto)",
-  "Ventas cajas físicas mes (sin rep)",
+  "Ventas cajas físicas (sin rep)",
+  "TotalVentaMes",
   "Objetivo mes ",
-  "Ventas acumuladas negociacion",
   "ID Actividad",
   "Fecha inicio",
   "Fecha fin",
@@ -31,12 +31,15 @@ const REQUIRED_COLUMNS = [
 const NUMERIC_COLUMNS = new Set([
   "Año",
   "Año Mes",
-  "Ventas cajas físicas mes (sin rep)",
+  "Ventas cajas físicas (sin rep)",
+  "TotalVentaMes",
   "Objetivo mes ",
-  "Ventas acumuladas negociacion",
   "Objetivo cajas total",
   "Porcentaje descuento"
 ]);
+
+const ZERO_WHEN_EMPTY_NUMERIC_COLUMNS = new Set(["Ventas cajas físicas (sin rep)", "TotalVentaMes"]);
+const FLEXIBLE_DECIMAL_NUMERIC_COLUMNS = new Set(["TotalVentaMes"]);
 
 const TEXT_COLUMNS = new Set([
   "Mes",
@@ -58,6 +61,11 @@ const TEXT_COLUMNS = new Set([
 ]);
 
 const DATE_COLUMNS = new Set(["Fecha inicio", "Fecha fin"]);
+const HEADER_ALIASES = new Map([
+  ["Ventas cajas físicas (sin rep)", ["Ventas cajas físicas mes (sin rep)"]],
+  ["Objetivo mes ", ["Objetivo mes"]],
+  ["TotalVentaMes", ["Total venta mes", "Total Venta Mes", "Total ventas mes", "Total Ventas Mes"]]
+]);
 const THEME_KEY = "dashboardTheme";
 
 const state = {
@@ -273,7 +281,7 @@ function readSelectedSheet() {
   const matrix = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: null,
-    raw: false,
+    raw: true,
     dateNF: "yyyy-mm-dd",
     blankrows: false
   });
@@ -403,7 +411,7 @@ function processCurrentSheet() {
       state.processedRows = state.rowsRaw.map((row) => {
         const rowObject = {};
         REQUIRED_COLUMNS.forEach((requiredColumn) => {
-          const actualIndex = headerMap.get(normalizeHeader(requiredColumn));
+          const actualIndex = getHeaderIndex(headerMap, requiredColumn);
           rowObject[requiredColumn] = actualIndex === undefined ? null : row[actualIndex];
         });
         return normalizeRow(rowObject);
@@ -457,11 +465,30 @@ function normalizeHeader(header) {
   return normalizeCellText(header).replace(/\s+/g, " ").trim().toLocaleLowerCase("es-CO");
 }
 
+function getHeaderVariants(column) {
+  return [column].concat(HEADER_ALIASES.get(column) || []);
+}
+
+function getHeaderIndex(headerMap, column) {
+  const variants = getHeaderVariants(column);
+  for (const variant of variants) {
+    const actualIndex = headerMap.get(normalizeHeader(variant));
+    if (actualIndex !== undefined) {
+      return actualIndex;
+    }
+  }
+  return undefined;
+}
+
 function validateColumns(headers) {
   const normalizedHeaders = new Set(headers.map(normalizeHeader).filter(Boolean));
-  const expectedHeaders = new Set(REQUIRED_COLUMNS.map(normalizeHeader));
+  const expectedHeaders = new Set(
+    REQUIRED_COLUMNS.reduce((columns, column) => columns.concat(getHeaderVariants(column)), []).map(normalizeHeader)
+  );
 
-  const missing = REQUIRED_COLUMNS.filter((column) => !normalizedHeaders.has(normalizeHeader(column)));
+  const missing = REQUIRED_COLUMNS.filter((column) => {
+    return !getHeaderVariants(column).some((variant) => normalizedHeaders.has(normalizeHeader(variant)));
+  });
   const extras = headers.filter((header) => {
     const normalized = normalizeHeader(header);
     return normalized && !expectedHeaders.has(normalized);
@@ -486,7 +513,7 @@ async function parseExcelFile(file) {
   });
 }
 
-function parseNumber(value) {
+function parseNumber(value, column = "") {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
   }
@@ -513,19 +540,7 @@ function parseNumber(value) {
     return null;
   }
 
-  const lastComma = text.lastIndexOf(",");
-  const lastDot = text.lastIndexOf(".");
-
-  if (lastComma > -1 && lastDot > -1) {
-    const decimalSeparator = lastComma > lastDot ? "," : ".";
-    const thousandsSeparator = decimalSeparator === "," ? "." : ",";
-    text = text.split(thousandsSeparator).join("");
-    text = text.replace(decimalSeparator, ".");
-  } else if (lastComma > -1) {
-    text = normalizeSingleSeparatorNumber(text, ",");
-  } else if (lastDot > -1) {
-    text = normalizeSingleSeparatorNumber(text, ".");
-  }
+  text = FLEXIBLE_DECIMAL_NUMERIC_COLUMNS.has(column) ? normalizeFlexibleDecimalNumberText(text) : normalizeNumberText(text);
 
   const number = Number(text);
   if (!Number.isFinite(number)) {
@@ -534,21 +549,28 @@ function parseNumber(value) {
   return isNegative ? -number : number;
 }
 
-function normalizeSingleSeparatorNumber(text, separator) {
-  const parts = text.split(separator);
-  if (parts.length === 1) {
-    return text;
+function isDotThousandsNumber(text) {
+  return /^-?\d{1,3}(\.\d{3})+$/.test(text);
+}
+
+function normalizeNumberText(text) {
+  if (text.includes(",")) {
+    return text.split(".").join("").replace(",", ".");
   }
-
-  const lastPart = parts[parts.length - 1];
-  const hasMultipleSeparators = parts.length > 2;
-  const isLikelyDecimal = lastPart.length > 0 && lastPart.length <= 2;
-
-  if (hasMultipleSeparators || !isLikelyDecimal) {
-    return parts.join("");
+  if (isDotThousandsNumber(text)) {
+    return text.split(".").join("");
   }
+  return text;
+}
 
-  return `${parts.slice(0, -1).join("")}.${lastPart}`;
+function normalizeFlexibleDecimalNumberText(text) {
+  if (text.includes(",")) {
+    return text.split(".").join("").replace(",", ".");
+  }
+  if ((text.match(/\./g) || []).length > 1 && isDotThousandsNumber(text)) {
+    return text.split(".").join("");
+  }
+  return text;
 }
 
 function parseDate(value) {
@@ -596,7 +618,7 @@ function normalizeRow(row) {
   REQUIRED_COLUMNS.forEach((column) => {
     const value = row[column];
     if (NUMERIC_COLUMNS.has(column)) {
-      normalized[column] = parseNumber(value);
+      normalized[column] = ZERO_WHEN_EMPTY_NUMERIC_COLUMNS.has(column) && isEmptyCell(value) ? 0 : parseNumber(value, column);
     } else if (DATE_COLUMNS.has(column)) {
       const parsedDate = parseDate(value);
       normalized[column] = parsedDate;
@@ -619,11 +641,14 @@ function normalizeRow(row) {
   if (!normalized["Presentación AS400 de la venta - Clave"]) {
     normalized.__warnings.push("Sin presentación");
   }
-  if (normalized["Objetivo cajas total"] === null) {
+  if (normalized["Objetivo mes "] === null) {
     normalized.__warnings.push("Sin objetivo");
   }
-  if (normalized["Ventas cajas físicas mes (sin rep)"] === null) {
-    normalized.__warnings.push("Sin ventas");
+  if (normalized["Ventas cajas físicas (sin rep)"] === null) {
+    normalized.__warnings.push("Ventas inválidas");
+  }
+  if (normalized["TotalVentaMes"] === null) {
+    normalized.__warnings.push("Total venta mes inválido");
   }
 
   normalized["Estado de vigencia"] = getVigenciaStatus(normalized["Fecha inicio"], normalized["Fecha fin"]);
@@ -638,8 +663,8 @@ function buildDataQualityReport(rows, context = {}) {
     rowsWithoutNit: rows.filter((row) => !row["Nit cliente - Clave"]).length,
     rowsWithoutSapClient: rows.filter((row) => !row["Cliente SAP - Clave"]).length,
     rowsWithoutPresentation: rows.filter((row) => !row["Presentación AS400 de la venta - Clave"]).length,
-    rowsWithoutObjective: rows.filter((row) => row["Objetivo cajas total"] === null).length,
-    rowsWithoutSales: rows.filter((row) => row["Ventas cajas físicas mes (sin rep)"] === null).length,
+    rowsWithoutObjective: rows.filter((row) => row["Objetivo mes "] === null).length,
+    rowsWithoutSales: rows.filter((row) => row["Ventas cajas físicas (sin rep)"] === null).length,
     rowsWithWarnings: rows.filter((row) => row.__warnings.length).length,
     extraColumns: context.extraColumns || [],
     detectedColumns: context.detectedColumns || [],
@@ -649,22 +674,23 @@ function buildDataQualityReport(rows, context = {}) {
 }
 
 function computeKpis(rows) {
-  const salesMonth = sumField(rows, "Ventas cajas físicas mes (sin rep)");
-  const accumulatedSales = sumField(rows, "Ventas acumuladas negociacion");
-  const objective = sumField(rows, "Objetivo cajas total");
-  const compliance = objective ? accumulatedSales / objective : null;
-  const missingBoxes = objective - accumulatedSales;
+  const salesPeriod = sumUniqueTotalSalesMonth(rows);
+  const latestMonthRows = getLatestYearMonthRows(rows);
+  const salesMonth = sumUniqueTotalSalesMonth(latestMonthRows);
+  const objective = sumUniqueActivityObjective(rows);
+  const compliance = objective ? salesMonth / objective : null;
+  const missingBoxes = objective - salesMonth;
   const discounts = rows
     .map((row) => row["Porcentaje descuento"])
     .filter((value) => typeof value === "number" && Number.isFinite(value));
 
   return {
+    salesPeriod,
     salesMonth,
-    accumulatedSales,
     objective,
     compliance,
     missingBoxes,
-    uniqueClients: countUnique(rows, "Nit cliente - Clave"),
+    uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
     averageDiscount: discounts.length ? discounts.reduce((acc, value) => acc + value, 0) / discounts.length : null,
@@ -679,6 +705,64 @@ function groupBySum(rows, groupField, valueField) {
     grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField]));
   });
   return Array.from(grouped, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+}
+
+function sumUniqueTotalSalesMonth(rows) {
+  return sumUniqueField(rows, getClientMonthKey, "TotalVentaMes");
+}
+
+function getLatestYearMonthRows(rows) {
+  const latestValue = rows.reduce((latest, row) => {
+    const value = getYearMonthSortValue(row);
+    return value === null || (latest !== null && value <= latest) ? latest : value;
+  }, null);
+  if (latestValue === null) {
+    return rows;
+  }
+  return rows.filter((row) => getYearMonthSortValue(row) === latestValue);
+}
+
+function getYearMonthSortValue(row) {
+  const value = normalizeCellText(row["Año Mes"]);
+  if (!value) {
+    return null;
+  }
+  const monthYear = value.match(/^(\d{1,2})\.(\d{4})$/);
+  if (monthYear) {
+    return Number(monthYear[2]) * 100 + Number(monthYear[1]);
+  }
+  const yearMonth = value.match(/^(\d{4})(\d{2})$/);
+  if (yearMonth) {
+    return Number(yearMonth[1]) * 100 + Number(yearMonth[2]);
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function sumUniqueActivityObjective(rows) {
+  return sumUniqueField(rows, getActivityKey, "Objetivo mes ");
+}
+
+function sumUniqueField(rows, keyGetter, valueField) {
+  const seen = new Set();
+  return rows.reduce((acc, row, index) => {
+    const key = keyGetter(row, index);
+    if (seen.has(key)) {
+      return acc;
+    }
+    seen.add(key);
+    return acc + numberForCalc(row[valueField]);
+  }, 0);
+}
+
+function getClientMonthKey(row, index) {
+  const client = normalizeCellText(row["Cliente SAP - Clave"]) || `fila-${index}`;
+  const yearMonth = normalizeCellText(row["Año Mes"]) || normalizeCellText(row["Mes"]) || `fila-${index}`;
+  return `${client}||${yearMonth}`;
+}
+
+function getActivityKey(row, index) {
+  return normalizeCellText(row["ID Actividad"]) || `fila-${index}`;
 }
 
 function getUniqueOptions(rows, field) {

@@ -498,11 +498,9 @@ const TABLE_COLUMNS = [
   "Categoría AS400 de la venta",
   "Región SAP",
   "Cedi",
-  "Cliente AS400 - Texto",
   "Cliente SAP - Clave",
   "Presentación AS400 de la venta - Texto",
-  "Ventas cajas físicas mes (sin rep)",
-  "Ventas acumuladas negociacion",
+  "Ventas cajas físicas (sin rep)",
   "Objetivo cajas total",
   "Porcentaje descuento",
   "Fecha inicio",
@@ -513,8 +511,7 @@ const TABLE_COLUMNS = [
 const NUMERIC_FIELDS = new Set([
   "Año",
   "Año Mes",
-  "Ventas cajas físicas mes (sin rep)",
-  "Ventas acumuladas negociacion",
+  "Ventas cajas físicas (sin rep)",
   "Objetivo cajas total",
   "Porcentaje descuento"
 ]);
@@ -525,7 +522,7 @@ const state = {
   search: "",
   page: 1,
   pageSize: 10,
-  sortField: "Ventas cajas físicas mes (sin rep)",
+  sortField: "Ventas cajas físicas (sin rep)",
   sortDir: "desc"
 };
 
@@ -621,8 +618,7 @@ function renderAll() {
 }
 
 function computeKpis(rows) {
-  const salesMonth = sumField(rows, "Ventas cajas físicas mes (sin rep)");
-  const accumulatedSales = sumField(rows, "Ventas acumuladas negociacion");
+  const salesMonth = sumField(rows, "Ventas cajas físicas (sin rep)");
   const objective = sumField(rows, "Objetivo cajas total");
   const discounts = rows.map(function (row) {
     return row["Porcentaje descuento"];
@@ -632,11 +628,10 @@ function computeKpis(rows) {
 
   return {
     salesMonth: salesMonth,
-    accumulatedSales: accumulatedSales,
     objective: objective,
-    compliance: objective ? accumulatedSales / objective : null,
-    missingBoxes: objective - accumulatedSales,
-    uniqueClients: countUnique(rows, "Nit cliente - Clave"),
+    compliance: objective ? salesMonth / objective : null,
+    missingBoxes: objective - salesMonth,
+    uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
     averageDiscount: discounts.length ? discounts.reduce(function (acc, value) { return acc + value; }, 0) / discounts.length : null,
@@ -647,12 +642,11 @@ function computeKpis(rows) {
 function renderKpis(rows) {
   const kpis = computeKpis(rows);
   const items = [
-    ["Total ventas cajas físicas mes", formatNumber(kpis.salesMonth)],
-    ["Total ventas acumuladas negociación", formatNumber(kpis.accumulatedSales)],
+    ["Total ventas cajas físicas", formatNumber(kpis.salesMonth)],
     ["Total objetivo cajas", formatNumber(kpis.objective)],
     ["Cumplimiento", kpis.compliance === null ? "N/A" : formatPercent(kpis.compliance)],
     ["Cajas faltantes", formatNumber(kpis.missingBoxes)],
-    ["Clientes únicos", formatInteger(kpis.uniqueClients)],
+    ["Clientes SAP únicos", formatInteger(kpis.uniqueClients)],
     ["Presentaciones únicas", formatInteger(kpis.uniquePresentations)],
     ["Actividades únicas", formatInteger(kpis.uniqueActivities)],
     ["Descuento promedio", kpis.averageDiscount === null ? "N/A" : formatPercent(kpis.averageDiscount)],
@@ -665,11 +659,11 @@ function renderKpis(rows) {
 }
 
 function renderCharts(rows) {
-  renderBarChart("chartRegion", groupBySum(rows, "Región SAP", "Ventas cajas físicas mes (sin rep)").slice(0, 12), false);
-  renderBarChart("chartCanal", groupBySum(rows, "Canal", "Ventas cajas físicas mes (sin rep)").slice(0, 12), false);
-  renderBarChart("chartCategoria", groupBySum(rows, "Categoría AS400 de la venta", "Ventas cajas físicas mes (sin rep)").slice(0, 12), false);
-  renderBarChart("chartClientes", groupBySum(rows, "Cliente AS400 - Texto", "Ventas cajas físicas mes (sin rep)").slice(0, 10), false);
-  renderBarChart("chartPresentaciones", groupBySum(rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas mes (sin rep)").slice(0, 10), false);
+  renderBarChart("chartRegion", groupBySum(rows, "Región SAP", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
+  renderBarChart("chartCanal", groupBySum(rows, "Canal", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
+  renderBarChart("chartCategoria", groupBySum(rows, "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)").slice(0, 12), false);
+  renderBarChart("chartClientes", groupBySum(rows, "Cliente SAP - Clave", "Ventas cajas físicas (sin rep)").slice(0, 10), false);
+  renderBarChart("chartPresentaciones", groupBySum(rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas (sin rep)").slice(0, 10), false);
   renderBarChart("chartCedi", complianceByField(rows, "Cedi").slice(0, 12), true);
   renderVerticalChart("chartMes", salesByMonth(rows));
 }
@@ -816,16 +810,16 @@ function complianceByField(rows, field) {
   rows.forEach(function (row) {
     const key = normalizeText(row[field]) || "Sin dato";
     if (!grouped.has(key)) {
-      grouped.set(key, { accumulated: 0, objective: 0 });
+      grouped.set(key, { sales: 0, objective: 0 });
     }
     const current = grouped.get(key);
-    current.accumulated += numberForCalc(row["Ventas acumuladas negociacion"]);
+    current.sales += numberForCalc(row["Ventas cajas físicas (sin rep)"]);
     current.objective += numberForCalc(row["Objetivo cajas total"]);
   });
   return Array.from(grouped, function (entry) {
     return {
       label: entry[0],
-      value: entry[1].objective ? entry[1].accumulated / entry[1].objective : 0
+      value: entry[1].objective ? entry[1].sales / entry[1].objective : 0
     };
   }).sort(function (a, b) {
     return b.value - a.value;
@@ -834,7 +828,7 @@ function complianceByField(rows, field) {
 
 function salesByMonth(rows) {
   const field = rows.some(function (row) { return row["Año Mes"] !== null && row["Año Mes"] !== undefined; }) ? "Año Mes" : "Mes";
-  const grouped = groupBySum(rows, field, "Ventas cajas físicas mes (sin rep)");
+  const grouped = groupBySum(rows, field, "Ventas cajas físicas (sin rep)");
   return grouped.sort(function (a, b) {
     const aNumber = Number(a.label);
     const bNumber = Number(b.label);
@@ -1073,19 +1067,19 @@ function generateDashboardHtml(payload) {
           </div>
           <div class="quick-search">
             <i data-lucide="search"></i>
-            <input id="globalSearchInput" type="search" placeholder="Buscar cliente, canal, cedi o presentación">
+            <input id="globalSearchInput" type="search" placeholder="Buscar cliente SAP, canal, cedi o presentación">
           </div>
           <div id="filtersGrid" class="filters-grid"></div>
         </section>
 
         <section id="charts" class="charts-grid">
-          <article class="chart-card"><div><h2>Ventas por Región SAP</h2><p>Distribución de cajas físicas por región.</p></div><div id="chartRegion" class="chart"></div></article>
+          <article class="chart-card"><div><h2>Ventas por Región SAP</h2><p>Total venta mes agrupado por Cliente SAP y Año Mes.</p></div><div id="chartRegion" class="chart"></div></article>
           <article class="chart-card"><div><h2>Ventas por Canal</h2><p>Comparativo por canal comercial.</p></div><div id="chartCanal" class="chart"></div></article>
           <article class="chart-card"><div><h2>Ventas por Categoría</h2><p>Categorías AS400 con mayor volumen.</p></div><div id="chartCategoria" class="chart"></div></article>
-          <article class="chart-card"><div><h2>Top 10 clientes</h2><p>Clientes con más cajas físicas del mes.</p></div><div id="chartClientes" class="chart"></div></article>
+          <article class="chart-card"><div><h2>Top 10 clientes SAP</h2><p>Clientes SAP con mayor total venta mes.</p></div><div id="chartClientes" class="chart"></div></article>
           <article class="chart-card"><div><h2>Top 10 presentaciones</h2><p>Presentaciones más relevantes por volumen.</p></div><div id="chartPresentaciones" class="chart"></div></article>
-          <article class="chart-card"><div><h2>Cumplimiento por Cedi</h2><p>Ventas acumuladas frente al objetivo total.</p></div><div id="chartCedi" class="chart"></div></article>
-          <article class="chart-card chart-wide"><div><h2>Ventas por Mes / Año Mes</h2><p>Evolución temporal de ventas en cajas físicas.</p></div><div id="chartMes" class="chart"></div></article>
+          <article class="chart-card"><div><h2>Cumplimiento por Cedi</h2><p>Total venta último mes frente a objetivo mes.</p></div><div id="chartCedi" class="chart"></div></article>
+          <article class="chart-card chart-wide"><div><h2>Ventas por Mes / Año Mes</h2><p>Evolución temporal de total venta mes.</p></div><div id="chartMes" class="chart"></div></article>
         </section>
 
         <section id="detail" class="table-card">
@@ -1432,15 +1426,15 @@ const FILTER_FIELDS = [
 ];
 const TABLE_COLUMNS = [
   "Año", "Mes", "Canal", "Categoría AS400 de la venta", "Región SAP", "Cedi",
-  "Cliente AS400 - Texto", "Cliente SAP - Clave", "Presentación AS400 de la venta - Texto",
-  "Ventas cajas físicas mes (sin rep)", "Ventas acumuladas negociacion", "Objetivo cajas total",
+  "Cliente SAP - Clave", "Presentación AS400 de la venta - Texto",
+  "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes ", "Objetivo cajas total",
   "Porcentaje descuento", "Fecha inicio", "Fecha fin", "Estado de vigencia"
 ];
-const NUMERIC_FIELDS = new Set(["Año", "Año Mes", "Ventas cajas físicas mes (sin rep)", "Ventas acumuladas negociacion", "Objetivo cajas total", "Porcentaje descuento"]);
+const NUMERIC_FIELDS = new Set(["Año", "Año Mes", "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes ", "Objetivo cajas total", "Porcentaje descuento"]);
 const DASHBOARD_THEME_KEY = "negotiationsDashboardTheme";
 const chartInstances = {};
 const debouncedResizeCharts = debounce(resizeCharts, 160);
-const state = { filters: {}, filteredRows: [], search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas mes (sin rep)", sortDir: "desc" };
+const state = { filters: {}, filteredRows: [], search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc" };
 document.addEventListener("DOMContentLoaded", initDashboard);
 
 function initDashboard() {
@@ -1555,7 +1549,7 @@ function validateDashboardDataShape(rows) {
     console.warn("DASHBOARD_DATA no contiene filas.");
     return false;
   }
-  const requiredFields = ["Región SAP", "Canal", "Categoría AS400 de la venta", "Ventas cajas físicas mes (sin rep)", "Ventas acumuladas negociacion", "Objetivo cajas total"];
+  const requiredFields = ["Región SAP", "Canal", "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", "TotalVentaMes", "Objetivo mes "];
   requiredFields.forEach(function (field) {
     if (!(field in rows[0])) {
       console.warn("Campo no encontrado en DASHBOARD_DATA:", field);
@@ -1649,18 +1643,32 @@ function renderActiveFilters() {
     return "<span class=\\"filter-chip\\">" + escapeHtml(field) + ": " + escapeHtml(state.filters[field]) + "</span>";
   }).join("") : "<span class=\\"badge badge-muted\\">Sin filtros activos</span>";
 }
+function applyChartFilter(field, value) {
+  if (!field || !value) return;
+  if (state.filters[field] === value) {
+    delete state.filters[field];
+  } else {
+    state.filters[field] = value;
+  }
+  document.querySelectorAll("[data-filter-field]").forEach(function (select) {
+    if (select.dataset.filterField === field) select.value = state.filters[field] || "";
+  });
+  state.page = 1;
+  renderAll();
+}
 function computeKpis(rows) {
-  const salesMonth = sumField(rows, "Ventas cajas físicas mes (sin rep)");
-  const accumulatedSales = sumField(rows, "Ventas acumuladas negociacion");
-  const objective = sumField(rows, "Objetivo cajas total");
+  const salesPeriod = sumUniqueTotalSalesMonth(rows);
+  const latestMonthRows = getLatestYearMonthRows(rows);
+  const salesMonth = sumUniqueTotalSalesMonth(latestMonthRows);
+  const objective = sumUniqueActivityObjective(rows);
   const discounts = rows.map(function (row) { return row["Porcentaje descuento"]; }).filter(isFiniteNumber);
   return {
+    salesPeriod: salesPeriod,
     salesMonth: salesMonth,
-    accumulatedSales: accumulatedSales,
     objective: objective,
-    compliance: objective ? accumulatedSales / objective : null,
-    missingBoxes: objective - accumulatedSales,
-    uniqueClients: countUnique(rows, "Nit cliente - Clave"),
+    compliance: objective ? salesMonth / objective : null,
+    missingBoxes: objective - salesMonth,
+    uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
     averageDiscount: discounts.length ? discounts.reduce(function (acc, value) { return acc + value; }, 0) / discounts.length : null,
@@ -1670,12 +1678,12 @@ function computeKpis(rows) {
 function renderKpis(rows) {
   const k = computeKpis(rows);
   const items = [
-    ["shopping-bag", "Total ventas cajas físicas mes", formatNumber(k.salesMonth), "Suma de ventas del mes"],
-    ["trending-up", "Ventas acumuladas negociación", formatNumber(k.accumulatedSales), "Avance acumulado negociado"],
-    ["target", "Objetivo cajas total", formatNumber(k.objective), "Meta total del periodo"],
-    ["gauge", "Cumplimiento", k.compliance === null ? "N/A" : formatPercent(k.compliance), "Avance sobre objetivo"],
-    ["package-minus", "Cajas faltantes", formatNumber(k.missingBoxes), "Objetivo menos acumulado"],
-    ["users", "Clientes únicos", formatInteger(k.uniqueClients), "NIT cliente distintos"],
+    ["shopping-bag", "Total ventas periodo", formatNumber(k.salesPeriod), "Cliente SAP y Año Mes del periodo"],
+    ["calendar-days", "Total venta último mes", formatNumber(k.salesMonth), "Último Año Mes filtrado"],
+    ["target", "Objetivo mes", formatNumber(k.objective), "Una vez por actividad"],
+    ["gauge", "Cumplimiento", k.compliance === null ? "N/A" : formatRatioPercent(k.compliance), "Avance sobre objetivo"],
+    ["package-minus", "Cajas faltantes", formatNumber(k.missingBoxes), "Objetivo mes menos total venta último mes"],
+    ["users", "Clientes SAP únicos", formatInteger(k.uniqueClients), "Cliente SAP distintos"],
     ["boxes", "Presentaciones únicas", formatInteger(k.uniquePresentations), "Claves de presentación"],
     ["badge-check", "Actividades únicas", formatInteger(k.uniqueActivities), "ID Actividad distintos"],
     ["percent", "Descuento promedio", k.averageDiscount === null ? "N/A" : formatPercent(k.averageDiscount), "Promedio válido"],
@@ -1691,20 +1699,21 @@ function renderCharts(rows) {
     renderAllChartEmptyStates("No hay datos para mostrar con los filtros seleccionados.");
     return;
   }
-  renderChartFromFields("chartRegion", "bar", rows, "Región SAP", "Ventas cajas físicas mes (sin rep)", false, true, 12);
-  renderChartFromFields("chartCanal", "donut", rows, "Canal", "Ventas cajas físicas mes (sin rep)", false, false, 10);
-  renderChartFromFields("chartCategoria", "bar", rows, "Categoría AS400 de la venta", "Ventas cajas físicas mes (sin rep)", false, true, 12);
-  renderChartFromFields("chartClientes", "bar", rows, "Cliente AS400 - Texto", "Ventas cajas físicas mes (sin rep)", false, true, 10);
-  renderChartFromFields("chartPresentaciones", "bar", rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas mes (sin rep)", false, true, 10);
-  renderChart("chartCedi", "bar", groupComplianceByCedi(rows).slice(0, 12), true, true);
-  renderChart("chartMes", "line", salesByMonth(rows), false, false);
+  const monthField = getMonthChartField(rows);
+  renderChart("chartRegion", "bar", groupUniqueTotalSalesByField(rows, "Región SAP", 12), false, true, "Región SAP");
+  renderChart("chartCanal", "donut", groupUniqueTotalSalesByField(rows, "Canal", 10), false, false, "Canal");
+  renderChartFromFields("chartCategoria", "bar", rows, "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", false, true, 12);
+  renderChart("chartClientes", "bar", groupUniqueTotalSalesByField(rows, "Cliente SAP - Clave", 10), false, true, "Cliente SAP - Clave");
+  renderChartFromFields("chartPresentaciones", "bar", rows, "Presentación AS400 de la venta - Texto", "Ventas cajas físicas (sin rep)", false, true, 10);
+  renderChart("chartCedi", "bar", groupComplianceByCedi(rows).slice(0, 12), true, true, "Cedi");
+  renderChart("chartMes", "line", salesByMonth(rows), false, false, monthField);
 }
 function renderChartFromFields(elementId, type, rows, groupField, valueField, asPercent, horizontal, limit) {
   if (!hasField(rows, groupField) || !hasField(rows, valueField)) {
     renderChartMessage(elementId, "No se encontró el campo necesario para esta gráfica.");
     return;
   }
-  renderChart(elementId, type, groupBySum(rows, groupField, valueField, limit), asPercent, horizontal);
+  renderChart(elementId, type, groupBySum(rows, groupField, valueField, limit), asPercent, horizontal, groupField);
 }
 function hasField(rows, field) {
   return rows.some(function (row) {
@@ -1719,7 +1728,7 @@ function renderChartMessage(elementId, message) {
     console.warn("No se encontró el contenedor de gráfica:", elementId);
   }
 }
-function renderChart(elementId, type, items, asPercent, horizontal) {
+function renderChart(elementId, type, items, asPercent, horizontal, filterField) {
   const element = document.getElementById(elementId);
   if (!element) {
     console.warn("No se encontró el contenedor de gráfica:", elementId);
@@ -1732,7 +1741,7 @@ function renderChart(elementId, type, items, asPercent, horizontal) {
   }
   if (!window.echarts) {
     console.warn("ECharts no está disponible. Se usa renderizado nativo para", elementId);
-    renderNativeChart(element, type, chartItems, asPercent, horizontal);
+    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField);
     return;
   }
   if (chartInstances[elementId]) {
@@ -1747,11 +1756,19 @@ function renderChart(elementId, type, items, asPercent, horizontal) {
   try {
     const chart = window.echarts.init(element, null, { renderer: "canvas" });
     chart.setOption(buildEChartOption(type, chartItems, asPercent, horizontal), true);
+    if (filterField) {
+      element.style.cursor = "pointer";
+      chart.on("click", function (params) {
+        if (params && params.name) applyChartFilter(filterField, String(params.name));
+      });
+    } else {
+      element.style.cursor = "";
+    }
     chartInstances[elementId] = chart;
   } catch (error) {
     console.warn("Error renderizando gráfica con ECharts. Se usa renderizado nativo para", elementId, error);
     delete chartInstances[elementId];
-    renderNativeChart(element, type, chartItems, asPercent, horizontal);
+    renderNativeChart(element, type, chartItems, asPercent, horizontal, filterField);
   }
 }
 function getChartThemeColors() {
@@ -1803,14 +1820,14 @@ function buildEChartOption(type, items, asPercent, horizontal) {
   }
   return {
     color: colors,
-    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: function (value) { return asPercent ? formatPercent(value) : formatNumber(value); } }, tooltip),
+    tooltip: Object.assign({ trigger: "axis", axisPointer: { type: "shadow" }, valueFormatter: function (value) { return asPercent ? formatRatioPercent(value) : formatNumber(value); } }, tooltip),
     grid: { left: 18, right: 18, top: 24, bottom: 28, containLabel: true },
     xAxis: horizontal
-      ? { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } }
+      ? { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatRatioPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } }
       : { type: "category", data: labels, axisLabel: { color: theme.muted, fontWeight: 700, rotate: labels.length > 6 ? 28 : 0 }, axisLine: { lineStyle: { color: theme.grid } } },
     yAxis: horizontal
       ? { type: "category", data: labels.slice().reverse(), axisLabel: { color: theme.muted, fontWeight: 700, width: 120, overflow: "truncate" }, axisLine: { lineStyle: { color: theme.grid } } }
-      : { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } },
+      : { type: "value", axisLabel: { color: theme.muted, formatter: function (value) { return asPercent ? formatRatioPercent(value) : compactNumber(value); } }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } },
     series: [{ type: "bar", barMaxWidth: 28, itemStyle: { borderRadius: horizontal ? [0, 8, 8, 0] : [8, 8, 0, 0] }, data: horizontal ? values.slice().reverse() : values }]
   };
 }
@@ -1869,32 +1886,44 @@ function hasRenderableChartData(items) {
     return Math.abs(item.value) > 0;
   });
 }
-function renderNativeChart(element, type, items, asPercent, horizontal) {
+function renderNativeChart(element, type, items, asPercent, horizontal, filterField) {
   if (type === "donut") {
-    renderNativeDonutChart(element, items, asPercent);
+    renderNativeDonutChart(element, items, asPercent, filterField);
+    bindNativeChartFilters(element);
     return;
   }
-  renderNativeBarChart(element, items, asPercent, horizontal);
+  renderNativeBarChart(element, items, asPercent, horizontal, filterField);
+  bindNativeChartFilters(element);
 }
-function renderNativeBarChart(element, items, asPercent, horizontal) {
+function renderNativeBarChart(element, items, asPercent, horizontal, filterField) {
   const max = Math.max.apply(null, items.map(function (item) { return Math.abs(item.value); })) || 1;
   element.innerHTML = "<div class=\\"native-chart " + (horizontal ? "native-horizontal" : "native-vertical") + "\\">" + items.map(function (item) {
     const size = Math.max(3, Math.min(100, Math.abs(item.value) / max * 100));
-    const valueText = asPercent ? formatPercent(item.value) : formatNumber(item.value);
+    const valueText = asPercent ? formatRatioPercent(item.value) : formatNumber(item.value);
+    const filterAttrs = filterField ? " data-chart-filter-field=\\"" + escapeHtml(filterField) + "\\" data-chart-filter-value=\\"" + escapeHtml(item.label) + "\\"" : "";
     if (horizontal) {
-      return "<div class=\\"native-row\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"><span class=\\"native-label\\">" + escapeHtml(item.label) + "</span><span class=\\"native-track\\"><span class=\\"native-fill\\" style=\\"width:" + size.toFixed(2) + "%\\"></span></span><strong>" + escapeHtml(valueText) + "</strong></div>";
+      return "<div class=\\"native-row\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"" + filterAttrs + "><span class=\\"native-label\\">" + escapeHtml(item.label) + "</span><span class=\\"native-track\\"><span class=\\"native-fill\\" style=\\"width:" + size.toFixed(2) + "%\\"></span></span><strong>" + escapeHtml(valueText) + "</strong></div>";
     }
-    return "<div class=\\"native-column\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"><span class=\\"native-column-fill\\" style=\\"height:" + size.toFixed(2) + "%\\"></span><small>" + escapeHtml(item.label) + "</small></div>";
+    return "<div class=\\"native-column\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\"" + filterAttrs + "><span class=\\"native-column-fill\\" style=\\"height:" + size.toFixed(2) + "%\\"></span><small>" + escapeHtml(item.label) + "</small></div>";
   }).join("") + "</div>";
 }
-function renderNativeDonutChart(element, items, asPercent) {
+function renderNativeDonutChart(element, items, asPercent, filterField) {
   const total = items.reduce(function (acc, item) { return acc + Math.max(0, item.value); }, 0);
   const topItems = items.slice(0, 6);
   element.innerHTML = "<div class=\\"native-donut\\"><div class=\\"native-donut-center\\"><strong>" + escapeHtml(formatNumber(total)) + "</strong><span>Total</span></div><div class=\\"native-donut-list\\">" + topItems.map(function (item, index) {
-    const valueText = asPercent ? formatPercent(item.value) : formatNumber(item.value);
+    const valueText = asPercent ? formatRatioPercent(item.value) : formatNumber(item.value);
     const percent = total ? Math.max(0, item.value) / total * 100 : 0;
-    return "<div class=\\"native-donut-item\\"><span class=\\"native-swatch swatch-" + index + "\\"></span><span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(valueText) + "</strong><small>" + percent.toFixed(1) + "%</small></div>";
+    const filterAttrs = filterField ? " data-chart-filter-field=\\"" + escapeHtml(filterField) + "\\" data-chart-filter-value=\\"" + escapeHtml(item.label) + "\\"" : "";
+    return "<div class=\\"native-donut-item\\"" + filterAttrs + "><span class=\\"native-swatch swatch-" + index + "\\"></span><span>" + escapeHtml(item.label) + "</span><strong>" + escapeHtml(valueText) + "</strong><small>" + percent.toFixed(1) + "%</small></div>";
   }).join("") + "</div></div>";
+}
+function bindNativeChartFilters(element) {
+  element.querySelectorAll("[data-chart-filter-field]").forEach(function (node) {
+    node.style.cursor = "pointer";
+    node.addEventListener("click", function () {
+      applyChartFilter(node.dataset.chartFilterField, node.dataset.chartFilterValue);
+    });
+  });
 }
 function renderTable() {
   const table = document.getElementById("detailTable");
@@ -1953,7 +1982,8 @@ function applyFilters(rows, filters) {
       const selected = filters[field];
       if (!selected) return true;
       if (field === "Estado de vigencia") return getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === selected;
-      return normalizeText(row[field]) === selected;
+      const rowValue = normalizeText(row[field]);
+      return selected === "Sin dato" ? !rowValue : rowValue === selected;
     });
   });
 }
@@ -1962,7 +1992,34 @@ function groupBySum(rows, groupField, valueField, limit) {
   rows.forEach(function (row) {
     const rawKey = row[groupField];
     const key = rawKey === null || rawKey === undefined || String(rawKey).trim() === "" ? "Sin dato" : String(rawKey).trim();
-    grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField]));
+    grouped.set(key, (grouped.get(key) || 0) + numberForCalc(row[valueField], valueField));
+  });
+  let result = Array.from(grouped, function (entry) {
+    return { label: entry[0], value: numberForCalc(entry[1]) };
+  }).filter(function (item) {
+    return Number.isFinite(item.value);
+  }).sort(function (a, b) {
+    return b.value - a.value;
+  });
+  if (limit) result = result.slice(0, limit);
+  return result;
+}
+function groupUniqueTotalSalesByField(rows, groupField, limit) {
+  return groupByUniqueField(rows, groupField, getClientMonthKey, "TotalVentaMes", limit);
+}
+function groupUniqueObjectiveByField(rows, groupField, limit) {
+  return groupByUniqueField(rows, groupField, getActivityKey, "Objetivo mes ", limit);
+}
+function groupByUniqueField(rows, groupField, uniqueKeyGetter, valueField, limit) {
+  const grouped = new Map();
+  const seen = new Set();
+  rows.forEach(function (row, index) {
+    const rawKey = row[groupField];
+    const groupKey = rawKey === null || rawKey === undefined || String(rawKey).trim() === "" ? "Sin dato" : String(rawKey).trim();
+    const uniqueKey = groupKey + "||" + uniqueKeyGetter(row, index);
+    if (seen.has(uniqueKey)) return;
+    seen.add(uniqueKey);
+    grouped.set(groupKey, (grouped.get(groupKey) || 0) + numberForCalc(row[valueField], valueField));
   });
   let result = Array.from(grouped, function (entry) {
     return { label: entry[0], value: numberForCalc(entry[1]) };
@@ -1979,23 +2036,42 @@ function getUniqueOptions(rows, field) {
 }
 function groupComplianceByCedi(rows) {
   const grouped = new Map();
-  rows.forEach(function (row) {
+  const latestMonthRows = getLatestYearMonthRows(rows);
+  const seenSales = new Set();
+  const seenObjectives = new Set();
+  latestMonthRows.forEach(function (row, index) {
     const key = normalizeText(row["Cedi"]) || "Sin dato";
     if (!grouped.has(key)) grouped.set(key, { sales: 0, objective: 0 });
     const current = grouped.get(key);
-    current.sales += numberForCalc(row["Ventas acumuladas negociacion"]);
-    current.objective += numberForCalc(row["Objetivo cajas total"]);
+    const salesKey = key + "||" + getClientMonthKey(row, index);
+    if (!seenSales.has(salesKey)) {
+      seenSales.add(salesKey);
+      current.sales += numberForCalc(row["TotalVentaMes"], "TotalVentaMes");
+    }
+  });
+  rows.forEach(function (row, index) {
+    const key = normalizeText(row["Cedi"]) || "Sin dato";
+    if (!grouped.has(key)) grouped.set(key, { sales: 0, objective: 0 });
+    const current = grouped.get(key);
+    const objectiveKey = key + "||" + getActivityKey(row, index);
+    if (!seenObjectives.has(objectiveKey)) {
+      seenObjectives.add(objectiveKey);
+      current.objective += numberForCalc(row["Objetivo mes "], "Objetivo mes ");
+    }
   });
   return Array.from(grouped, function (entry) {
     return { label: entry[0], value: entry[1].objective > 0 ? entry[1].sales / entry[1].objective : 0 };
   }).sort(function (a, b) { return b.value - a.value; });
 }
 function salesByMonth(rows) {
-  const field = rows.some(function (row) { return row["Año Mes"] !== null && row["Año Mes"] !== undefined; }) ? "Año Mes" : "Mes";
-  return groupBySum(rows, field, "Ventas cajas físicas mes (sin rep)").sort(function (a, b) {
+  const field = getMonthChartField(rows);
+  return groupUniqueTotalSalesByField(rows, field).sort(function (a, b) {
     const an = Number(a.label), bn = Number(b.label);
     return Number.isFinite(an) && Number.isFinite(bn) ? an - bn : String(a.label).localeCompare(String(b.label), "es");
   });
+}
+function getMonthChartField(rows) {
+  return rows.some(function (row) { return row["Año Mes"] !== null && row["Año Mes"] !== undefined; }) ? "Año Mes" : "Mes";
 }
 function exportFilteredCsv(rows) {
   return [TABLE_COLUMNS.join(",")].concat(rows.map(function (row) {
@@ -2037,39 +2113,80 @@ function valueForSort(row, field) {
   return NUMERIC_FIELDS.has(field) ? (isFiniteNumber(value) ? value : -Number.MAX_VALUE) : normalizeText(value);
 }
 function getTotalPages(rows) { return Math.max(1, Math.ceil(rows.length / state.pageSize)); }
-function sumField(rows, field) { return rows.reduce(function (acc, row) { return acc + numberForCalc(row[field]); }, 0); }
+function sumField(rows, field) { return rows.reduce(function (acc, row) { return acc + numberForCalc(row[field], field); }, 0); }
+function sumUniqueTotalSalesMonth(rows) { return sumUniqueField(rows, getClientMonthKey, "TotalVentaMes"); }
+function sumUniqueActivityObjective(rows) { return sumUniqueField(rows, getActivityKey, "Objetivo mes "); }
+function getLatestYearMonthRows(rows) {
+  const latestValue = rows.reduce(function (latest, row) {
+    const value = getYearMonthSortValue(row);
+    return value === null || (latest !== null && value <= latest) ? latest : value;
+  }, null);
+  if (latestValue === null) return rows;
+  return rows.filter(function (row) { return getYearMonthSortValue(row) === latestValue; });
+}
+function getYearMonthSortValue(row) {
+  const value = normalizeText(row["Año Mes"]);
+  if (!value) return null;
+  const monthYear = value.match(/^(\\d{1,2})\\.(\\d{4})$/);
+  if (monthYear) return Number(monthYear[2]) * 100 + Number(monthYear[1]);
+  const yearMonth = value.match(/^(\\d{4})(\\d{2})$/);
+  if (yearMonth) return Number(yearMonth[1]) * 100 + Number(yearMonth[2]);
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+function sumUniqueField(rows, keyGetter, valueField) {
+  const seen = new Set();
+  return rows.reduce(function (acc, row, index) {
+    const key = keyGetter(row, index);
+    if (seen.has(key)) return acc;
+    seen.add(key);
+    return acc + numberForCalc(row[valueField], valueField);
+  }, 0);
+}
+function getClientMonthKey(row, index) {
+  const client = normalizeText(row["Cliente SAP - Clave"]) || "fila-" + index;
+  const yearMonth = normalizeText(row["Año Mes"]) || normalizeText(row["Mes"]) || "fila-" + index;
+  return client + "||" + yearMonth;
+}
+function getActivityKey(row, index) {
+  return normalizeText(row["ID Actividad"]) || "fila-" + index;
+}
 function countUnique(rows, field) { return new Set(rows.map(function (row) { return normalizeText(row[field]); }).filter(Boolean)).size; }
-function numberForCalc(value) {
+function numberForCalc(value, field) {
   if (isFiniteNumber(value)) return value;
   if (value === null || value === undefined || value === "") return 0;
-  const parsed = parseNumberLike(value);
+  const parsed = parseNumberLike(value, field);
   return isFiniteNumber(parsed) ? parsed : 0;
 }
 function isFiniteNumber(value) { return typeof value === "number" && Number.isFinite(value); }
-function parseNumberLike(value) {
+function parseNumberLike(value, field) {
   let text = String(value).trim();
   if (!text || text === "-") return null;
   text = text.replace(/\\s/g, "").replace(/[^0-9,.-]/g, "");
-  const lastComma = text.lastIndexOf(",");
-  const lastDot = text.lastIndexOf(".");
-  if (lastComma > -1 && lastDot > -1) {
-    const decimal = lastComma > lastDot ? "," : ".";
-    const thousands = decimal === "," ? "." : ",";
-    text = text.split(thousands).join("").replace(decimal, ".");
-  } else if (lastComma > -1) {
-    text = normalizeSingleSeparatorNumber(text, ",");
-  } else if (lastDot > -1) {
-    text = normalizeSingleSeparatorNumber(text, ".");
-  }
+  text = field === "TotalVentaMes" ? normalizeFlexibleDecimalNumberText(text) : normalizeNumberText(text);
   const number = Number(text);
   return Number.isFinite(number) ? number : null;
 }
-function normalizeSingleSeparatorNumber(text, separator) {
-  const parts = text.split(separator);
-  if (parts.length === 1) return text;
-  const last = parts[parts.length - 1];
-  if (parts.length > 2 || last.length > 2) return parts.join("");
-  return parts.slice(0, -1).join("") + "." + last;
+function isDotThousandsNumber(text) {
+  return /^-?\\d{1,3}(\\.\\d{3})+$/.test(text);
+}
+function normalizeNumberText(text) {
+  if (text.includes(",")) {
+    return text.split(".").join("").replace(",", ".");
+  }
+  if (isDotThousandsNumber(text)) {
+    return text.split(".").join("");
+  }
+  return text;
+}
+function normalizeFlexibleDecimalNumberText(text) {
+  if (text.includes(",")) {
+    return text.split(".").join("").replace(",", ".");
+  }
+  if ((text.match(/\\./g) || []).length > 1 && isDotThousandsNumber(text)) {
+    return text.split(".").join("");
+  }
+  return text;
 }
 function dateOnly(value) {
   if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(String(value))) return null;
@@ -2086,6 +2203,10 @@ function formatPercent(value) {
   if (!isFiniteNumber(value)) return "N/A";
   const displayValue = Math.abs(value) > 1 ? value / 100 : value;
   return new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(displayValue);
+}
+function formatRatioPercent(value) {
+  if (!isFiniteNumber(value)) return "N/A";
+  return new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(value);
 }
 function formatDateTime(value) {
   if (!value) return "—";
