@@ -361,6 +361,83 @@ function runSyntheticTests() {
   assert(!kpiElement.innerHTML.includes("Clientes SAP únicos"));
   assert(!kpiElement.innerHTML.includes("Descuento promedio"));
 
+  assert(dashboard.getSapRegionDepartments("Costa").includes("Atlántico"));
+  assert(dashboard.getSapRegionDepartments("Centro Sur").includes("Bogotá D.C."));
+  assert.strictEqual(dashboard.normalizeMapName("  BOYACÁ "), "boyaca");
+  assert.strictEqual(dashboard.getSapRegionForDepartmentName("ATLANTICO"), "Costa");
+  assert.strictEqual(dashboard.getSapRegionForDepartmentName("Archipiélago de San Andrés, Providencia y Santa Catalina"), "Costa");
+  assert.strictEqual(dashboard.getSapRegionForDepartmentName("Valle"), "Occidente");
+
+  const regionMapModel = dashboard.buildSapRegionMapModel([
+    { label: "Costa", value: 120000 },
+    { label: "Antioquia", value: 50000 },
+    { label: "Región X", value: 7000 }
+  ]);
+  const costaZoneData = regionMapModel.zoneData.find((item) => item.sapRegion === "Costa");
+  assert(costaZoneData);
+  assert.strictEqual(costaZoneData.regionValue, 120000);
+  assert.deepStrictEqual(plain(costaZoneData.value.slice(0, 2)), [-74.8, 10.4]);
+  assert.strictEqual(costaZoneData.symbolSize, 46);
+  assert.strictEqual(costaZoneData.color, dashboard.getSapRegionColor("Costa"));
+  assert.strictEqual(regionMapModel.regionTotals.Costa, 120000);
+  assert.strictEqual(regionMapModel.rankingItems.find((item) => item.label === "Costa").value, 120000);
+  assert.strictEqual(regionMapModel.unmappedRegions[0].label, "Región X");
+  assert(dashboard.getColombiaGeoJsonUrl().includes("geoBoundaries-COL-ADM1_simplified.geojson"));
+  const regionMapOption = dashboard.buildRegionMapOption(regionMapModel);
+  assert(regionMapOption.geo);
+  assert.strictEqual(regionMapOption.geo.silent, true);
+  assert(!regionMapOption.series.some((serie) => serie.type === "map"));
+  assert(regionMapOption.series.some((serie) => serie.type === "scatter"));
+  const costaTooltip = regionMapOption.tooltip.formatter({ data: costaZoneData });
+  assert(costaTooltip.includes("Región SAP: Costa"));
+  assert(costaTooltip.includes("Haz clic para filtrar"));
+  assert(!costaTooltip.includes("Departamento"));
+
+  const fakeGeoJson = { type: "FeatureCollection", features: [{ type: "Feature", properties: { name: "Colombia" }, geometry: { type: "Polygon", coordinates: [[[-77, 8], [-70, 8], [-70, 0], [-77, 0], [-77, 8]]] } }] };
+  const mapElements = { chartRegion: makeElement(), chartRegionMap: makeElement() };
+  const originalEcharts = dashboard.window.echarts;
+  let registeredMap = null;
+  let mapOption = null;
+  let clickEventName = "";
+  dashboard.window.echarts = {
+    registerMap(name, geoJson) {
+      registeredMap = { name, geoJson };
+    },
+    init() {
+      return {
+        setOption(option) {
+          mapOption = option;
+        },
+        on(eventName) {
+          clickEventName = eventName;
+        },
+        dispose() {}
+      };
+    }
+  };
+  withDashboardElements(mapElements, () => {
+    dashboard.renderRegionMapWithGeoJson(mapElements.chartRegion, regionMapModel, fakeGeoJson);
+  });
+  dashboard.window.echarts = originalEcharts;
+  assert.strictEqual(registeredMap.name, "colombiaSapRegions");
+  assert.strictEqual(registeredMap.geoJson, fakeGeoJson);
+  assert.strictEqual(mapOption.geo.silent, true);
+  assert.strictEqual(clickEventName, "click");
+
+  const regionChartElement = makeElement();
+  withDashboardElement("chartRegion", regionChartElement, () => {
+    dashboard.renderRegionSalesMap([
+      normalizeKpiRow({ clientId: "C-REG-1", sales: "120000", yearMonth: "202607", region: "Costa" }),
+      normalizeKpiRow({ clientId: "C-REG-2", sales: "50000", yearMonth: "202607", region: "Antioquia" })
+    ]);
+  });
+  assert(regionChartElement.innerHTML.includes("Mapa no disponible"));
+  assert(regionChartElement.innerHTML.includes("Ranking por Región SAP"));
+  assert(regionChartElement.innerHTML.includes(dashboard.getSapRegionColor("Costa")));
+  const costaFilterNode = regionChartElement.__children.find((node) => node.dataset.chartFilterValue === "Costa");
+  assert(costaFilterNode, "El fallback debe mantener nodos clicables por Región SAP.");
+  assert.strictEqual(costaFilterNode.dataset.chartFilterField, "Región SAP");
+
   const withoutRegionFilter = dashboard.applyFilters(validCustomerRows, {});
   assert.strictEqual(dashboard.getNoSalesAnalysis(withoutRegionFilter).presentationCount, 2);
   const selectedRegionFilter = dashboard.applyFilters(validCustomerRows, { "Región SAP": "Antioquia" });
@@ -781,7 +858,7 @@ function normalizeKpiRow(options = {}) {
     "Año Mes": options.yearMonth || "202607",
     "Centro - Clave": "001",
     "Canal": "Tradicional",
-    "Región SAP": "Antioquia",
+    "Región SAP": options.region || "Antioquia",
     "Categoría AS400 de la venta": "Gaseosa",
     "Nit cliente - Clave": options.nit || "900001",
     "Cliente AS400 - Texto": options.clientAs400 || "Cliente prueba",

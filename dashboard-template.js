@@ -92,7 +92,7 @@ function generateDashboardHtml(payload) {
         </section>
 
         <section id="charts" class="charts-grid">
-          <article class="chart-card"><div><h2>Ventas por Región SAP</h2><p>Total venta mes agrupado por Cliente SAP y Año Mes.</p></div><div id="chartRegion" class="chart"></div></article>
+          <article class="chart-card"><div><h2>Ventas por Región SAP</h2><p>Mapa aproximado por macrozonas comerciales. Las zonas se iluminan por Región SAP, no por venta departamental individual.</p></div><div id="chartRegion" class="chart region-map-host"></div></article>
           <article class="chart-card"><div><h2>Ventas por Canal</h2><p>Comparativo por canal comercial.</p></div><div id="chartCanal" class="chart"></div></article>
           <article class="chart-card"><div><h2>Ventas por Categoría</h2><p>Categorías AS400 con mayor volumen.</p></div><div id="chartCategoria" class="chart"></div></article>
           <article class="chart-card"><div><h2>Top 10 clientes SAP</h2><p>Clientes SAP con mayor total venta mes.</p></div><div id="chartClientes" class="chart"></div></article>
@@ -425,6 +425,21 @@ select, input[type="search"] {
 .swatch-3 { background: #4f46e5; }
 .swatch-4 { background: #0284c7; }
 .swatch-5 { background: #14b8a6; }
+.region-map-host { height: auto; min-height: 340px; }
+.region-map-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.75fr); gap: 16px; align-items: stretch; min-height: 340px; }
+.region-map-canvas { min-height: 340px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft-bg); }
+.region-ranking { display: grid; align-content: start; gap: 10px; min-width: 0; }
+.region-ranking-title { margin: 0; color: var(--muted); font-size: 0.73rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.region-ranking-list { display: grid; gap: 9px; }
+.region-ranking-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 9px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); font-weight: 800; }
+.region-ranking-row[role="button"] { cursor: pointer; }
+.region-ranking-row:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: 2px; }
+.region-ranking-name { display: inline-flex; gap: 8px; align-items: center; min-width: 0; }
+.region-ranking-name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.region-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; background: var(--primary); }
+.region-ranking-value { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.region-map-note { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
+.region-unmapped { padding: 9px 10px; border: 1px solid rgba(245, 158, 11, 0.32); border-radius: 12px; background: var(--amber-soft); color: var(--amber); font-size: 0.78rem; font-weight: 800; line-height: 1.4; }
 .table-tools { display: flex; gap: 10px; align-items: end; }
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; }
 table { width: 100%; min-width: 1400px; border-collapse: separate; border-spacing: 0; }
@@ -497,6 +512,8 @@ tbody tr:hover { background: var(--primary-soft); }
   .sidebar-note { position: static; margin-top: 18px; }
   .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .region-map-layout { grid-template-columns: 1fr; }
+  .region-map-canvas { min-height: 300px; }
 }
 @media (max-width: 820px) {
   .main { padding: 20px 12px 34px; }
@@ -580,9 +597,46 @@ const CATEGORY_FIELDS = [
   "Categoría",
   "Categoria"
 ];
+const SAP_REGION_DEPARTMENT_MAP = {
+  "Antioquia": ["Antioquia"],
+  "Centro Norte": ["Santander", "Norte de Santander", "Boyacá"],
+  "Centro Sur": ["Bogotá D.C.", "Cundinamarca", "Tolima", "Huila", "Caquetá"],
+  "Costa": ["Atlántico", "Bolívar", "Cesar", "Córdoba", "La Guajira", "Magdalena", "Sucre", "San Andrés y Providencia"],
+  "Occidente": ["Valle del Cauca", "Cauca", "Nariño", "Chocó", "Caldas", "Risaralda", "Quindío"],
+  "Oriente": ["Arauca", "Casanare", "Meta", "Vichada", "Guainía", "Guaviare", "Vaupés", "Amazonas", "Putumayo"]
+};
+const SAP_REGION_COLORS = {
+  "Antioquia": "#0f766e",
+  "Centro Norte": "#2563eb",
+  "Centro Sur": "#d97706",
+  "Costa": "#e11d48",
+  "Occidente": "#7c3aed",
+  "Oriente": "#16a34a"
+};
+const SAP_REGION_ZONE_MARKERS = {
+  "Costa": { coord: [-74.8, 10.4], size: 46 },
+  "Antioquia": { coord: [-75.6, 6.3], size: 38 },
+  "Centro Norte": { coord: [-73.1, 6.8], size: 40 },
+  "Centro Sur": { coord: [-74.4, 3.8], size: 42 },
+  "Occidente": { coord: [-76.3, 4.4], size: 44 },
+  "Oriente": { coord: [-70.9, 4.2], size: 52 }
+};
+const COLOMBIA_MAP_NAME = "colombiaSapRegions";
+const COLOMBIA_GEOJSON_URL = "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/COL/ADM1/geoBoundaries-COL-ADM1_simplified.geojson";
+const DEPARTMENT_NAME_ALIASES = {
+  "bogota": "Bogotá D.C.",
+  "bogota dc": "Bogotá D.C.",
+  "distrito capital": "Bogotá D.C.",
+  "valle": "Valle del Cauca",
+  "san andres": "San Andrés y Providencia",
+  "san andres y providencia": "San Andrés y Providencia",
+  "archipielago de san andres providencia y santa catalina": "San Andrés y Providencia"
+};
 const DASHBOARD_THEME_KEY = "negotiationsDashboardTheme";
 const NO_SALES_WITHOUT_CATEGORY_MESSAGE = "Hay presentaciones sin ventas, pero no tienen una categoría disponible para realizar la agrupación.";
 const chartInstances = {};
+let colombiaGeoJsonCache = null;
+let regionMapRenderToken = 0;
 const debouncedResizeCharts = debounce(resizeCharts, 160);
 const state = { filters: {}, filteredRows: [], noSalesAnalysis: getEmptyNoSalesAnalysis(), detailExplorer: getEmptyDetailExplorerState(), search: "", page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc" };
 const chartDrilldowns = {
@@ -622,6 +676,7 @@ function getPreferredTheme() {
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 function getCurrentTheme() {
+  if (!document.documentElement || !document.documentElement.dataset) return "light";
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 function applyTheme(theme, persist) {
@@ -898,7 +953,7 @@ function renderCharts(rows, noSalesAnalysis) {
     return;
   }
   const monthField = getMonthChartField(rows);
-  renderChart("chartRegion", "bar", groupUniqueTotalSalesByField(rows, "Región SAP", 12), false, true, "Región SAP");
+  renderRegionSalesMap(rows);
   renderChart("chartCanal", "donut", groupUniqueTotalSalesByField(rows, "Canal", 10), false, false, "Canal");
   renderChartFromFields("chartCategoria", "bar", rows, "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", false, true, 12);
   renderChart("chartClientes", "bar", groupUniqueTotalSalesByField(rows, "Cliente SAP - Clave", 10), false, true, "Cliente SAP - Clave");
@@ -923,6 +978,202 @@ function renderNoSalesCategoryChart(noSalesAnalysis) {
     },
     actionLabel: "Ver presentaciones sin ventas de"
   });
+}
+function renderRegionSalesMap(rows) {
+  const element = document.getElementById("chartRegion");
+  if (!element) return;
+  const renderToken = ++regionMapRenderToken;
+  const regionItems = groupUniqueTotalSalesByField(rows, "Región SAP", 12);
+  const model = buildSapRegionMapModel(regionItems);
+  if (!hasRenderableChartData(model.rankingItems)) {
+    disposeRegionMapChart();
+    element.innerHTML = "<div class=\\"no-data\\">No hay datos para mostrar con los filtros seleccionados.</div>";
+    return;
+  }
+  if (!window.echarts || !window.fetch) {
+    renderRegionMapFallback(element, model, "Mapa no disponible; se muestra el ranking por Región SAP.");
+    return;
+  }
+  renderRegionMapFallback(element, model, "Cargando mapa de Colombia; el ranking ya está disponible.");
+  loadColombiaGeoJson().then(function (geoJson) {
+    if (renderToken !== regionMapRenderToken) return;
+    renderRegionMapWithGeoJson(element, model, geoJson);
+  }).catch(function (error) {
+    console.warn("No se pudo cargar el GeoJSON de Colombia. Se usa ranking nativo.", error);
+    if (renderToken === regionMapRenderToken) renderRegionMapFallback(element, model, "Mapa no disponible; se muestra el ranking por Región SAP.");
+  });
+}
+function renderRegionMapWithGeoJson(element, model, geoJson) {
+  disposeRegionMapChart();
+  element.innerHTML = "<div class=\\"region-map-layout\\"><div id=\\"chartRegionMap\\" class=\\"region-map-canvas\\" role=\\"img\\" aria-label=\\"Mapa aproximado de Colombia por Región SAP\\"></div>" + buildRegionRankingHtml(model, "") + "</div>";
+  try {
+    window.echarts.registerMap(COLOMBIA_MAP_NAME, geoJson);
+    const chartElement = document.getElementById("chartRegionMap");
+    const chart = window.echarts.init(chartElement, null, { renderer: "canvas" });
+    chart.setOption(buildRegionMapOption(model), true);
+    chart.on("click", function (params) {
+      const data = params && params.data ? params.data : null;
+      if (data && data.sapRegion) applyChartFilter("Región SAP", data.sapRegion);
+    });
+    chartInstances.chartRegionMap = chart;
+    bindNativeChartInteractions(element, {});
+  } catch (error) {
+    console.warn("No se pudo renderizar el mapa de Colombia. Se usa ranking nativo.", error);
+    delete chartInstances.chartRegionMap;
+    renderRegionMapFallback(element, model, "Mapa no disponible; se muestra el ranking por Región SAP.");
+  }
+}
+function loadColombiaGeoJson() {
+  if (colombiaGeoJsonCache) return Promise.resolve(colombiaGeoJsonCache);
+  return window.fetch(COLOMBIA_GEOJSON_URL)
+    .then(function (response) {
+      if (!response.ok) throw new Error("No se pudo cargar GeoJSON: " + response.status);
+      return response.json();
+    })
+    .then(function (geoJson) {
+      if (!geoJson || geoJson.type !== "FeatureCollection" || !Array.isArray(geoJson.features)) {
+        throw new Error("GeoJSON de Colombia inválido.");
+      }
+      colombiaGeoJsonCache = geoJson;
+      return geoJson;
+    });
+}
+function renderRegionMapFallback(element, model, note) {
+  disposeRegionMapChart();
+  element.innerHTML = "<div class=\\"region-map-layout\\"><div class=\\"region-map-canvas no-data\\">" + escapeHtml(note) + "</div>" + buildRegionRankingHtml(model, note) + "</div>";
+  bindNativeChartInteractions(element, {});
+}
+function disposeRegionMapChart() {
+  if (!chartInstances.chartRegionMap) return;
+  try {
+    chartInstances.chartRegionMap.dispose();
+  } catch (error) {
+    console.warn("No se pudo destruir mapa previo", error);
+  }
+  delete chartInstances.chartRegionMap;
+}
+function buildRegionRankingHtml(model, note) {
+  const max = Math.max.apply(null, model.rankingItems.map(function (item) { return Math.abs(item.value); })) || 1;
+  const rows = model.rankingItems.map(function (item) {
+    const color = getSapRegionColor(item.label);
+    const width = Math.max(3, Math.min(100, Math.abs(item.value) / max * 100));
+    const valueText = formatNumber(item.value);
+    return "<div class=\\"region-ranking-row\\" title=\\"" + escapeHtml(item.label + ": " + valueText) + "\\" role=\\"button\\" tabindex=\\"0\\" data-chart-filter-field=\\"Región SAP\\" data-chart-filter-value=\\"" + escapeHtml(item.label) + "\\"><span class=\\"region-ranking-name\\"><span class=\\"region-dot\\" style=\\"background:" + escapeHtml(color) + "\\"></span><span>" + escapeHtml(item.label) + "</span></span><strong class=\\"region-ranking-value\\">" + escapeHtml(valueText) + "</strong><span class=\\"native-track\\" style=\\"grid-column:1 / -1\\"><span class=\\"native-fill\\" style=\\"width:" + width.toFixed(2) + "%;background:" + escapeHtml(color) + "\\"></span></span></div>";
+  }).join("");
+  const unmapped = model.unmappedRegions.length ? "<div class=\\"region-unmapped\\">Regiones no mapeadas: " + escapeHtml(model.unmappedRegions.map(function (item) { return item.label; }).join(", ")) + "</div>" : "";
+  const noteText = note ? "<p class=\\"region-map-note\\">" + escapeHtml(note) + "</p>" : "<p class=\\"region-map-note\\">El ranking conserva la misma venta regional que alimenta el mapa.</p>";
+  return "<aside class=\\"region-ranking\\"><p class=\\"region-ranking-title\\">Ranking por Región SAP</p><div class=\\"region-ranking-list\\">" + rows + "</div>" + unmapped + noteText + "</aside>";
+}
+function buildSapRegionMapModel(regionItems) {
+  const rankingItems = normalizeChartItems(regionItems);
+  const total = rankingItems.reduce(function (acc, item) { return acc + Math.max(0, item.value); }, 0);
+  const knownRegionNames = Object.keys(SAP_REGION_DEPARTMENT_MAP);
+  const knownRegions = knownRegionNames.reduce(function (acc, region) {
+    acc[normalizeMapName(region)] = region;
+    return acc;
+  }, {});
+  const regionTotals = {};
+  const unmappedRegions = [];
+  rankingItems.forEach(function (item) {
+    const region = knownRegions[normalizeMapName(item.label)];
+    if (region) regionTotals[region] = item.value;
+    else unmappedRegions.push(item);
+  });
+  const zoneData = Object.keys(regionTotals).map(function (region) {
+    const marker = SAP_REGION_ZONE_MARKERS[region];
+    const value = regionTotals[region];
+    if (!marker) return null;
+    return {
+      name: region,
+      sapRegion: region,
+      value: [marker.coord[0], marker.coord[1], value],
+      regionValue: value,
+      participation: total ? value / total : 0,
+      color: getSapRegionColor(region),
+      symbolSize: marker.size
+    };
+  }).filter(Boolean);
+  return {
+    rankingItems: rankingItems,
+    zoneData: zoneData,
+    unmappedRegions: unmappedRegions,
+    regionTotals: regionTotals,
+    total: total
+  };
+}
+function buildRegionMapOption(model) {
+  const theme = getChartThemeColors();
+  return {
+    tooltip: {
+      trigger: "item",
+      backgroundColor: theme.tooltipBg,
+      borderColor: theme.tooltipBorder,
+      textStyle: { color: theme.tooltipText, fontWeight: 700 },
+      formatter: function (params) {
+        const data = params && params.data ? params.data : {};
+        if (!data.sapRegion) {
+          return "Mapa base de Colombia<br><span style=\\"font-weight:600;color:" + theme.muted + "\\">Zonas comerciales aproximadas</span>";
+        }
+        return "Región SAP: " + escapeHtml(data.sapRegion) + "<br>Ventas de la región: " + escapeHtml(formatNumber(data.regionValue)) + " cajas<br>Participación: " + escapeHtml(formatRatioPercent(data.participation)) + "<br><span style=\\"font-weight:600;color:" + theme.muted + "\\">Haz clic para filtrar</span>";
+      }
+    },
+    geo: {
+      map: COLOMBIA_MAP_NAME,
+      roam: false,
+      silent: true,
+      layoutCenter: ["50%", "52%"],
+      layoutSize: "94%",
+      itemStyle: {
+        areaColor: getNeutralMapColor(),
+        borderColor: getCurrentTheme() === "dark" ? "#334155" : "#cbd5e1",
+        borderWidth: 1.2
+      },
+      emphasis: {
+        disabled: true
+      }
+    },
+    series: [{
+      name: "Regiones SAP",
+      type: "scatter",
+      coordinateSystem: "geo",
+      symbol: "circle",
+      symbolSize: function (value, params) {
+        return params && params.data ? params.data.symbolSize : 46;
+      },
+      data: model.zoneData,
+      itemStyle: {
+        color: function (params) {
+          return params && params.data ? params.data.color : "#0f766e";
+        },
+        opacity: 0.72,
+        borderColor: function (params) {
+          return params && params.data ? params.data.color : "#0f766e";
+        },
+        borderWidth: 2
+      },
+      emphasis: {
+        scale: true,
+        itemStyle: { opacity: 0.52, shadowBlur: 12, shadowColor: "rgba(15, 23, 42, 0.22)" }
+      }
+    }, {
+      name: "Centro de región",
+      type: "scatter",
+      coordinateSystem: "geo",
+      symbol: "circle",
+      symbolSize: 8,
+      silent: true,
+      tooltip: { show: false },
+      data: model.zoneData,
+      itemStyle: {
+        color: function (params) {
+          return params && params.data ? params.data.color : "#0f766e";
+        },
+        opacity: 0.9,
+        borderColor: "#ffffff",
+        borderWidth: 1
+      }
+    }]
+  };
 }
 function renderChartFromFields(elementId, type, rows, groupField, valueField, asPercent, horizontal, limit) {
   if (!hasField(rows, groupField) || !hasField(rows, valueField)) {
@@ -1767,6 +2018,48 @@ function groupUniqueTotalSalesByField(rows, groupField, limit) {
 }
 function groupUniqueObjectiveByField(rows, groupField, limit) {
   return groupByUniqueField(rows, groupField, getActivityKey, "Objetivo mes ", limit);
+}
+function getSapRegionDepartments(region) {
+  const key = normalizeMapName(region);
+  const regionName = Object.keys(SAP_REGION_DEPARTMENT_MAP).find(function (candidate) {
+    return normalizeMapName(candidate) === key;
+  });
+  return regionName ? SAP_REGION_DEPARTMENT_MAP[regionName].slice() : [];
+}
+function buildDepartmentSapRegionLookup() {
+  const lookup = {};
+  Object.keys(SAP_REGION_DEPARTMENT_MAP).forEach(function (region) {
+    SAP_REGION_DEPARTMENT_MAP[region].forEach(function (department) {
+      const key = normalizeDepartmentName(department);
+      if (!lookup[key]) lookup[key] = region;
+    });
+  });
+  return lookup;
+}
+function getSapRegionForDepartmentName(department) {
+  return buildDepartmentSapRegionLookup()[normalizeDepartmentName(department)] || "";
+}
+function normalizeDepartmentName(value) {
+  const normalized = normalizeMapName(value);
+  return normalizeMapName(DEPARTMENT_NAME_ALIASES[normalized] || value);
+}
+function normalizeMapName(value) {
+  return normalizeText(value)
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/&/g, " y ")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLocaleLowerCase("es-CO");
+}
+function getSapRegionColor(region) {
+  return SAP_REGION_COLORS[region] || "#64748b";
+}
+function getColombiaGeoJsonUrl() {
+  return COLOMBIA_GEOJSON_URL;
+}
+function getNeutralMapColor() {
+  return getCurrentTheme() === "dark" ? "#1f2937" : "#e5e7eb";
 }
 function groupByUniqueField(rows, groupField, uniqueKeyGetter, valueField, limit) {
   const grouped = new Map();
