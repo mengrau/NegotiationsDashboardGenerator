@@ -1,5 +1,8 @@
 {
   "scripts": {
-    "test": "node tests/sales-information.test.js"
+    "test": "node tests/sales-information.test.js",
+    "audit:workbook": "node tests/workbook-audit.js",
+    "audit:performance": "node tests/performance-audit.js",
+    "audit:production": "node tests/production-audit.js"
   }
 }

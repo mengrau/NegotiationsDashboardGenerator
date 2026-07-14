@@ -38,8 +38,15 @@ const NUMERIC_COLUMNS = new Set([
   "Porcentaje descuento"
 ]);
 
-const ZERO_WHEN_EMPTY_NUMERIC_COLUMNS = new Set(["Ventas cajas físicas (sin rep)", "TotalVentaMes"]);
+const ZERO_WHEN_EMPTY_NUMERIC_COLUMNS = new Set(["Ventas cajas físicas (sin rep)"]);
 const FLEXIBLE_DECIMAL_NUMERIC_COLUMNS = new Set(["TotalVentaMes"]);
+const MONTH_INDEX = new Map([
+  ["ENE", 1], ["ENERO", 1], ["FEB", 2], ["FEBRERO", 2], ["MAR", 3], ["MARZO", 3],
+  ["ABR", 4], ["ABRIL", 4], ["MAY", 5], ["MAYO", 5], ["JUN", 6], ["JUNIO", 6],
+  ["JUL", 7], ["JULIO", 7], ["AGO", 8], ["AGOSTO", 8], ["SEP", 9], ["SEPT", 9],
+  ["SEPTIEMBRE", 9], ["OCT", 10], ["OCTUBRE", 10], ["NOV", 11], ["NOVIEMBRE", 11],
+  ["DIC", 12], ["DICIEMBRE", 12]
+]);
 
 const TEXT_COLUMNS = new Set([
   "Mes",
@@ -71,6 +78,15 @@ const PRESENTATION_ID_FIELDS = [
   "Presentación AS400 de la venta - Texto",
   "Presentación AS400 de la venta - Clave"
 ];
+const BLOCKING_COLUMNS = [
+  "Año", "Mes", "Cliente SAP - Clave", "Ventas cajas físicas (sin rep)", "TotalVentaMes",
+  "Objetivo mes ", "ID Actividad", "Fecha inicio", "Fecha fin"
+];
+const OPTIONAL_ANALYTIC_COLUMNS = [
+  "Año Mes", "Canal", "Categoría AS400 de la venta", "Presentación AS400 de la venta - Texto",
+  "Presentación AS400 de la venta - Clave", "Región SAP", "Objetivo cajas total", "Cedi"
+];
+const INFORMATIONAL_COLUMNS = REQUIRED_COLUMNS.filter((column) => BLOCKING_COLUMNS.indexOf(column) === -1 && OPTIONAL_ANALYTIC_COLUMNS.indexOf(column) === -1);
 const NEGOTIATION_ID_FIELDS = [
   "Cliente SAP - Clave",
   "ID Actividad",
@@ -96,6 +112,7 @@ const HEADER_ALIASES = new Map([
   ["TotalVentaMes", ["Total venta mes", "Total Venta Mes", "Total ventas mes", "Total Ventas Mes"]]
 ]);
 const THEME_KEY = "dashboardTheme";
+const RUNTIME_DIAGNOSTIC_LIMIT = 40;
 
 const state = {
   file: null,
@@ -106,15 +123,44 @@ const state = {
   ignoredEmptyRows: 0,
   validation: null,
   processedRows: [],
+  indexes: null,
   quality: null,
   generatedHtml: "",
   previewObjectUrl: "",
-  previewVisible: false
+  previewVisible: false,
+  loadVersion: 0,
+  processVersion: 0,
+  processing: false,
+  runtimeDiagnostics: { errors: [], warnings: [] }
 };
 
 const els = {};
 
+function isGeneratorDebugEnabled() {
+  return Boolean(window.__DASHBOARD_DEBUG__ || window.__DASHBOARD_PERF_DEBUG__);
+}
+function reportGeneratorDiagnostic(level, component, error, message) {
+  const bucket = level === "error" ? "errors" : "warnings";
+  const diagnostic = {
+    component: normalizeCellText(component) || "generator",
+    message: normalizeCellText(message || (error && error.message) || "Incidencia técnica").slice(0, 240),
+    name: normalizeCellText(error && error.name).slice(0, 80),
+    at: new Date().toISOString()
+  };
+  state.runtimeDiagnostics[bucket].push(diagnostic);
+  if (state.runtimeDiagnostics[bucket].length > RUNTIME_DIAGNOSTIC_LIMIT) state.runtimeDiagnostics[bucket].splice(0, state.runtimeDiagnostics[bucket].length - RUNTIME_DIAGNOSTIC_LIMIT);
+  if (isGeneratorDebugEnabled() && window.console) {
+    const method = level === "error" ? "error" : "warn";
+    if (typeof window.console[method] === "function") window.console[method]("Generator " + diagnostic.component + ": " + diagnostic.message);
+  }
+  return diagnostic;
+}
+function getGeneratorDiagnosticsSnapshot() {
+  return { errors: state.runtimeDiagnostics.errors.slice(), warnings: state.runtimeDiagnostics.warnings.slice(), limit: RUNTIME_DIAGNOSTIC_LIMIT };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  window.__getGeneratorDiagnostics = getGeneratorDiagnosticsSnapshot;
   cacheElements();
   initTheme();
   bindEvents();
@@ -221,7 +267,7 @@ function getPreferredTheme() {
       return saved;
     }
   } catch (error) {
-    console.warn("No se pudo leer la preferencia de tema.", error);
+    reportGeneratorDiagnostic("warning", "theme-read", error, "No se pudo leer la preferencia de tema.");
   }
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
@@ -237,7 +283,7 @@ function applyTheme(theme, persist = true) {
     try {
       window.localStorage.setItem(THEME_KEY, normalizedTheme);
     } catch (error) {
-      console.warn("No se pudo guardar la preferencia de tema.", error);
+      reportGeneratorDiagnostic("warning", "theme-write", error, "No se pudo guardar la preferencia de tema.");
     }
   }
   updateThemeToggle(normalizedTheme);
@@ -261,6 +307,7 @@ function updateThemeToggle(theme) {
 
 async function handleFile(file) {
   resetState(false);
+  const loadVersion = state.loadVersion;
   state.file = file;
   els.fileName.textContent = file.name;
   els.fileSize.textContent = formatFileSize(file.size);
@@ -272,7 +319,9 @@ async function handleFile(file) {
   setStatus("info", "Leyendo archivo Excel...");
 
   try {
-    state.workbook = await parseExcelFile(file);
+    const workbook = await parseExcelFile(file);
+    if (loadVersion !== state.loadVersion) return;
+    state.workbook = workbook;
     if (!state.workbook.SheetNames.length) {
       throw new Error("El archivo no contiene hojas.");
     }
@@ -282,7 +331,8 @@ async function handleFile(file) {
     els.sheetSelect.value = state.sheetName;
     readSelectedSheet();
   } catch (error) {
-    console.error(error);
+    if (loadVersion !== state.loadVersion) return;
+    reportGeneratorDiagnostic("error", "workbook-read", error, "No se pudo leer el archivo Excel.");
     setStatus("error", "No se pudo leer el archivo Excel. Verifica que sea un archivo .xlsx o .xls válido.");
     updateStepper("upload", "error");
     els.processButton.disabled = true;
@@ -320,7 +370,7 @@ function readSelectedSheet() {
   if (!matrix.length || !Array.isArray(matrix[0]) || matrix[0].every(isEmptyCell)) {
     state.headers = [];
     state.rowsRaw = [];
-    state.validation = { missing: REQUIRED_COLUMNS.slice(), extras: [], isValid: false };
+    state.validation = { missing: BLOCKING_COLUMNS.slice(), optionalMissing: OPTIONAL_ANALYTIC_COLUMNS.slice(), informationalMissing: INFORMATIONAL_COLUMNS.slice(), extras: [], isValid: false };
     renderSheetValidation();
     setStatus("error", "La primera fila no contiene encabezados.");
     setPreviewState("error");
@@ -362,10 +412,11 @@ function readSelectedSheet() {
     return;
   }
 
-  const extraMessage = state.validation.extras.length
-    ? `Hay ${state.validation.extras.length} columna(s) extra. Puedes procesar el archivo.`
+  const hasNonBlockingWarnings = state.validation.extras.length || state.validation.optionalMissing.length;
+  const extraMessage = hasNonBlockingWarnings
+    ? `Estructura procesable con ${state.validation.optionalMissing.length} columna(s) analítica(s) opcional(es) ausente(s) y ${state.validation.extras.length} extra(s).`
     : "Estructura válida. Puedes procesar el archivo.";
-  setStatus(state.validation.extras.length ? "warning" : "success", extraMessage);
+  setStatus(hasNonBlockingWarnings ? "warning" : "success", extraMessage);
   updateStepper("process");
   els.processButton.disabled = false;
 }
@@ -381,7 +432,7 @@ function renderSheetValidation() {
     els.detectedColumns.innerHTML = '<i data-lucide="columns-3"></i><span>Aún no se ha leído ningún archivo.</span>';
   } else {
     const validation = state.validation || { missing: [], extras: [] };
-    const requiredDetected = REQUIRED_COLUMNS.length - validation.missing.length;
+    const requiredDetected = BLOCKING_COLUMNS.length - validation.missing.length;
     const summaryTone = validation.missing.length ? "is-invalid" : validation.extras.length ? "is-warning" : "is-valid";
     const summaryIcon = validation.missing.length ? "circle-alert" : validation.extras.length ? "triangle-alert" : "check-circle-2";
     const summaryTitle = validation.missing.length ? "Estructura incompleta" : "Estructura validada";
@@ -393,12 +444,12 @@ function renderSheetValidation() {
       <span class="structure-icon"><i data-lucide="${summaryIcon}"></i></span>
       <div>
         <strong>${summaryTitle}</strong>
-        <span>${formatInteger(requiredDetected)} de ${formatInteger(REQUIRED_COLUMNS.length)} columnas requeridas detectadas</span>
+        <span>${formatInteger(requiredDetected)} de ${formatInteger(BLOCKING_COLUMNS.length)} columnas obligatorias detectadas</span>
         <small>${validation.missing.length ? `${formatInteger(validation.missing.length)} columna(s) faltante(s)` : "Sin columnas faltantes"} · ${extraText}</small>
       </div>`;
   }
 
-  const validation = state.validation || { missing: [], extras: [], isValid: false };
+  const validation = state.validation || { missing: [], optionalMissing: [], informationalMissing: [], extras: [], isValid: false };
   els.validationDetails.className = "validation-details";
   els.extraColumnsBadge.textContent = validation.extras.length
     ? `${validation.extras.length} extra(s)`
@@ -417,24 +468,31 @@ function renderSheetValidation() {
         validation.extras.length
       )} columna(s) adicional(es) detectada(s). Se conservará la validación y se procesarán las columnas requeridas.</p></div>`
     : '<div class="validation-alert validation-alert-success"><strong>Sin columnas extra</strong><p>La estructura coincide con el formato esperado.</p></div>';
-  els.validationDetails.innerHTML = missingHtml + extraHtml;
+  const optionalHtml = validation.optionalMissing.length
+    ? '<div class="validation-alert validation-alert-warning"><strong>Funciones analíticas no disponibles</strong><p>Faltan: ' + validation.optionalMissing.map(escapeHtml).join(", ") + '. El dashboard continuará sin esas dimensiones.</p></div>'
+    : '<div class="validation-alert validation-alert-success"><strong>Columnas analíticas completas</strong><p>Las dimensiones opcionales están disponibles.</p></div>';
+  els.validationDetails.innerHTML = missingHtml + optionalHtml + extraHtml;
   refreshIcons();
 }
 
 function processCurrentSheet() {
-  if (!state.validation || !state.validation.isValid || !state.rowsRaw.length) {
+  if (state.processing || !state.validation || !state.validation.isValid || !state.rowsRaw.length) {
     return;
   }
+  state.processing = true;
+  state.processVersion += 1;
+  const processVersion = state.processVersion;
 
   state.generatedHtml = "";
   closePreviewDashboard({ nextState: "loading" });
   els.downloadButton.hidden = true;
-  setStatus("info", "Procesando datos...");
+  setStatus("info", "Procesando " + formatInteger(state.rowsRaw.length) + " registros...");
   updateStepper("process");
   els.processButton.disabled = true;
   els.processButton.classList.add("is-loading");
 
   window.setTimeout(() => {
+    if (processVersion !== state.processVersion) return;
     try {
       const headerMap = buildHeaderMap(state.headers);
       state.processedRows = state.rowsRaw.map((row) => {
@@ -445,6 +503,7 @@ function processCurrentSheet() {
         });
         return normalizeRow(rowObject);
       });
+      initializeProcessedDataIndexes(state.processedRows);
 
       state.quality = buildDataQualityReport(state.processedRows, {
         ignoredEmptyRows: state.ignoredEmptyRows,
@@ -468,13 +527,16 @@ function processCurrentSheet() {
       updateStepper("download");
       setStatus("success", "Dashboard generado correctamente. Puedes descargarlo o abrir la vista previa.");
     } catch (error) {
-      console.error(error);
+      reportGeneratorDiagnostic("error", "dashboard-generation", error, "No se pudo generar el dashboard.");
       updateStepper("process", "error");
       setStatus("error", "No se pudo generar el dashboard. Revisa el archivo e inténtalo de nuevo.");
       setPreviewState("error");
     } finally {
-      els.processButton.disabled = false;
-      els.processButton.classList.remove("is-loading");
+      if (processVersion === state.processVersion) {
+        state.processing = false;
+        els.processButton.disabled = false;
+        els.processButton.classList.remove("is-loading");
+      }
     }
   }, 60);
 }
@@ -515,9 +577,11 @@ function validateColumns(headers) {
     REQUIRED_COLUMNS.reduce((columns, column) => columns.concat(getHeaderVariants(column)), []).map(normalizeHeader)
   );
 
-  const missing = REQUIRED_COLUMNS.filter((column) => {
+  const missing = BLOCKING_COLUMNS.filter((column) => {
     return !getHeaderVariants(column).some((variant) => normalizedHeaders.has(normalizeHeader(variant)));
   });
+  const optionalMissing = OPTIONAL_ANALYTIC_COLUMNS.filter((column) => !getHeaderVariants(column).some((variant) => normalizedHeaders.has(normalizeHeader(variant))));
+  const informationalMissing = INFORMATIONAL_COLUMNS.filter((column) => !getHeaderVariants(column).some((variant) => normalizedHeaders.has(normalizeHeader(variant))));
   const extras = headers.filter((header) => {
     const normalized = normalizeHeader(header);
     return normalized && !expectedHeaders.has(normalized);
@@ -525,6 +589,8 @@ function validateColumns(headers) {
 
   return {
     missing,
+    optionalMissing,
+    informationalMissing,
     extras,
     isValid: missing.length === 0
   };
@@ -661,10 +727,17 @@ function normalizeRow(row) {
     }
   });
 
-  if (!normalized["Nit cliente - Clave"]) {
+  const period = getCanonicalPeriod(normalized);
+  normalized.__periodKey = period.key;
+  normalized.__periodLabel = period.label;
+  normalized.__periodSource = period.source;
+  normalized.estadoInformacionVenta = classifySalesInformation(normalized);
+
+  const withoutSalesInformation = isWithoutSalesInformation(normalized);
+  if (!withoutSalesInformation && !normalized["Nit cliente - Clave"]) {
     normalized.__warnings.push("Sin NIT cliente");
   }
-  if (!normalized["Cliente SAP - Clave"]) {
+  if (!withoutSalesInformation && !normalized["Cliente SAP - Clave"]) {
     normalized.__warnings.push("Sin cliente SAP");
   }
   if (!normalized["Presentación AS400 de la venta - Clave"]) {
@@ -679,10 +752,59 @@ function normalizeRow(row) {
   if (normalized["TotalVentaMes"] === null) {
     normalized.__warnings.push("Total venta mes inválido");
   }
+  if (hasTemporalSource(normalized) && period.key === null) {
+    normalized.__warnings.push("Mes no interpretable");
+  }
 
   normalized["Estado de vigencia"] = getVigenciaStatus(normalized["Fecha inicio"], normalized["Fecha fin"]);
-  normalized.estadoInformacionVenta = classifySalesInformation(normalized);
   return normalized;
+}
+
+function getCanonicalPeriod(row) {
+  const year = parseCanonicalYear(row["Año"]);
+  const month = parseCanonicalMonth(row["Mes"]);
+  if (year && month) {
+    return buildCanonicalPeriod(year, month, "Año + Mes");
+  }
+
+  const source = normalizeCellText(row["Año Mes"]).replace(/\s/g, "");
+  if (!source) {
+    return { key: null, label: "", source: "AUSENTE" };
+  }
+  const monthYear = source.match(/^(\d{1,2})[./-]?(\d{4})$/);
+  if (monthYear) {
+    return buildCanonicalPeriod(Number(monthYear[2]), Number(monthYear[1]), "Año Mes");
+  }
+  const yearMonth = source.match(/^(\d{4})[./-]?(\d{1,2})$/);
+  if (yearMonth) {
+    return buildCanonicalPeriod(Number(yearMonth[1]), Number(yearMonth[2]), "Año Mes");
+  }
+  return { key: null, label: "", source: "INVALIDO" };
+}
+
+function parseCanonicalYear(value) {
+  const number = typeof value === "number" ? value : Number(normalizeCellText(value));
+  return Number.isInteger(number) && number >= 1900 && number <= 2200 ? number : null;
+}
+
+function parseCanonicalMonth(value) {
+  const text = normalizeCellText(value).toLocaleUpperCase("es-CO").replace(/\./g, "");
+  if (MONTH_INDEX.has(text)) {
+    return MONTH_INDEX.get(text);
+  }
+  const number = Number(text);
+  return Number.isInteger(number) && number >= 1 && number <= 12 ? number : null;
+}
+
+function buildCanonicalPeriod(year, month, source) {
+  if (!Number.isInteger(year) || year < 1900 || year > 2200 || !Number.isInteger(month) || month < 1 || month > 12) {
+    return { key: null, label: "", source: "INVALIDO" };
+  }
+  return { key: year * 100 + month, label: `${year}-${pad2(month)}`, source };
+}
+
+function hasTemporalSource(row) {
+  return hasUsableValue(row["Año"]) || hasUsableValue(row["Mes"]) || hasUsableValue(row["Año Mes"]);
 }
 
 function classifySalesInformation(row) {
@@ -752,6 +874,8 @@ function groupPresentationsWithoutSalesByCategory(rows) {
 }
 
 function buildDataQualityReport(rows, context = {}) {
+  const totalSalesResolution = resolveMetricGroups(rows, getClientPeriodKey, "TotalVentaMes", { preferNonZero: true });
+  const activityAnalytics = context.activityAnalytics || buildActivityAnalytics(rows);
   return {
     totalRows: rows.length,
     ignoredEmptyRows: context.ignoredEmptyRows || 0,
@@ -762,6 +886,16 @@ function buildDataQualityReport(rows, context = {}) {
     rowsWithoutObjective: rows.filter((row) => row["Objetivo mes "] === null).length,
     rowsWithoutSales: rows.filter((row) => row["Ventas cajas físicas (sin rep)"] === null).length,
     rowsWithoutSalesInformation: rows.filter(isWithoutSalesInformation).length,
+    rowsWithoutNitUnexpected: rows.filter((row) => !isWithoutSalesInformation(row) && !row["Nit cliente - Clave"]).length,
+    unparseableMonthRows: rows.filter((row) => row.__warnings.includes("Mes no interpretable")).length,
+    totalSalesConflicts: totalSalesResolution.filter((group) => group.status === "CONFLICTO").length,
+    monthlyObjectiveConflicts: activityAnalytics.summary.objectiveConflictActivities,
+    totalObjectiveConflicts: activityAnalytics.summary.totalObjectiveConflictActivities,
+    conflictingActivityDates: activityAnalytics.summary.dateConflictActivities,
+    sharedActivities: activityAnalytics.summary.sharedActivityCount,
+    multipleActivityClientPeriods: activityAnalytics.summary.multipleActivityClientPeriods,
+    ambiguousActivityPeriods: activityAnalytics.summary.ambiguousActivityPeriods,
+    exactDuplicateRows: countExactDuplicateRows(rows),
     uniquePresentationsWithoutSales: countUniquePresentationsWithoutSales(rows),
     rowsWithWarnings: rows.filter((row) => row.__warnings.length).length,
     extraColumns: context.extraColumns || [],
@@ -772,27 +906,45 @@ function buildDataQualityReport(rows, context = {}) {
 }
 
 function computeKpis(rows) {
-  const salesPeriod = sumUniqueTotalSalesMonth(rows);
   const latestMonthRows = getLatestYearMonthRows(rows);
-  const salesMonth = sumUniqueTotalSalesMonth(latestMonthRows);
-  const objective = sumUniqueActivityObjective(rows);
-  const compliance = objective ? salesMonth / objective : null;
-  const missingBoxes = objective - salesMonth;
-  const discounts = rows
-    .map((row) => row["Porcentaje descuento"])
-    .filter((value) => typeof value === "number" && Number.isFinite(value));
-
+  const salesPeriodResolution = resolveMetricGroups(rows, getClientPeriodKey, "TotalVentaMes", { preferNonZero: true });
+  const salesMonthResolution = resolveMetricGroups(latestMonthRows, getClientPeriodKey, "TotalVentaMes", { preferNonZero: true });
+  const activityAnalytics = buildActivityAnalytics(rows);
+  const latestPeriod = latestMonthRows.length ? getYearMonthSortValue(latestMonthRows[0]) : null;
+  const latestPerformance = activityAnalytics.activityPerformance.filter((item) => item.period === latestPeriod);
+  const activityAggregate = aggregateActivityPerformance(latestPerformance);
+  const salesPeriod = sumResolvedMetricGroups(salesPeriodResolution);
+  const salesMonth = sumResolvedMetricGroups(salesMonthResolution);
+  const objective = activityAggregate.eligibleCount ? activityAggregate.objectiveAll : null;
+  const compliance = activityAggregate.achievement;
+  const objectiveDifference = activityAggregate.gap;
+  const performanceConsistency = reconcileComparablePerformance({
+    comparableSales: activityAggregate.sales,
+    comparableObjective: activityAggregate.objective,
+    compliance,
+    objectiveDifference
+  });
   return {
     salesPeriod,
     salesMonth,
     objective,
     compliance,
-    missingBoxes,
+    objectiveDifference,
+    missingBoxes: objectiveDifference === null ? null : -objectiveDifference,
     uniqueClients: countUnique(rows, "Cliente SAP - Clave"),
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
-    averageDiscount: discounts.length ? discounts.reduce((acc, value) => acc + value, 0) / discounts.length : null,
-    activeNegotiations: rows.filter((row) => getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === "Vigente").length
+    activeNegotiations: countUniqueBy(
+      rows.filter((row) => getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) === "Vigente"),
+      getActivityKey
+    ),
+    salesResolution: salesPeriodResolution,
+    comparableSales: activityAggregate.sales,
+    comparableObjective: activityAggregate.objective,
+    comparableActivities: activityAggregate.comparableCount,
+    eligibleActivities: activityAggregate.eligibleCount,
+    performanceConsistency,
+    activityAnalytics
   };
 }
 
@@ -809,7 +961,7 @@ function groupBySum(rows, groupField, valueField) {
 }
 
 function sumUniqueTotalSalesMonth(rows) {
-  return sumUniqueField(rows, getClientMonthKey, "TotalVentaMes");
+  return sumResolvedMetricGroups(resolveMetricGroups(rows, getClientPeriodKey, "TotalVentaMes", { preferNonZero: true }));
 }
 
 function getLatestYearMonthRows(rows) {
@@ -824,24 +976,17 @@ function getLatestYearMonthRows(rows) {
 }
 
 function getYearMonthSortValue(row) {
-  const value = normalizeCellText(row["Año Mes"]);
-  if (!value) {
-    return null;
+  if (Number.isInteger(row.__periodKey)) {
+    return row.__periodKey;
   }
-  const monthYear = value.match(/^(\d{1,2})\.(\d{4})$/);
-  if (monthYear) {
-    return Number(monthYear[2]) * 100 + Number(monthYear[1]);
-  }
-  const yearMonth = value.match(/^(\d{4})(\d{2})$/);
-  if (yearMonth) {
-    return Number(yearMonth[1]) * 100 + Number(yearMonth[2]);
-  }
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
+  return getCanonicalPeriod(row).key;
 }
 
 function sumUniqueActivityObjective(rows) {
-  return sumUniqueField(rows, getActivityKey, "Objetivo mes ");
+  const analytics = buildActivityAnalytics(rows);
+  const latestRows = getLatestYearMonthRows(rows);
+  const latestPeriod = latestRows.length ? getYearMonthSortValue(latestRows[0]) : null;
+  return aggregateActivityPerformance(analytics.activityPerformance.filter((item) => item.period === latestPeriod)).objectiveAll;
 }
 
 function sumUniqueField(rows, keyGetter, valueField) {
@@ -857,13 +1002,366 @@ function sumUniqueField(rows, keyGetter, valueField) {
 }
 
 function getClientMonthKey(row, index) {
-  const client = normalizeCellText(row["Cliente SAP - Clave"]) || `fila-${index}`;
-  const yearMonth = normalizeCellText(row["Año Mes"]) || normalizeCellText(row["Mes"]) || `fila-${index}`;
-  return `${client}||${yearMonth}`;
+  return getClientPeriodKey(row, index) || `fila-${index}`;
+}
+
+function getClientPeriodKey(row) {
+  const client = normalizeCellText(row["Cliente SAP - Clave"]);
+  const period = getYearMonthSortValue(row);
+  return client && period !== null ? `${client}||${period}` : "";
 }
 
 function getActivityKey(row, index) {
   return normalizeCellText(row["ID Actividad"]) || `fila-${index}`;
+}
+
+function resolveMetricGroups(rows, keyGetter, valueField, options = {}) {
+  const grouped = new Map();
+  rows.forEach((row, index) => {
+    const key = keyGetter(row, index);
+    if (!key) {
+      return;
+    }
+    if (!grouped.has(key)) {
+      grouped.set(key, []);
+    }
+    const value = row[valueField];
+    if (typeof value === "number" && Number.isFinite(value) && !grouped.get(key).includes(value)) {
+      grouped.get(key).push(value);
+    }
+  });
+  return Array.from(grouped, ([key, sourceValues]) => {
+    const candidates = options.preferNonZero && sourceValues.some((value) => value !== 0)
+      ? sourceValues.filter((value) => value !== 0)
+      : sourceValues.slice();
+    if (!candidates.length) {
+      return { key, value: null, status: "AUSENTE", sourceValues };
+    }
+    if (candidates.length > 1) {
+      return { key, value: null, status: "CONFLICTO", sourceValues };
+    }
+    return { key, value: candidates[0], status: candidates[0] === 0 ? "CERO" : "OK", sourceValues };
+  });
+}
+
+function sumResolvedMetricGroups(groups) {
+  if (!groups.length || groups.some((group) => group.status === "CONFLICTO" || group.value === null)) {
+    return null;
+  }
+  return groups.reduce((sum, group) => sum + group.value, 0);
+}
+
+function isFiniteMetric(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function countUniqueBy(rows, keyGetter) {
+  return new Set(rows.map((row, index) => keyGetter(row, index)).filter(Boolean)).size;
+}
+
+function countExactDuplicateRows(rows) {
+  const counts = new Map();
+  rows.forEach((row) => {
+    const key = JSON.stringify(REQUIRED_COLUMNS.map((column) => row[column]));
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  return Array.from(counts.values()).reduce((duplicates, count) => duplicates + Math.max(0, count - 1), 0);
+}
+
+function buildActivityAnalytics(rows) {
+  const sourceRows = rows || [];
+  const salesByClientPeriod = buildSalesByClientPeriod(sourceRows);
+  const objectivesByActivity = buildObjectivesByActivity(sourceRows);
+  const relations = buildActivityClientRelations(sourceRows, objectivesByActivity);
+  const granularSales = buildGranularActivitySales(sourceRows);
+  const activityPerformance = buildActivityPerformance(
+    sourceRows,
+    salesByClientPeriod,
+    objectivesByActivity,
+    relations,
+    granularSales
+  );
+  return {
+    salesByClientPeriod,
+    objectivesByActivity,
+    activityClientRelations: relations,
+    granularSalesByActivity: granularSales,
+    activityPerformance,
+    summary: summarizeActivityAnalytics(objectivesByActivity, relations, activityPerformance)
+  };
+}
+
+function buildSalesByClientPeriod(rows) {
+  return resolveMetricGroups(rows, getClientPeriodKey, "TotalVentaMes", { preferNonZero: true }).map((group) => {
+    const [clientId, periodText] = group.key.split("||");
+    return { ...group, clientId, period: Number(periodText) };
+  });
+}
+
+function buildObjectivesByActivity(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const activityId = normalizeCellText(row["ID Actividad"]);
+    if (!activityId) return;
+    if (!grouped.has(activityId)) grouped.set(activityId, []);
+    grouped.get(activityId).push(row);
+  });
+  return Array.from(grouped, ([activityId, activityRows]) => {
+    const monthly = resolveActivityNumericField(activityRows, "Objetivo mes ");
+    const total = resolveActivityNumericField(activityRows, "Objetivo cajas total");
+    const datePairs = Array.from(new Set(activityRows.map((row) => {
+      const start = normalizeCellText(row["Fecha inicio"]);
+      const end = normalizeCellText(row["Fecha fin"]);
+      return start || end ? `${start}||${end}` : "";
+    }).filter(Boolean)));
+    const datesValid = datePairs.length === 1 && dateOnly(datePairs[0].split("||")[0]) && dateOnly(datePairs[0].split("||")[1]);
+    return {
+      activityId,
+      objectiveMonthly: monthly.value,
+      objectiveStatus: monthly.status,
+      objectiveSourceValues: monthly.sourceValues,
+      objectiveTotal: total.value,
+      objectiveTotalStatus: total.status,
+      objectiveTotalSourceValues: total.sourceValues,
+      dateStatus: datePairs.length > 1 || !datesValid ? "FECHAS_CONFLICTIVAS" : "OK",
+      datePairs,
+      startDate: datesValid ? datePairs[0].split("||")[0] : null,
+      endDate: datesValid ? datePairs[0].split("||")[1] : null
+    };
+  });
+}
+
+function resolveActivityNumericField(rows, field) {
+  const sourceValues = [];
+  rows.forEach((row) => {
+    const value = row[field];
+    if (typeof value === "number" && Number.isFinite(value) && !sourceValues.includes(value)) sourceValues.push(value);
+  });
+  if (!sourceValues.length) return { value: null, status: "SIN_OBJETIVO", sourceValues };
+  if (sourceValues.length > 1) return { value: null, status: "OBJETIVO_CONFLICTIVO", sourceValues };
+  return { value: sourceValues[0], status: "OK", sourceValues };
+}
+
+function buildActivityClientRelations(rows, objectivesByActivity = buildObjectivesByActivity(rows)) {
+  const activityClients = new Map();
+  const clientNames = new Map();
+  rows.forEach((row) => {
+    const activityId = normalizeCellText(row["ID Actividad"]);
+    const clientId = normalizeCellText(row["Cliente SAP - Clave"]);
+    if (!activityId || !clientId) return;
+    if (!activityClients.has(activityId)) activityClients.set(activityId, new Set());
+    activityClients.get(activityId).add(clientId);
+    if (!clientNames.has(clientId)) {
+      clientNames.set(clientId, normalizeCellText(row["Cliente AS400 - Nombre negocio (Texto)"]) || normalizeCellText(row["Cliente AS400 - Texto"]));
+    }
+  });
+  const periods = Array.from(new Set(rows.map(getYearMonthSortValue).filter((period) => period !== null))).sort((a, b) => a - b);
+  const activeActivitiesByClientPeriod = new Map();
+  objectivesByActivity.forEach((objective) => {
+    if (objective.dateStatus !== "OK") return;
+    periods.forEach((period) => {
+      if (!isActivityActiveInPeriod(objective, period)) return;
+      (activityClients.get(objective.activityId) || []).forEach((clientId) => {
+        const key = `${clientId}||${period}`;
+        if (!activeActivitiesByClientPeriod.has(key)) activeActivitiesByClientPeriod.set(key, new Set());
+        activeActivitiesByClientPeriod.get(key).add(objective.activityId);
+      });
+    });
+  });
+  return { activityClients, clientNames, periods, activeActivitiesByClientPeriod };
+}
+
+function isActivityActiveInPeriod(activity, period) {
+  if (!activity || activity.dateStatus !== "OK") return false;
+  const start = dateOnly(activity.startDate);
+  const end = dateOnly(activity.endDate);
+  if (!start || !end) return false;
+  const year = Math.floor(period / 100);
+  const month = period % 100;
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  return start <= monthEnd && end >= monthStart;
+}
+
+function buildGranularActivitySales(rows) {
+  const byPresentation = new Map();
+  rows.forEach((row, index) => {
+    const clientId = normalizeCellText(row["Cliente SAP - Clave"]);
+    const activityId = normalizeCellText(row["ID Actividad"]);
+    const period = getYearMonthSortValue(row);
+    if (!clientId || !activityId || period === null) return;
+    const presentationId = normalizeCellText(row["Presentación AS400 de la venta - Clave"]) || `fila-${index}`;
+    const key = `${clientId}||${period}||${activityId}||${presentationId}`;
+    if (!byPresentation.has(key)) byPresentation.set(key, []);
+    const value = row["Ventas cajas físicas (sin rep)"];
+    if (typeof value === "number" && Number.isFinite(value) && !byPresentation.get(key).includes(value)) byPresentation.get(key).push(value);
+  });
+  const byClientActivityPeriod = new Map();
+  byPresentation.forEach((values, key) => {
+    const parts = key.split("||");
+    const aggregateKey = parts.slice(0, 3).join("||");
+    if (!byClientActivityPeriod.has(aggregateKey)) byClientActivityPeriod.set(aggregateKey, { value: 0, status: "OK", presentationCount: 0, conflictKeys: [] });
+    const aggregate = byClientActivityPeriod.get(aggregateKey);
+    aggregate.presentationCount += 1;
+    if (values.length !== 1) {
+      aggregate.value = null;
+      aggregate.status = "VENTA_CONFLICTIVA";
+      aggregate.conflictKeys.push(key);
+    } else if (aggregate.status === "OK") {
+      aggregate.value += values[0];
+    }
+  });
+  return byClientActivityPeriod;
+}
+
+function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivity, relations, granularSales) {
+  const salesLookup = new Map(salesByClientPeriod.map((item) => [item.key, item]));
+  const performance = [];
+  objectivesByActivity.forEach((objective) => {
+    relations.periods.forEach((period) => {
+      const active = isActivityActiveInPeriod(objective, period);
+      if (objective.dateStatus === "OK" && !active) return;
+      const associatedClientIds = Array.from(relations.activityClients.get(objective.activityId) || []);
+      const contributionRows = associatedClientIds.map((clientId) => {
+        const clientPeriodKey = `${clientId}||${period}`;
+        const clientSale = salesLookup.get(clientPeriodKey);
+        const activeActivities = relations.activeActivitiesByClientPeriod.get(clientPeriodKey) || new Set();
+        const granularKey = `${clientId}||${period}||${objective.activityId}`;
+        const granular = granularSales.get(granularKey);
+        let sales = null;
+        let status = "SIN_VENTAS";
+        let source = "SIN_FUENTE";
+        if (clientSale && clientSale.status === "CONFLICTO") {
+          status = "VENTA_CONFLICTIVA";
+        } else if (activeActivities.size <= 1 && clientSale && isFiniteMetric(clientSale.value)) {
+          sales = clientSale.value;
+          status = "OK";
+          source = "TOTAL_VENTA_CLIENTE_PERIODO";
+        } else if (activeActivities.size > 1 && granular && granular.status === "OK") {
+          sales = granular.value;
+          status = "OK";
+          source = "VENTAS_FISICAS_ACTIVIDAD";
+        } else if (activeActivities.size > 1 && clientSale && clientSale.value === 0) {
+          sales = 0;
+          status = "OK";
+          source = "TOTAL_VENTA_CERO";
+        } else if (activeActivities.size > 1) {
+          status = granular && granular.status === "VENTA_CONFLICTIVA" ? "VENTA_CONFLICTIVA" : "VENTA_ACTIVIDAD_AMBIGUA";
+        }
+        return {
+          clientId,
+          clientName: relations.clientNames.get(clientId) || "",
+          sales,
+          status,
+          source,
+          activeActivityCount: activeActivities.size,
+          presentationCount: granular ? granular.presentationCount : 0,
+          share: null,
+          rank: null
+        };
+      });
+      const invalidContribution = contributionRows.find((item) => item.status !== "OK");
+      const totalSales = invalidContribution ? null : contributionRows.reduce((sum, item) => sum + item.sales, 0);
+      const attributedSales = contributionRows.reduce((sum, item) => sum + (isFiniteMetric(item.sales) ? item.sales : 0), 0);
+      let status = "OK";
+      const ambiguityReasons = [];
+      if (objective.dateStatus !== "OK") status = "FECHAS_CONFLICTIVAS";
+      else if (objective.objectiveStatus === "OBJETIVO_CONFLICTIVO") status = "OBJETIVO_CONFLICTIVO";
+      else if (objective.objectiveStatus !== "OK") status = "SIN_OBJETIVO";
+      else if (contributionRows.some((item) => item.status === "VENTA_CONFLICTIVA")) status = "VENTA_CONFLICTIVA";
+      else if (contributionRows.some((item) => item.status === "VENTA_ACTIVIDAD_AMBIGUA")) status = "VENTA_ACTIVIDAD_AMBIGUA";
+      else if (contributionRows.some((item) => item.status === "SIN_VENTAS")) status = "SIN_VENTAS";
+      contributionRows.filter((item) => item.status !== "OK").forEach((item) => ambiguityReasons.push(`${item.clientId}: ${item.status}`));
+      if (isFiniteMetric(totalSales) && totalSales > 0) assignContributionRanks(contributionRows, totalSales);
+      const comparable = status === "OK" && isFiniteMetric(objective.objectiveMonthly) && objective.objectiveMonthly > 0;
+      performance.push({
+        activityId: objective.activityId,
+        period,
+        isSharedActivity: associatedClientIds.length > 1,
+        associatedClientCount: associatedClientIds.length,
+        associatedClientIds,
+        objectiveMonthly: objective.objectiveMonthly,
+        objectiveStatus: objective.objectiveStatus,
+        objectiveTotal: objective.objectiveTotal,
+        totalSales,
+        attributedSales,
+        salesStatus: invalidContribution ? invalidContribution.status : "OK",
+        achievement: comparable ? totalSales / objective.objectiveMonthly : null,
+        gap: comparable ? totalSales - objective.objectiveMonthly : null,
+        comparable,
+        status,
+        ambiguityReasons,
+        contributionRows,
+        dateStatus: objective.dateStatus,
+        startDate: objective.startDate,
+        endDate: objective.endDate
+      });
+    });
+  });
+  return performance;
+}
+
+function assignContributionRanks(rows, totalSales) {
+  rows.sort((a, b) => b.sales - a.sales || a.clientId.localeCompare(b.clientId, "es"));
+  let previousSales = null;
+  let previousRank = 0;
+  rows.forEach((row, index) => {
+    row.share = totalSales ? row.sales / totalSales : null;
+    row.rank = previousSales !== null && row.sales === previousSales ? previousRank : index + 1;
+    previousSales = row.sales;
+    previousRank = row.rank;
+  });
+}
+
+function summarizeActivityAnalytics(objectives, relations, performance) {
+  const sharedActivities = objectives.filter((item) => (relations.activityClients.get(item.activityId) || new Set()).size > 1);
+  const multipleClientPeriods = Array.from(relations.activeActivitiesByClientPeriod.values()).filter((activities) => activities.size > 1);
+  return {
+    activityCount: objectives.length,
+    individualActivityCount: objectives.length - sharedActivities.length,
+    sharedActivityCount: sharedActivities.length,
+    maximumClientsPerActivity: Math.max(0, ...Array.from(relations.activityClients.values(), (clients) => clients.size)),
+    singleActivityClientPeriods: Array.from(relations.activeActivitiesByClientPeriod.values()).filter((activities) => activities.size === 1).length,
+    multipleActivityClientPeriods: multipleClientPeriods.length,
+    ambiguousActivityPeriods: performance.filter((item) => item.status === "VENTA_ACTIVIDAD_AMBIGUA").length,
+    nonComparableActivityPeriods: performance.filter((item) => !item.comparable).length,
+    objectiveConflictActivities: objectives.filter((item) => item.objectiveStatus === "OBJETIVO_CONFLICTIVO").length,
+    totalObjectiveConflictActivities: objectives.filter((item) => item.objectiveTotalStatus === "OBJETIVO_CONFLICTIVO").length,
+    dateConflictActivities: objectives.filter((item) => item.dateStatus === "FECHAS_CONFLICTIVAS").length
+  };
+}
+
+function aggregateActivityPerformance(performance) {
+  const eligible = performance.filter((item) => item.objectiveStatus === "OK" && item.dateStatus === "OK");
+  const comparable = eligible.filter((item) => item.comparable);
+  const sales = comparable.reduce((sum, item) => sum + item.totalSales, 0);
+  const objective = comparable.reduce((sum, item) => sum + item.objectiveMonthly, 0);
+  const objectiveAll = eligible.reduce((sum, item) => sum + item.objectiveMonthly, 0);
+  return {
+    sales,
+    objective,
+    objectiveAll,
+    achievement: objective > 0 ? sales / objective : null,
+    gap: objective > 0 ? sales - objective : null,
+    comparableCount: comparable.length,
+    eligibleCount: eligible.length,
+    totalCount: performance.length
+  };
+}
+
+function reconcileComparablePerformance(metrics, tolerance = 1e-9) {
+  const sales = metrics && metrics.comparableSales;
+  const objective = metrics && metrics.comparableObjective;
+  const compliance = metrics && metrics.compliance;
+  const difference = metrics && metrics.objectiveDifference;
+  if (![sales, objective, compliance, difference].every(Number.isFinite) || objective <= 0) {
+    return { comparable: false, differenceConsistent: null, complianceConsistent: null, consistent: null };
+  }
+  const expectedDifference = sales - objective;
+  const expectedCompliance = sales / objective;
+  const differenceConsistent = Math.abs(expectedDifference - difference) < tolerance;
+  const complianceConsistent = Math.abs(expectedCompliance - compliance) < tolerance;
+  return { comparable: true, expectedDifference, expectedCompliance, differenceConsistent, complianceConsistent, consistent: differenceConsistent && complianceConsistent };
 }
 
 function getUniqueOptions(rows, field) {
@@ -903,18 +1401,23 @@ function renderPreviewDashboard() {
     return;
   }
   revokePreviewUrl();
-  const blob = new Blob([state.generatedHtml], { type: "text/html;charset=utf-8" });
-  state.previewObjectUrl = URL.createObjectURL(blob);
-  els.previewFrame.removeAttribute("srcdoc");
-  els.previewFrame.src = state.previewObjectUrl;
-  els.previewFrame.hidden = false;
-  els.previewWindow.hidden = false;
-  els.previewEmpty.hidden = true;
-  state.previewVisible = true;
-  updatePreviewToggle();
-  els.previewBadge.textContent = "Interactivo";
-  els.previewBadge.className = "badge badge-success";
-  refreshIcons();
+  try {
+    const blob = new Blob([state.generatedHtml], { type: "text/html;charset=utf-8" });
+    state.previewObjectUrl = URL.createObjectURL(blob);
+    els.previewFrame.removeAttribute("srcdoc");
+    els.previewFrame.src = state.previewObjectUrl;
+    els.previewFrame.hidden = false;
+    els.previewWindow.hidden = false;
+    els.previewEmpty.hidden = true;
+    state.previewVisible = true;
+    updatePreviewToggle();
+    els.previewBadge.textContent = "Interactivo";
+    els.previewBadge.className = "badge badge-success";
+    refreshIcons();
+  } catch (error) {
+    reportGeneratorDiagnostic("error", "preview", error, "No se pudo abrir la vista previa.");
+    closePreviewDashboard({ nextState: "error" });
+  }
 }
 
 function closePreviewDashboard(options = {}) {
@@ -947,26 +1450,35 @@ function updatePreviewToggle() {
 }
 
 function downloadHtml(filename, htmlContent) {
-  const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  let url = "";
+  try {
+    const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = normalizeDownloadFilename(filename, "dashboard.html");
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    return true;
+  } catch (error) {
+    if (url) URL.revokeObjectURL(url);
+    reportGeneratorDiagnostic("error", "html-download", error, "No se pudo descargar el dashboard.");
+    setStatus("error", "No se pudo descargar el dashboard. Inténtalo nuevamente.");
+    return false;
+  }
 }
 
 function exportFilteredCsv(rows) {
   const columns = REQUIRED_COLUMNS.concat(["Estado de vigencia"]);
-  const csv = [columns.join(",")]
+  const csv = ["\uFEFF" + columns.map((column) => serializeCsvCell(column, column)).join(",")]
     .concat(
       rows.map((row) =>
         columns
           .map((column) => {
             const value = column === "Estado de vigencia" ? getVigenciaStatus(row["Fecha inicio"], row["Fecha fin"]) : row[column];
-            return `"${String(value ?? "").replace(/"/g, '""')}"`;
+            return serializeCsvCell(value, value);
           })
           .join(",")
       )
@@ -987,6 +1499,15 @@ function renderQualitySummary(quality) {
     ["Filas sin ventas", quality.rowsWithoutSales],
     ["Filas sin información de venta", quality.rowsWithoutSalesInformation],
     ["Presentaciones sin ventas", quality.uniquePresentationsWithoutSales],
+    ["Conflictos de venta mensual", quality.totalSalesConflicts],
+    ["Conflictos de objetivo mensual", quality.monthlyObjectiveConflicts],
+    ["Conflictos de objetivo total", quality.totalObjectiveConflicts],
+    ["Actividades con fechas conflictivas", quality.conflictingActivityDates],
+    ["Actividades compartidas", quality.sharedActivities],
+    ["Cliente-periodo con varias actividades", quality.multipleActivityClientPeriods],
+    ["Actividad-periodo con venta ambigua", quality.ambiguousActivityPeriods],
+    ["Meses no interpretables", quality.unparseableMonthRows],
+    ["Filas duplicadas exactas", quality.exactDuplicateRows],
     ["Columnas extra detectadas", quality.extraColumns.length],
     ["Fecha y hora de generación", new Date(quality.generatedAt).toLocaleString("es-CO")]
   ];
@@ -1010,6 +1531,8 @@ function buildMetadata() {
     processedRows: state.processedRows.length,
     detectedColumns: state.headers,
     extraColumns: state.validation ? state.validation.extras : [],
+    optionalMissingColumns: state.validation ? state.validation.optionalMissing : [],
+    informationalMissingColumns: state.validation ? state.validation.informationalMissing : [],
     qualityWarnings: state.quality || null
   };
 }
@@ -1039,6 +1562,10 @@ function getVigenciaStatus(fechaInicio, fechaFin) {
 }
 
 function resetState(clearFileInput = true) {
+  state.loadVersion += 1;
+  state.processVersion += 1;
+  state.processing = false;
+  state.runtimeDiagnostics = { errors: [], warnings: [] };
   state.file = null;
   state.workbook = null;
   state.sheetName = "";
@@ -1054,6 +1581,7 @@ function resetState(clearFileInput = true) {
     els.fileExtension.textContent = "-";
   }
   els.dropZone.classList.remove("has-file", "drag-over");
+  els.processButton.classList.remove("is-loading");
   els.fileLoadedMetric.textContent = "No";
   els.sheetsCount.textContent = "0";
   setBadge(els.uploadStateBadge, "Sin archivo", "muted");
@@ -1077,7 +1605,11 @@ function resetState(clearFileInput = true) {
 }
 
 function resetProcessedOutput() {
+  state.processVersion += 1;
+  state.processing = false;
+  state.runtimeDiagnostics = { errors: [], warnings: [] };
   state.processedRows = [];
+  clearProcessedDataIndexes();
   state.quality = null;
   state.generatedHtml = "";
   state.previewVisible = false;
@@ -1213,9 +1745,23 @@ function setBadge(element, text, type = "muted") {
 }
 
 function refreshIcons() {
-  if (window.lucide) {
+  if (!window.lucide) return;
+  try {
     window.lucide.createIcons();
+  } catch (error) {
+    reportGeneratorDiagnostic("warning", "lucide", error, "No se pudieron actualizar los iconos; los controles conservan texto accesible.");
   }
+}
+function protectCsvValue(value, originalValue) {
+  const text = String(value ?? "");
+  return typeof originalValue === "string" && /^[=+@-]/.test(text) ? "'" + text : text;
+}
+function serializeCsvCell(value, originalValue) {
+  return `"${protectCsvValue(value, originalValue).replace(/"/g, '""')}"`;
+}
+function normalizeDownloadFilename(filename, fallback) {
+  const safe = normalizeCellText(filename).replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").slice(0, 180);
+  return safe || fallback;
 }
 
 function formatFileSize(bytes) {
@@ -1253,6 +1799,64 @@ function qualityIcon(index) {
     "clock"
   ];
   return `<i data-lucide="${icons[index] || "sparkles"}"></i>`;
+}
+
+function buildProcessedDataIndexes(rows) {
+  const filterFields = ["Año", "Año Mes", "Región SAP", "Canal", "Subcanal", "Cedi", "Cliente SAP - Clave", "ID Actividad"];
+  const rowsByField = new Map(filterFields.map((field) => [field, new Map()]));
+  const rowsByActivity = new Map();
+  const rowsByClient = new Map();
+  const rowsByPeriod = new Map();
+  const clientsByActivity = new Map();
+  const activitiesByClient = new Map();
+  const presentationsByActivity = new Map();
+  const addToArrayMap = (map, key, row) => {
+    if (!key) return;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  };
+  const addToSetMap = (map, key, value) => {
+    if (!key || !value) return;
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(value);
+  };
+  (rows || []).forEach((row) => {
+    filterFields.forEach((field) => {
+      const key = normalizeCellText(row[field]);
+      addToArrayMap(rowsByField.get(field), key, row);
+    });
+    const activity = normalizeCellText(row["ID Actividad"]);
+    const client = normalizeCellText(row["Cliente SAP - Clave"]);
+    const periodInfo = getCanonicalPeriod(row);
+    const period = periodInfo && periodInfo.valid ? periodInfo.key : "";
+    const presentation = normalizeCellText(row["Presentación AS400 de la venta - Clave"]) || normalizeCellText(row["Presentación AS400 de la venta - Texto"]);
+    addToArrayMap(rowsByActivity, activity, row);
+    addToArrayMap(rowsByClient, client, row);
+    addToArrayMap(rowsByPeriod, period, row);
+    addToSetMap(clientsByActivity, activity, client);
+    addToSetMap(activitiesByClient, client, activity);
+    addToSetMap(presentationsByActivity, activity, presentation);
+  });
+  return {
+    sourceRows: rows,
+    rowsByField,
+    rowsByActivity,
+    rowsByClient,
+    rowsByPeriod,
+    clientsByActivity,
+    activitiesByClient,
+    presentationsByActivity
+  };
+}
+function initializeProcessedDataIndexes(rows) {
+  state.indexes = buildProcessedDataIndexes(rows || []);
+  return state.indexes;
+}
+function clearProcessedDataIndexes() {
+  state.indexes = null;
+}
+function getProcessedDataIndexes() {
+  return state.indexes;
 }
 
 function normalizeCellText(value) {
