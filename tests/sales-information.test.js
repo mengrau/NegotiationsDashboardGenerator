@@ -824,6 +824,23 @@ function runSyntheticTests() {
     dashboard.getComboboxSelectionText({ id: "client", placeholder: "Seleccionar" }, ["1", "2"]),
     "2 clientes seleccionados"
   );
+  const originalViewportWidth = dashboard.window.innerWidth;
+  const originalViewportHeight = dashboard.window.innerHeight;
+  dashboard.window.innerWidth = 1024;
+  dashboard.window.innerHeight = 768;
+  const lowerFilterRoot = {
+    getBoundingClientRect() {
+      return { left: 720, top: 640, bottom: 684, width: 360 };
+    }
+  };
+  const portalPanel = { style: {}, dataset: {}, scrollHeight: 360 };
+  dashboard.positionComboboxPanel(lowerFilterRoot, portalPanel);
+  assert.strictEqual(portalPanel.dataset.placement, "top");
+  assert.strictEqual(portalPanel.style.top, "272px");
+  assert.strictEqual(portalPanel.style.left, "652px");
+  assert.strictEqual(portalPanel.style.width, "360px");
+  dashboard.window.innerWidth = originalViewportWidth;
+  dashboard.window.innerHeight = originalViewportHeight;
   const activityComboboxShell = dashboard.buildMultiSelectComboboxShell({
     id: "activity", field: "ID Actividad", label: "Actividad", placeholder: "Seleccionar actividad(es)", searchPlaceholder: "Buscar actividad"
   });
@@ -1284,36 +1301,26 @@ function runSyntheticTests() {
   assert.strictEqual(resolvedCategoryAnalysis.presentationsWithoutCategory, 0);
   assert.deepStrictEqual(plain(resolvedCategoryAnalysis.byCategory), [{ label: "Gaseosa", value: 1 }]);
 
-  const onlyMissingCategory = dashboard.getNoSalesAnalysis([withoutSalesWithoutCategory]);
-  const messageElement = makeElement();
-  withDashboardElement("chartSinVentasCategoria", messageElement, () => {
-    dashboard.renderNoSalesCategoryChart(onlyMissingCategory);
-  });
-  assert(messageElement.innerHTML.includes("categoría disponible"));
-
-  const repeatedRenderElement = makeElement();
-  withDashboardElement("chartSinVentasCategoria", repeatedRenderElement, () => {
-    dashboard.renderNoSalesCategoryChart(noSalesByClient);
-    const firstRender = repeatedRenderElement.innerHTML;
-    dashboard.renderNoSalesCategoryChart(noSalesByClient);
-    assert.strictEqual(repeatedRenderElement.innerHTML, firstRender);
-    assert(!repeatedRenderElement.innerHTML.includes("No hay datos para mostrar"));
-  });
-
   const drilldownAnalysis = dashboard.getNoSalesAnalysis([
     withoutSales,
     withoutSalesSameClient,
     withoutSalesGaseosaHighObjective
   ]);
   const explorerElements = makeDetailExplorerElements();
-  const chartElement = makeElement();
   const opener = makeElement();
   dashboard.document.activeElement = opener;
-  withDashboardElements(Object.assign({ chartSinVentasCategoria: chartElement }, explorerElements), () => {
-    dashboard.renderNoSalesCategoryChart(drilldownAnalysis);
-    const gaseosaNode = chartElement.__children.find((node) => node.dataset.chartDrilldownValue === "Gaseosa");
-    assert(gaseosaNode, "El fallback nativo debe crear nodos clicables por categoría.");
-    gaseosaNode.dispatch("click");
+  withDashboardElements(explorerElements, () => {
+    dashboard.openNoSalesCategoryExplorer(opener, null, drilldownAnalysis);
+    const categoryState = dashboard.getDetailExplorerState();
+    assert.strictEqual(categoryState.type, "noSalesCategories");
+    assert.strictEqual(categoryState.allRows.length, 2);
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Ver presentaciones"));
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Porcentaje del total"));
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Actividades"));
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Clientes"));
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Página 1 de 1"));
+
+    dashboard.openNoSalesCategoryDetail("Gaseosa", drilldownAnalysis, opener);
 
     const explorerState = dashboard.getDetailExplorerState();
     assert.strictEqual(explorerElements.detailExplorerOverlay.hidden, false);
@@ -1322,8 +1329,9 @@ function runSyntheticTests() {
     assert(explorerElements.detailExplorerBody.innerHTML.includes("Manzana Pet 250x12"));
     assert(explorerElements.detailExplorerBody.innerHTML.includes("Cola Max 400x12"));
     assert(!explorerElements.detailExplorerBody.innerHTML.includes("Squash Pet 500x12"));
-    assert.strictEqual(countOccurrences(explorerElements.detailExplorerBody.innerHTML, "<th "), 5);
-    assert(!explorerElements.detailExplorerBody.innerHTML.includes("Objetivo cajas total"));
+    assert.strictEqual(countOccurrences(explorerElements.detailExplorerBody.innerHTML, "<th "), 11);
+    assert(explorerElements.detailExplorerBody.innerHTML.includes("Motivo"));
+    assert(explorerElements.detailExplorerToolbar.innerHTML.includes("Volver a categorías"));
 
     dashboard.setDetailExplorerQuery("Cola");
     assert.strictEqual(dashboard.getDetailExplorerSortedRows().length, 1);
@@ -1374,8 +1382,8 @@ function runSyntheticTests() {
       }
     });
     dashboard.downloadCsv = originalDownloadCsv;
-    assert(exportedCsv.includes("Objetivo mes"));
-    assert(exportedCsv.includes("Objetivo cajas total"));
+    assert(exportedCsv.includes("Categoría"));
+    assert(exportedCsv.includes("Motivo"));
     assert(exportedCsv.includes("Cola Max 400x12"));
     dashboard.handleDetailExplorerDocumentKeydown({
       key: "Escape",
@@ -1405,7 +1413,9 @@ function runSyntheticTests() {
   assert(!regionLabels.includes("Sin dato"));
 
   const html = dashboard.generatedHtml({ rows: [withoutSales, zeroSale, withSale], metadata: {} });
-  assert(html.includes("Presentaciones sin ventas por categoría"));
+  assert(html.includes("open-no-sales-explorer"));
+  assert(html.includes("RESUMEN POR CATEGORÍA"));
+  assert(!html.includes("chartSinVentasCategoria"));
   assert(html.includes("detailExplorerOverlay"));
   assert(html.includes('aria-describedby="detailExplorerSubtitle"'));
   assert(!html.includes("withoutSalesTable"));
@@ -1436,9 +1446,12 @@ function runSyntheticTests() {
   assert(html.includes(".chart-compact"));
   assert(html.includes(".chart-timeline"));
   assert(html.includes(".empty-state-info"));
-  assert(html.includes(".multi-combobox-panel { position: fixed; z-index: 60;"));
+  assert(html.includes(".multi-combobox-panel {\n  position: fixed; z-index: 1000;"));
+  assert(html.includes("document.body.appendChild(panel)"));
+  assert(html.includes("getBoundingClientRect()"));
+  assert(html.includes('window.addEventListener("scroll", repositionOpenComboboxPanel, true)'));
   assert(html.includes(".detail-explorer-overlay {"));
-  assert(html.includes("z-index: 80"));
+  assert(html.includes("z-index: 2000"));
   assert.strictEqual(countOccurrences(html, "echarts@5/dist/echarts.min.js"), 1);
   assert.strictEqual(countOccurrences(html, "unpkg.com/lucide@latest"), 1);
   assert.deepStrictEqual(findDuplicateHtmlIds(html), []);
@@ -1587,8 +1600,7 @@ function runAttachedWorkbookValidation() {
     clients: false,
     regions: false,
     channels: false,
-    cedi: false,
-    noSales: true
+    cedi: false
   });
 }
 
@@ -1720,7 +1732,7 @@ function runLayoutPresentationTests() {
   assert.strictEqual(registry.find((item) => item.id === "presentationStatus").visualType, "donut");
   assert.strictEqual(registry.find((item) => item.id === "category").visualType, "treemap-or-bar");
   assert.strictEqual(registry.find((item) => item.id === "presentations").visualType, "lollipop");
-  assert.strictEqual(registry.find((item) => item.id === "noSales").visualType, "donut-or-treemap");
+  assert.strictEqual(registry.some((item) => item.id === "noSales" || item.elementId === "chartSinVentasCategoria"), false);
   assert.strictEqual(registry.find((item) => item.id === "salesTarget").visualType, "bar");
   assert.strictEqual(registry.some((item) => item.id === "salesTrend" || item.elementId === "chartMes" || item.title === "Evolución de ventas"), false);
   assert.strictEqual(dashboard.chooseCompositionChartType([{ label: "A", value: 2 }, { label: "B", value: 1 }], { donutLimit: 6, treemapLimit: 18 }), "donut");
@@ -1760,7 +1772,9 @@ function runLayoutPresentationTests() {
   assert(templateSource.includes('renderChart("chartPresentaciones", "lollipop"'));
   assert(templateSource.includes("renderNativeTreemapChart"));
   assert(templateSource.includes("renderNativeLollipopChart"));
-  assert(templateSource.includes("chartDrilldowns.noSalesByCategory.open"));
+  assert(templateSource.includes("openNoSalesCategoryExplorer"));
+  assert(!templateSource.includes("renderNoSalesCategoryChart"));
+  assert(!templateSource.includes("chartSinVentasCategoria"));
   assert(!templateSource.includes('id: "salesTrend"'));
   assert(!templateSource.includes('"chartMes"'));
   assert(!templateSource.includes('if (type === "line")'));

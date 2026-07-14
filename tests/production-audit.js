@@ -48,7 +48,12 @@ checkProduction(!appSource.includes("console.error(") && !appSource.includes("co
 checkProduction(!dashboardSource.includes("console.error(") && !dashboardSource.includes("console.warn("), "Logs invasivos en dashboard");
 checkProduction(countOccurrences(dashboardSource, 'window.addEventListener("resize", debouncedResizeCharts)') === 1, "Listener resize duplicado");
 checkProduction(countOccurrences(dashboardSource, 'charts.addEventListener("click", handleTimelineAction)') === 1, "Listener timeline duplicado");
+checkProduction(dashboardSource.includes("function portalComboboxPanel") && dashboardSource.includes("document.body.appendChild(panel)"), "El dropdown no usa portal directo en body");
+checkProduction(dashboardSource.includes("position: fixed; z-index: 1000") && dashboardSource.includes("z-index: 2000"), "Jerarquía de capas de dropdown/modal inválida");
+checkProduction(dashboardSource.includes('window.addEventListener("scroll", repositionOpenComboboxPanel, true)') && dashboardSource.includes("getBoundingClientRect()"), "El dropdown no se reposiciona tras scroll");
 checkProduction(!dashboardSource.includes('id: "salesTrend"') && !dashboardSource.includes('"chartMes"') && !dashboardSource.includes("Evolución de ventas"), "La gráfica Evolución de ventas no fue eliminada completamente");
+checkProduction(!dashboardSource.includes('id: "noSales"') && !dashboardSource.includes('"chartSinVentasCategoria"') && !dashboardSource.includes("renderNoSalesCategoryChart"), "La gráfica de presentaciones sin ventas no fue eliminada completamente");
+checkProduction(dashboardSource.includes('action: "open-no-sales-explorer"') && dashboardSource.includes("buildNoSalesCategoryExplorerConfig"), "Falta el explorador del KPI de presentaciones sin ventas");
 checkProduction(dashboardSource.includes('title: "Ventas atribuibles comparables"'), "Falta el KPI de ventas atribuibles comparables");
 checkProduction(productionRows.length === 18319, "Cantidad de filas inesperada");
 checkProduction(productionAnalytics.summary.activityCount === 370, "Cantidad de actividades inesperada");

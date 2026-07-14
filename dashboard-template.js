@@ -360,12 +360,11 @@ label, .kpi-label {
 .multi-combobox-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; }
 .multi-combobox-count { flex: 0 0 auto; color: var(--muted); font-size: 0.74rem; font-weight: 900; }
 .multi-combobox-panel {
-  position: absolute; z-index: 45; top: calc(100% + 7px); left: 0; width: max(100%, 360px); max-width: min(460px, calc(100vw - 32px));
+  position: fixed; z-index: 1000; width: min(460px, calc(100vw - 24px)); max-height: min(72vh, 560px);
   overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 18px 44px rgba(15, 23, 42, 0.22);
   animation: sectionIn 0.18s ease both;
 }
 .multi-combobox-panel[hidden] { display: none; }
-.multi-combobox-panel.opens-up { top: auto; bottom: calc(100% + 7px); }
 .multi-combobox-search { position: sticky; top: 0; z-index: 1; padding: 10px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .multi-combobox-search .quick-search { margin: 0; }
 .multi-combobox-status { display: flex; justify-content: space-between; gap: 10px; padding: 8px 11px; color: var(--muted); font-size: 0.74rem; font-weight: 800; }
@@ -414,6 +413,9 @@ select, input[type="search"] {
 .kpi-card.kpi-negative .kpi-icon { background: var(--red-soft); color: var(--red); }
 .kpi-card.kpi-neutral { border-left-color: var(--line); }
 .kpi-card.kpi-secondary { min-height: 148px; background: var(--soft-bg); box-shadow: none; }
+.kpi-card[data-kpi-action] { cursor: pointer; }
+.kpi-card[data-kpi-action]:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09); }
+.kpi-card[data-kpi-action]:focus-visible { outline: 3px solid var(--primary-2); outline-offset: 3px; }
 .kpi-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
 .kpi-icon { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 14px; background: var(--primary-soft); color: var(--primary); }
 .kpi-icon-fallback { display: inline-grid; place-items: center; width: 100%; height: 100%; font-size: 1.25rem; font-weight: 900; }
@@ -583,7 +585,7 @@ tbody tr:hover { background: var(--primary-soft); }
 .status-sin-fechas { background: var(--amber-soft); color: var(--amber); }
 .pagination { display: flex; justify-content: flex-end; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font-weight: 800; }
 .detail-explorer-overlay {
-  position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 22px;
+  position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 22px;
   background: rgba(15, 23, 42, 0.48); backdrop-filter: blur(4px);
 }
 .detail-explorer-overlay[hidden] { display: none; }
@@ -689,7 +691,7 @@ tbody tr:hover { background: var(--primary-soft); }
   .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .filter-control, .filter-control-wide, .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3 { grid-column: auto; }
   .chart-wide, .chart-featured, .chart-timeline, .chart-row-fill { grid-column: auto; }
-  .multi-combobox-panel { position: fixed; z-index: 60; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-width: none; max-height: min(72vh, 560px); }
+  .multi-combobox-panel { z-index: 1000; width: calc(100vw - 24px); max-width: none; max-height: min(72vh, 560px); }
   .multi-combobox-list { max-height: min(44vh, 340px); }
   .detail-explorer-overlay { padding: 8px; place-items: stretch; }
   .detail-explorer-dialog { width: 100%; max-height: calc(100vh - 16px); border-radius: 16px; }
@@ -796,11 +798,17 @@ const WITHOUT_SALES_DETAIL_COLUMNS = [
   "Cedi"
 ];
 const NO_SALES_EXPLORER_COLUMNS = [
+  { id: "presentationCode", label: "Código" },
   { id: "presentation", label: "Presentación" },
-  { id: "client", label: "Cliente" },
+  { id: "category", label: "Categoría" },
   { id: "activity", label: "Actividad" },
-  { id: "objectiveMonth", label: "Objetivo mes", numeric: true },
-  { id: "endDate", label: "Fecha fin" }
+  { id: "client", label: "Cliente SAP" },
+  { id: "clientName", label: "Nombre" },
+  { id: "region", label: "Región" },
+  { id: "channel", label: "Canal" },
+  { id: "cedi", label: "CEDI" },
+  { id: "period", label: "Período" },
+  { id: "absenceReason", label: "Motivo" }
 ];
 const NO_SALES_EXPLORER_SORT_OPTIONS = [
   { field: "presentation", label: "Presentación", dir: "asc" },
@@ -860,7 +868,6 @@ const DEPARTMENT_NAME_ALIASES = {
 const DASHBOARD_THEME_KEY = "negotiationsDashboardTheme";
 const PERFORMANCE_DEBUG = false;
 const RUNTIME_DIAGNOSTIC_LIMIT = 40;
-const NO_SALES_WITHOUT_CATEGORY_MESSAGE = "Hay presentaciones sin ventas, pero no tienen una categoría disponible para realizar la agrupación.";
 const TIMELINE_MAX_GANTT_ROWS = 8;
 const TIMELINE_MAX_PERIODS = 36;
 const chartInstances = {};
@@ -870,6 +877,7 @@ let detailExplorerEventsBound = false;
 let detailSearchDebounced = null;
 let filterPanelEventsBound = false;
 let filterSearchDebounced = null;
+let comboboxViewportEventsBound = false;
 let dashboardInitialized = false;
 const debouncedResizeCharts = debounce(resizeCharts, 160);
 const state = {
@@ -885,11 +893,6 @@ const state = {
   page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc"
 };
 const chartDrilldowns = {
-  noSalesByCategory: {
-    open: function (category, sourceElement, analysis) {
-      openNoSalesCategoryDetail(category, analysis || state.noSalesAnalysis, sourceElement);
-    }
-  },
   activityContribution: {
     open: function (activity, sourceElement) { openActivityContributionDetail(activity, sourceElement); }
   }
@@ -1040,6 +1043,18 @@ function bindEvents() {
   });
   const charts = document.getElementById("charts");
   if (charts) charts.addEventListener("click", handleTimelineAction);
+  const kpis = document.getElementById("kpis");
+  if (kpis) {
+    kpis.addEventListener("click", handleKpiAction);
+    kpis.addEventListener("keydown", handleKpiAction);
+  }
+}
+function handleKpiAction(event) {
+  const target = event.target && event.target.closest ? event.target.closest("[data-kpi-action]") : null;
+  if (!target || target.dataset.kpiAction !== "open-no-sales-explorer") return;
+  if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+  if (event.type === "keydown") event.preventDefault();
+  openNoSalesCategoryExplorer(target);
 }
 function isDashboardDebugEnabled() {
   return PERFORMANCE_DEBUG || Boolean(window.__DASHBOARD_PERF_DEBUG__ || window.__DASHBOARD_DEBUG__);
@@ -1074,7 +1089,7 @@ function safelyRenderComponent(componentId, renderFn, fallbackFn) {
   try {
     return renderFn();
   } catch (error) {
-    reportDashboardDiagnostic("error", componentId, error, "No se pudo renderizar el componente.");
+    reportDashboardDiagnostic("error", componentId, error, "No se pudo renderizar el componente: " + normalizeText(error && error.message));
     return typeof fallbackFn === "function" ? fallbackFn(error) : undefined;
   }
 }
@@ -1289,23 +1304,38 @@ function syncFilterControlsFromState(options) {
 function getComboboxRoot(id) {
   return document.querySelector ? document.querySelector('[data-combobox-id="' + id + '"].multi-combobox') : null;
 }
+function getComboboxPanel(id, root) {
+  const selector = '[data-combobox-panel="' + id + '"]';
+  return document.querySelector ? document.querySelector(selector) || (root && root.querySelector ? root.querySelector(selector) : null) : root && root.querySelector ? root.querySelector(selector) : null;
+}
+function portalComboboxPanel(root, panel) {
+  if (!root || !panel || !document.body || !document.body.appendChild) return;
+  if (!panel.__comboboxHome) panel.__comboboxHome = root;
+  if (panel.parentNode !== document.body) document.body.appendChild(panel);
+}
+function restoreComboboxPanel(panel) {
+  if (!panel || !panel.__comboboxHome || !panel.__comboboxHome.appendChild) return;
+  if (panel.parentNode !== panel.__comboboxHome) panel.__comboboxHome.appendChild(panel);
+}
 function syncMultiSelectCombobox(config) {
   const root = getComboboxRoot(config.id);
   if (!root) return;
   const selected = state.filters[config.field] || [];
   const trigger = root.querySelector('[data-filter-action="toggle-combobox"]');
-  const panel = root.querySelector('[data-combobox-panel="' + config.id + '"]');
+  const panel = getComboboxPanel(config.id, root);
   const value = root.querySelector(".multi-combobox-value");
   const count = root.querySelector(".multi-combobox-count");
   const isOpen = state.filterUi.openComboboxId === config.id;
   if (trigger) trigger.setAttribute("aria-expanded", String(isOpen));
+  if (panel && isOpen) portalComboboxPanel(root, panel);
   if (panel) panel.hidden = !isOpen;
   if (value) value.textContent = getComboboxSelectionText(config, selected);
   if (count) count.textContent = selected.length + " seleccionados";
-  const input = root.querySelector('[data-filter-action="search-options"]');
+  const input = panel && panel.querySelector ? panel.querySelector('[data-filter-action="search-options"]') : null;
   if (input && input.value !== state.filterUi.queries[config.id]) input.value = state.filterUi.queries[config.id];
-  renderComboboxOptions(config, root);
+  renderComboboxOptions(config, root, panel);
   if (isOpen) positionComboboxPanel(root, panel);
+  else if (panel) restoreComboboxPanel(panel);
 }
 function getComboboxSelectionText(config, selected) {
   const count = (selected || []).length;
@@ -1318,14 +1348,16 @@ function getVisibleComboboxOptions(config) {
   const options = state.facetedOptions ? state.facetedOptions.get(config.field) || [] : [];
   return options.filter(function (option) { return !query || option.searchText.includes(query); });
 }
-function renderComboboxOptions(config, root) {
-  const list = root.querySelector('[data-combobox-list="' + config.id + '"]');
+function renderComboboxOptions(config, root, panel) {
+  const candidatePanel = panel || getComboboxPanel(config.id, root);
+  const scope = candidatePanel && candidatePanel.querySelector ? candidatePanel : root;
+  const list = scope && scope.querySelector ? scope.querySelector('[data-combobox-list="' + config.id + '"]') : null;
   if (!list) return;
   const options = getVisibleComboboxOptions(config);
   const selectedCount = (state.filters[config.field] || []).length;
   const availableCount = options.filter(function (option) { return option.available; }).length;
-  const results = root.querySelector('[data-filter-results-count="' + config.id + '"]');
-  const selected = root.querySelector('[data-filter-selected-count="' + config.id + '"]');
+  const results = scope.querySelector('[data-filter-results-count="' + config.id + '"]');
+  const selected = scope.querySelector('[data-filter-selected-count="' + config.id + '"]');
   if (results) results.textContent = formatInteger(options.length) + " resultado(s)";
   if (selected) selected.textContent = formatInteger(selectedCount) + " seleccionado(s)";
   if (!options.length) {
@@ -1344,10 +1376,22 @@ function renderComboboxOptions(config, root) {
   }).join("");
 }
 function positionComboboxPanel(root, panel) {
-  if (!root || !panel || !root.getBoundingClientRect || window.innerWidth <= 820) return;
+  if (!root || !panel || !root.getBoundingClientRect) return;
   const rect = root.getBoundingClientRect();
-  const estimatedHeight = Math.min(420, panel.scrollHeight || 420);
-  panel.classList.toggle("opens-up", window.innerHeight - rect.bottom < estimatedHeight && rect.top > estimatedHeight);
+  const viewportWidth = Math.max(0, Number(window.innerWidth) || 0);
+  const viewportHeight = Math.max(0, Number(window.innerHeight) || 0);
+  if (!viewportWidth || !viewportHeight) return;
+  const gap = 8, edge = 12;
+  const width = Math.min(Math.max(rect.width, 320), Math.max(0, viewportWidth - edge * 2));
+  const estimatedHeight = Math.min(panel.scrollHeight || 420, Math.max(160, viewportHeight - edge * 2));
+  const opensUp = viewportHeight - rect.bottom < estimatedHeight + gap && rect.top > viewportHeight - rect.bottom;
+  const top = opensUp ? Math.max(edge, rect.top - estimatedHeight - gap) : Math.min(viewportHeight - estimatedHeight - edge, rect.bottom + gap);
+  const left = Math.max(edge, Math.min(rect.left, viewportWidth - width - edge));
+  panel.style.width = Math.round(width) + "px";
+  panel.style.maxHeight = Math.round(Math.max(160, viewportHeight - edge * 2)) + "px";
+  panel.style.left = Math.round(left) + "px";
+  panel.style.top = Math.round(top) + "px";
+  panel.dataset.placement = opensUp ? "top" : "bottom";
 }
 function bindFilterPanelEvents() {
   if (filterPanelEventsBound) return;
@@ -1357,7 +1401,7 @@ function bindFilterPanelEvents() {
   filterSearchDebounced = debounce(function (id) {
     const config = MULTI_FILTER_CONFIGS[id];
     const root = config ? getComboboxRoot(id) : null;
-    if (config && root) renderComboboxOptions(config, root);
+    if (config && root) renderComboboxOptions(config, root, getComboboxPanel(id, root));
   }, 120);
   container.addEventListener("click", handleFilterPanelClick);
   container.addEventListener("input", handleFilterPanelInput);
@@ -1366,6 +1410,33 @@ function bindFilterPanelEvents() {
   const chips = document.getElementById("activeFilters");
   if (chips) chips.addEventListener("click", handleActiveFilterClick);
   document.addEventListener("mousedown", handleFilterOutsideClick);
+  document.addEventListener("click", handlePortalComboboxClick);
+  document.addEventListener("input", handlePortalComboboxInput);
+  document.addEventListener("keydown", handlePortalComboboxKeydown);
+  if (!comboboxViewportEventsBound) {
+    comboboxViewportEventsBound = true;
+    window.addEventListener("scroll", repositionOpenComboboxPanel, true);
+    window.addEventListener("resize", repositionOpenComboboxPanel);
+  }
+}
+function isPortalComboboxEvent(event) {
+  return Boolean(event && event.target && event.target.closest && event.target.closest("[data-combobox-panel]"));
+}
+function handlePortalComboboxClick(event) {
+  if (isPortalComboboxEvent(event)) handleFilterPanelClick(event);
+}
+function handlePortalComboboxInput(event) {
+  if (isPortalComboboxEvent(event)) handleFilterPanelInput(event);
+}
+function handlePortalComboboxKeydown(event) {
+  if (isPortalComboboxEvent(event)) handleFilterPanelKeydown(event);
+}
+function repositionOpenComboboxPanel() {
+  const id = state.filterUi.openComboboxId;
+  if (!id) return;
+  const root = getComboboxRoot(id);
+  const panel = getComboboxPanel(id, root);
+  if (root && panel && !panel.hidden) positionComboboxPanel(root, panel);
 }
 function handleFilterPanelClick(event) {
   const target = event.target && event.target.closest ? event.target.closest("[data-filter-action]") : null;
@@ -1379,7 +1450,8 @@ function handleFilterPanelClick(event) {
     syncFilterControlsFromState({ refreshOptions: false });
     if (state.filterUi.openComboboxId === id) {
       const root = getComboboxRoot(id);
-      const input = root && root.querySelector('[data-filter-action="search-options"]');
+      const panel = getComboboxPanel(id, root);
+      const input = panel && panel.querySelector ? panel.querySelector('[data-filter-action="search-options"]') : null;
       if (input && input.focus) input.focus();
     }
     return;
@@ -1420,8 +1492,9 @@ function handleFilterPanelChange(event) {
 function handleFilterPanelKeydown(event) {
   const target = event.target;
   const root = target && target.closest ? target.closest("[data-combobox-id].multi-combobox") : null;
-  if (!root) return;
-  const id = root.dataset.comboboxId;
+  const panel = target && target.closest ? target.closest("[data-combobox-panel]") : null;
+  if (!root && !panel) return;
+  const id = root ? root.dataset.comboboxId : panel.dataset.comboboxPanel;
   const config = MULTI_FILTER_CONFIGS[id];
   if (!config) return;
   if ((event.key === "Enter" || event.key === " ") && target.dataset.filterAction === "toggle-combobox") {
@@ -1450,13 +1523,14 @@ function handleFilterPanelKeydown(event) {
   else index = Math.max(0, index < 0 ? options.length - 1 : index - 1);
   state.filterUi.highlighted[id] = index;
   syncMultiSelectCombobox(config);
-  const current = root.querySelector('[data-option-index="' + index + '"]');
+  const panelElement = getComboboxPanel(id, root);
+  const current = panelElement && panelElement.querySelector ? panelElement.querySelector('[data-option-index="' + index + '"]') : null;
   if (current && current.focus) current.focus();
 }
 function handleFilterOutsideClick(event) {
   if (!state.filterUi.openComboboxId) return;
   const target = event.target;
-  if (target && target.closest && target.closest(".multi-combobox")) return;
+  if (target && target.closest && (target.closest(".multi-combobox") || target.closest("[data-combobox-panel]"))) return;
   state.filterUi.openComboboxId = null;
   syncFilterControlsFromState({ refreshOptions: false });
 }
@@ -1882,7 +1956,8 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
     const className = "kpi-card " + (secondary ? "" : "kpi-primary ") + (item.className || "");
     const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
     const icon = resolveKpiIcon(item.icon);
-    return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
+    const actionAttrs = item.action ? " data-kpi-action=\\\"" + escapeHtml(item.action) + "\\\" role=\\\"button\\\" tabindex=\\\"0\\\" aria-label=\\\"" + escapeHtml(item.actionLabel || item.title) + "\\\"" : "";
+    return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
   refreshIcons(container, "data-kpi-icon");
 }
@@ -2032,7 +2107,7 @@ function buildExecutiveKpis(context) {
     { id: "monthlyObjectives", icon: "target", title: "Objetivo mensual de las actividades", value: formatAvailableMetric(comparableObjective), description: "Suma una vez los objetivos de las actividades comparables." },
     { id: "activityCompliance", icon: "gauge", title: "Cumplimiento de las actividades", value: formatAvailablePercent(k.compliance), description: "Ventas atribuibles comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
     { id: "objectiveDifference", icon: difference.icon, title: "Diferencia atribuible frente al objetivo", value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: "Ventas atribuibles comparables menos objetivos comparables.", className: difference.className, status: difference.label },
-    { id: "withoutSales", icon: "package-x", title: "Presentaciones sin ventas", value: formatInteger(k.presentationsWithoutSales), description: buildWithoutSalesKpiDescription(k), className: "kpi-attention kpi-secondary" },
+    { id: "withoutSales", icon: "package-x", title: "Presentaciones sin ventas", value: formatInteger(k.presentationsWithoutSales), description: buildWithoutSalesKpiDescription(k) + " · Haz clic para explorar por categoría.", className: "kpi-attention kpi-secondary", action: "open-no-sales-explorer", actionLabel: "Explorar presentaciones sin ventas" },
     { id: "activeNegotiations", icon: "calendar-check", title: "Negociaciones vigentes", value: formatInteger(k.activeNegotiations), description: "Actividades únicas vigentes a la fecha actual.", className: "kpi-secondary" }
   ];
 }
@@ -2498,7 +2573,6 @@ function getChartRegistry() {
     { id: "presentationStatus", elementId: "chartPresentationStatus", title: "Estado de presentaciones", subtitle: "Presentaciones únicas con venta, venta cero o sin información.", visualType: "donut", layout: "compact", height: "compact", shouldRender: function (a) { return a.presentationStatus.filter(function (item) { return item.value > 0; }).length >= 2; } },
     { id: "category", elementId: "chartCategoria", title: "Ventas por categoría", subtitle: "Cajas físicas por categoría; no usa TotalVentaMes repetido.", visualType: "treemap-or-bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.categorySales.length >= 2 && hasRenderableChartData(a.categorySales); } },
     { id: "presentations", elementId: "chartPresentaciones", title: "Presentaciones con mayor venta", subtitle: "Top 10 por cajas físicas registradas.", visualType: "lollipop", layout: "standard", height: "standard", shouldRender: function (a) { return a.presentationSales.length >= 2 && hasRenderableChartData(a.presentationSales); } },
-    { id: "noSales", elementId: "chartSinVentasCategoria", title: "Presentaciones sin ventas por categoría", subtitle: "Presentaciones negociadas sin contexto de venta en el período.", action: "Haz clic en una categoría para explorar el detalle.", visualType: "donut-or-treemap", layout: "standard", height: "standard", shouldRender: function (a) { return a.noSalesAnalysis.presentationCount > 0 && a.noSalesAnalysis.byCategory.length >= 2; } },
     { id: "clients", elementId: "chartClientes", title: "Ventas por cliente", subtitle: "Total mensual resuelto por cliente y período.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions["Cliente SAP - Clave"].count >= 2; } },
     { id: "regions", elementId: "chartRegion", title: "Ventas por Región SAP", subtitle: "Macrozonas comerciales; no atribuye ventas a departamentos.", visualType: "map-and-ranking", layout: "featured", height: "featured", shouldRender: function (a) { return a.dimensions["Región SAP"].count >= 2; } },
     { id: "channels", elementId: "chartCanal", title: "Ventas por canal", subtitle: "Comparativo entre canales con datos.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions.Canal.count >= 2; } },
@@ -2773,24 +2847,6 @@ function renderRegisteredChart(id, analysis) {
   if (id === "regions") return renderRegionSalesMap(analysis.rows, analysis.chartData.regions);
   if (id === "channels") return renderChart("chartCanal", "bar", analysis.chartData.channels, false, true, "Canal");
   if (id === "cedi") return renderChart("chartCedi", "bar", analysis.chartData.cediCompliance.slice(0, 12), true, true, "Cedi");
-  if (id === "noSales") return renderNoSalesCategoryChart(analysis.noSalesAnalysis);
-}
-function renderNoSalesCategoryChart(noSalesAnalysis) {
-  const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
-  if (analysis.presentationCount > 0 && !analysis.byCategory.length) {
-    renderChartMessage("chartSinVentasCategoria", NO_SALES_WITHOUT_CATEGORY_MESSAGE);
-    return;
-  }
-  renderChart("chartSinVentasCategoria", chooseCompositionChartType(analysis.byCategory, { donutLimit: 6, treemapLimit: 18, fallbackType: "bar" }), analysis.byCategory, false, true, null, {
-    showLabels: true,
-    integerValues: true,
-    includePercentTooltip: true,
-    tooltipNote: "Sin ventas significa que no se encontraron ventas dentro del periodo analizado.",
-    onClick: function (category, eventInfo) {
-      chartDrilldowns.noSalesByCategory.open(category, eventInfo && eventInfo.sourceElement, analysis);
-    },
-    actionLabel: "Ver presentaciones sin ventas de"
-  });
 }
 function renderRegionSalesMap(rows, preparedItems) {
   const element = document.getElementById("chartRegion");
@@ -3373,6 +3429,7 @@ function getEmptyDetailExplorerState() {
     sortField: "presentation",
     sortDir: "asc",
     visibleCount: DETAIL_EXPLORER_VISIBLE_STEP,
+    page: 1,
     selectedKey: "",
     selectedRow: null,
     selectedClientIds: [],
@@ -3389,6 +3446,7 @@ function setDetailExplorerQuery(query) {
   if (!state.detailExplorer.isOpen) return;
   state.detailExplorer.query = query || "";
   state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+  state.detailExplorer.page = 1;
   state.detailExplorer.selectedKey = "";
   state.detailExplorer.selectedRow = null;
   state.detailExplorer.viewCache = null;
@@ -3398,6 +3456,7 @@ function setDetailExplorerSort(field, dir) {
   if (!state.detailExplorer.isOpen) return;
   state.detailExplorer.sortField = field || state.detailExplorer.sortField;
   state.detailExplorer.sortDir = dir === "desc" ? "desc" : "asc";
+  state.detailExplorer.page = 1;
   state.detailExplorer.viewCache = null;
   renderDetailExplorer();
 }
@@ -3414,6 +3473,7 @@ function bindDetailExplorerEvents() {
     if (!state.detailExplorer.isOpen) return;
     state.detailExplorer.query = value;
     state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+    state.detailExplorer.page = 1;
     state.detailExplorer.selectedKey = "";
     state.detailExplorer.selectedRow = null;
     state.detailExplorer.viewCache = null;
@@ -3430,6 +3490,7 @@ function bindDetailExplorerEvents() {
       state.detailExplorer.sortField = option.field;
       state.detailExplorer.sortDir = option.dir;
       state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+      state.detailExplorer.page = 1;
       state.detailExplorer.viewCache = null;
       renderDetailExplorer();
     }
@@ -3445,6 +3506,7 @@ function handleDetailExplorerClick(event) {
   if (action === "clear-search") {
     state.detailExplorer.query = "";
     state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
+    state.detailExplorer.page = 1;
     state.detailExplorer.viewCache = null;
     renderDetailExplorer();
     return;
@@ -3452,6 +3514,21 @@ function handleDetailExplorerClick(event) {
   if (action === "show-more") {
     state.detailExplorer.visibleCount += DETAIL_EXPLORER_VISIBLE_STEP;
     renderDetailExplorer();
+    return;
+  }
+  if (action === "page-prev" || action === "page-next") {
+    const total = getDetailExplorerSortedRows().length;
+    const pageCount = Math.max(1, Math.ceil(total / DETAIL_EXPLORER_VISIBLE_STEP));
+    state.detailExplorer.page = Math.max(1, Math.min(pageCount, state.detailExplorer.page + (action === "page-next" ? 1 : -1)));
+    renderDetailExplorer();
+    return;
+  }
+  if (action === "open-category") {
+    openNoSalesCategoryDetail(target.dataset.detailCategory, state.detailExplorer.config.analysis, state.detailExplorer.opener, { skipFocus: true });
+    return;
+  }
+  if (action === "back-categories") {
+    openNoSalesCategoryExplorer(state.detailExplorer.opener, { skipFocus: true });
     return;
   }
   if (action === "back-list") {
@@ -3493,6 +3570,9 @@ function openNoSalesCategoryDetail(category, noSalesAnalysis, opener, options) {
   const config = buildNoSalesCategoryDetailConfig(category, noSalesAnalysis || state.noSalesAnalysis);
   openDetailExplorer(config, opener || document.activeElement, options);
 }
+function openNoSalesCategoryExplorer(opener, options, noSalesAnalysis) {
+  openDetailExplorer(buildNoSalesCategoryExplorerConfig(noSalesAnalysis || state.noSalesAnalysis), opener || document.activeElement, options);
+}
 function syncOpenDetailExplorer() {
   if (!state.detailExplorer.isOpen) return;
   if (state.detailExplorer.type === "activityContribution" || state.detailExplorer.type === "activityDetail") {
@@ -3502,9 +3582,11 @@ function syncOpenDetailExplorer() {
     if (activity) openActivityContributionDetail(activity, state.detailExplorer.opener, { preserveState: true, skipFocus: true });
     return;
   }
-  if (state.detailExplorer.type !== "noSalesCategory") return;
+  if (state.detailExplorer.type !== "noSalesCategory" && state.detailExplorer.type !== "noSalesCategories") return;
   const category = state.detailExplorer.category;
-  const config = buildNoSalesCategoryDetailConfig(category, state.noSalesAnalysis);
+  const config = state.detailExplorer.type === "noSalesCategories"
+    ? buildNoSalesCategoryExplorerConfig(state.noSalesAnalysis)
+    : buildNoSalesCategoryDetailConfig(category, state.noSalesAnalysis);
   const message = config.rows.length ? "" : "La selección anterior ya no tiene datos con los filtros actuales.";
   openDetailExplorer(config, state.detailExplorer.opener, { preserveState: true, skipFocus: true, message: message });
 }
@@ -3523,6 +3605,7 @@ function openDetailExplorer(config, opener, options) {
     sortField: preserve ? previous.sortField : config.defaultSortField,
     sortDir: preserve ? previous.sortDir : config.defaultSortDir,
     visibleCount: preserve ? previous.visibleCount : DETAIL_EXPLORER_VISIBLE_STEP,
+    page: preserve ? previous.page : 1,
     selectedKey: preserve ? previous.selectedKey : "",
     selectedRow: preserve ? previous.selectedRow : null,
     selectedClientIds: (config.selectedClientIds || []).slice(),
@@ -3603,11 +3686,13 @@ function renderDetailExplorerToolbar() {
   }).join("");
   const directionIcon = state.detailExplorer.sortDir === "asc" ? "arrow-up-a-z" : "arrow-down-z-a";
   const directionLabel = state.detailExplorer.sortDir === "asc" ? "Ascendente" : "Descendente";
+  const backButton = config.backToCategories ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"back-categories\\"><i data-lucide=\\"chevron-left\\"></i> Volver a categorías</button>" : "";
   container.innerHTML =
     "<div class=\\"quick-search\\"><i data-lucide=\\"search\\"></i><input id=\\"detailExplorerSearch\\" type=\\"search\\" value=\\"" + escapeHtml(state.detailExplorer.query) + "\\" placeholder=\\"" + escapeHtml(config.searchPlaceholder || "Buscar") + "\\"></div>" +
     "<label>Ordenar<select id=\\"detailExplorerSort\\">" + sortOptions + "</select></label>" +
     "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"sort-dir\\"><i data-lucide=\\"" + directionIcon + "\\"></i> " + directionLabel + "</button>" +
     "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"clear-search\\" aria-label=\\"Limpiar búsqueda del explorador\\"><i data-lucide=\\"x-circle\\"></i> Limpiar búsqueda</button>" +
+    backButton +
     "<button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"export-csv\\"><i data-lucide=\\"download\\"></i> CSV</button>";
 }
 function renderDetailExplorerList() {
@@ -3617,8 +3702,15 @@ function renderDetailExplorerList() {
     renderActivityContributionList(body);
     return;
   }
+  if (state.detailExplorer.config.type === "noSalesCategories") {
+    renderNoSalesCategoryList(body);
+    return;
+  }
   const rows = getDetailExplorerSortedRows();
-  const visibleRows = rows.slice(0, state.detailExplorer.visibleCount);
+  const paginated = Boolean(state.detailExplorer.config.paginated);
+  const page = paginated ? state.detailExplorer.page : 1;
+  const start = paginated ? (page - 1) * DETAIL_EXPLORER_VISIBLE_STEP : 0;
+  const visibleRows = paginated ? rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP) : rows.slice(0, state.detailExplorer.visibleCount);
   const config = state.detailExplorer.config;
   if (!rows.length) {
     body.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(state.detailExplorer.query ? config.searchEmptyMessage || "No hay resultados para la búsqueda." : config.emptyMessage || "No hay datos para mostrar.") + "</div>";
@@ -3644,18 +3736,41 @@ function renderDetailExplorerList() {
     const client = getDetailExplorerCellDisplay(row, config.cardMetaField || "client");
     return "<article class=\\"detail-card\\"><strong>" + escapeHtml(title) + "</strong><span>" + escapeHtml(code ? "Código: " + code : "") + "</span><span>" + escapeHtml(client ? "Cliente: " + client : "") + "</span><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\">Ver detalle</button></article>";
   }).join("") : "";
-  const footer = buildDetailExplorerFooter(visibleRows.length, rows.length, config.entitySingular || "presentación", config.entityPlural || "presentaciones");
+  const footer = buildDetailExplorerFooter(visibleRows.length, rows.length, config.entitySingular || "presentación", config.entityPlural || "presentaciones", paginated ? page : null);
   body.innerHTML = compactLayout
     ? "<div class=\\"detail-card-list\\">" + cards + "</div>" + footer
     : "<div class=\\"detail-table-wrap\\"><table class=\\"detail-table\\">" + header + "<tbody>" + tableRows + "</tbody></table></div>" + footer;
   state.performance.counters.modalRowsRendered += visibleRows.length;
 }
-function buildDetailExplorerFooter(visibleCount, totalCount, singular, plural) {
+function renderNoSalesCategoryList(body) {
+  const explorer = state.detailExplorer;
+  const rows = getDetailExplorerSortedRows();
+  const pageCount = Math.max(1, Math.ceil(rows.length / DETAIL_EXPLORER_VISIBLE_STEP));
+  explorer.page = Math.max(1, Math.min(pageCount, explorer.page));
+  const start = (explorer.page - 1) * DETAIL_EXPLORER_VISIBLE_STEP;
+  const visibleRows = rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP);
+  if (!rows.length) {
+    body.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(explorer.query ? "No hay categorías que coincidan con la búsqueda." : "No hay presentaciones sin ventas para los filtros actuales.") + "</div>";
+    return;
+  }
+  const header = "<thead><tr><th scope=\\"col\\">Categoría</th><th scope=\\"col\\">Presentaciones sin ventas</th><th scope=\\"col\\">Porcentaje del total</th><th scope=\\"col\\">Actividades</th><th scope=\\"col\\">Clientes</th><th scope=\\"col\\">Acción</th></tr></thead>";
+  const tableRows = visibleRows.map(function (row) {
+    return "<tr><td><strong>" + escapeHtml(row.category) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.presentationCount)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatRatioPercent(row.percent)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.activityCount)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.clientCount)) + "</td><td><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-action=\\"open-category\\" data-detail-category=\\"" + escapeHtml(row.category) + "\\">Ver presentaciones</button></td></tr>";
+  }).join("");
+  body.innerHTML = "<div class=\\"detail-table-wrap\\"><table class=\\"detail-table\\">" + header + "<tbody>" + tableRows + "</tbody></table></div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "categoría", "categorías", explorer.page);
+  state.performance.counters.modalRowsRendered += visibleRows.length;
+}
+function buildDetailExplorerFooter(visibleCount, totalCount, singular, plural, page) {
   const noun = totalCount === 1 ? singular : plural;
+  const pageCount = Math.max(1, Math.ceil(totalCount / DETAIL_EXPLORER_VISIBLE_STEP));
+  if (page) {
+    const first = totalCount ? (page - 1) * DETAIL_EXPLORER_VISIBLE_STEP + 1 : 0;
+    const last = totalCount ? first + visibleCount - 1 : 0;
+    const text = "Mostrando " + formatInteger(first) + "–" + formatInteger(last) + " de " + formatInteger(totalCount) + " " + noun + " · Página " + formatInteger(page) + " de " + formatInteger(pageCount);
+    return "<div class=\\"detail-footer\\"><span>" + escapeHtml(text) + "</span><div><button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"page-prev\\"" + (page <= 1 ? " disabled" : "") + ">Anterior</button><button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"page-next\\"" + (page >= pageCount ? " disabled" : "") + ">Siguiente</button></div></div>";
+  }
   const range = visibleCount ? "1–" + formatInteger(visibleCount) : "0";
-  const text = visibleCount === totalCount
-    ? "Mostrando " + formatInteger(totalCount) + " de " + formatInteger(totalCount) + " " + noun
-    : "Mostrando " + range + " de " + formatInteger(totalCount) + " " + noun;
+  const text = visibleCount === totalCount ? "Mostrando " + formatInteger(totalCount) + " de " + formatInteger(totalCount) + " " + noun : "Mostrando " + range + " de " + formatInteger(totalCount) + " " + noun;
   return "<div class=\\"detail-footer\\"><span>" + escapeHtml(text) + "</span>" + (visibleCount < totalCount ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"show-more\\">Ver más</button>" : "") + "</div>";
 }
 function formatOrdinal(rank) {
@@ -3764,6 +3879,7 @@ function configIsStandaloneDetail(config) {
 }
 function getDetailExplorerRawValueForConfig(row, field, config) {
   if (field === "category") {
+    if (Object.prototype.hasOwnProperty.call(row, "category")) return normalizeText(row.category);
     const analysis = config && config.analysis ? config.analysis : state.noSalesAnalysis;
     return getResolvedCategory(row, analysis.categoryLookup);
   }
@@ -3778,11 +3894,13 @@ function getDetailExplorerCellDisplay(row, field) {
   if (field === "discount") return isFiniteNumber(value) ? formatPercent(value) : "";
   if (field === "sales") return isFiniteNumber(value) ? formatNumber(value) : "N/A";
   if (field === "share") return isFiniteNumber(value) ? formatRatioPercent(value) : "N/A";
-  if (field === "rank" || field === "presentationCount") return isFiniteNumber(value) ? formatInteger(value) : "N/A";
+  if (field === "rank" || field === "presentationCount" || field === "activityCount" || field === "clientCount") return isFiniteNumber(value) ? formatInteger(value) : "N/A";
+  if (field === "percent") return isFiniteNumber(value) ? formatRatioPercent(value) : "N/A";
   return String(value);
 }
 function getDetailExplorerRawValue(row, field) {
   if (field === "category") {
+    if (Object.prototype.hasOwnProperty.call(row, "category")) return normalizeText(row.category);
     const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : state.noSalesAnalysis;
     return getResolvedCategory(row, analysis.categoryLookup);
   }
@@ -3803,12 +3921,15 @@ function getDetailExplorerRawValue(row, field) {
   if (field === "discountType") return normalizeText(row["Tipo descuento"]);
   if (field === "period") return normalizeText(row["Periodo negociacion"]);
   if (field === "cedi") return normalizeText(row["Cedi"]);
-  if (field === "sales" || field === "share" || field === "rank" || field === "presentationCount") return row[field];
+  if (field === "region") return normalizeText(row["Región SAP"]);
+  if (field === "channel") return normalizeText(row.Canal);
+  if (field === "absenceReason") return getNoSalesAbsenceReason(row);
+  if (field === "sales" || field === "share" || field === "rank" || field === "presentationCount" || field === "activityCount" || field === "clientCount" || field === "percent") return row[field];
   if (field === "source" || field === "status") return normalizeText(row[field]);
   return normalizeText(row[field]);
 }
 function getDetailExplorerSortValue(row, field) {
-  if (["objectiveTotal", "objectiveMonth", "discount", "sales", "share", "rank", "presentationCount"].indexOf(field) !== -1) {
+  if (["objectiveTotal", "objectiveMonth", "discount", "sales", "share", "rank", "presentationCount", "activityCount", "clientCount", "percent"].indexOf(field) !== -1) {
     const value = getDetailExplorerRawValue(row, field);
     return isFiniteNumber(value) ? value : -Number.MAX_VALUE;
   }
@@ -3991,6 +4112,72 @@ function buildActivityClientDetailFields(row) {
     ] }
   ];
 }
+function buildNoSalesCategoryExplorerConfig(noSalesAnalysis) {
+  const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
+  const rows = buildNoSalesCategoryExplorerRows(analysis);
+  return {
+    type: "noSalesCategories",
+    category: "",
+    analysis: analysis,
+    title: "Presentaciones sin ventas",
+    subtitle: "RESUMEN POR CATEGORÍA",
+    rows: rows,
+    columns: [],
+    exportColumns: [
+      { id: "category", label: "Categoría" },
+      { id: "presentationCount", label: "Presentaciones sin ventas" },
+      { id: "percent", label: "Porcentaje del total" },
+      { id: "activityCount", label: "Actividades relacionadas" },
+      { id: "clientCount", label: "Clientes relacionados" }
+    ],
+    sortOptions: [
+      { field: "presentationCount", label: "Presentaciones sin ventas", dir: "desc" },
+      { field: "percent", label: "Porcentaje del total", dir: "desc" },
+      { field: "category", label: "Categoría", dir: "asc" },
+      { field: "activityCount", label: "Actividades", dir: "desc" },
+      { field: "clientCount", label: "Clientes", dir: "desc" }
+    ],
+    defaultSortField: "presentationCount",
+    defaultSortDir: "desc",
+    searchFields: ["category"],
+    searchPlaceholder: "Buscar categoría",
+    emptyMessage: "No hay presentaciones sin ventas con los filtros actuales.",
+    entitySingular: "categoría",
+    entityPlural: "categorías",
+    paginated: true,
+    summary: [
+      { label: "Presentaciones sin ventas", value: formatInteger(analysis.presentationCount), primary: true },
+      { label: "Categorías", value: formatInteger(rows.length) },
+      { label: "Actividades", value: formatInteger(analysis.activityCount) },
+      { label: "Clientes", value: formatInteger(analysis.clientCount) }
+    ],
+    rowKey: function (row) { return row.category; },
+    exportFilename: "resumen_presentaciones_sin_ventas.csv"
+  };
+}
+function buildNoSalesCategoryExplorerRows(analysis) {
+  const grouped = new Map();
+  const total = analysis.presentationCount || 0;
+  (analysis.uniquePresentations || []).forEach(function (row, index) {
+    const category = getResolvedCategory(row, analysis.categoryLookup, index) || "Sin categoría disponible";
+    if (!grouped.has(category)) grouped.set(category, { category: category, presentationCount: 0, activityIds: new Set(), clientIds: new Set() });
+    const item = grouped.get(category);
+    item.presentationCount += 1;
+    const activity = normalizeText(row["ID Actividad"]);
+    const client = normalizeText(row["Cliente SAP - Clave"]);
+    if (activity) item.activityIds.add(activity);
+    if (client) item.clientIds.add(client);
+  });
+  return Array.from(grouped.values()).map(function (item) {
+    return {
+      category: item.category,
+      presentationCount: item.presentationCount,
+      percent: total ? item.presentationCount / total : 0,
+      activityCount: item.activityIds.size,
+      clientCount: item.clientIds.size
+    };
+  });
+}
 function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
   const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
   const rows = getNoSalesRowsForCategory(category, analysis);
@@ -3999,7 +4186,7 @@ function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
     category: category,
     analysis: analysis,
     title: "Presentaciones sin ventas — " + category,
-    subtitle: "Seguimiento comercial",
+    subtitle: "DETALLE DE PRESENTACIONES",
     rows: rows,
     columns: NO_SALES_EXPLORER_COLUMNS,
     exportColumns: [
@@ -4009,6 +4196,10 @@ function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
       { id: "clientName", label: "Nombre del cliente" },
       { id: "activity", label: "ID actividad" },
       { id: "category", label: "Categoría" },
+      { id: "region", label: "Región" },
+      { id: "channel", label: "Canal" },
+      { id: "cedi", label: "CEDI" },
+      { id: "absenceReason", label: "Motivo de ausencia de venta" },
       { id: "objectiveMonth", label: "Objetivo mes" },
       { id: "objectiveTotal", label: "Objetivo cajas total" },
       { id: "period", label: "Periodo negociación" },
@@ -4021,11 +4212,14 @@ function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
     sortOptions: NO_SALES_EXPLORER_SORT_OPTIONS,
     defaultSortField: "presentation",
     defaultSortDir: "asc",
-    searchFields: ["presentation", "presentationCode", "client", "clientName", "activity"],
+    searchFields: ["presentation", "presentationCode", "category", "client", "clientName", "activity", "region", "channel", "cedi", "period", "absenceReason"],
     searchPlaceholder: "Buscar presentación, código o cliente",
     emptyMessage: "No hay presentaciones disponibles para esta categoría con los filtros actuales.",
     summary: buildNoSalesCategorySummary(category, rows, analysis),
-    rowKey: getNoSalesExplorerRowKey
+    rowKey: getNoSalesExplorerRowKey,
+    paginated: true,
+    backToCategories: true,
+    exportFilename: "presentaciones_sin_ventas_" + normalizeFilenamePart(category) + ".csv"
   };
 }
 function getNoSalesRowsForCategory(category, noSalesAnalysis) {
@@ -4049,6 +4243,12 @@ function buildNoSalesCategorySummary(category, rows, noSalesAnalysis) {
 }
 function getNoSalesExplorerRowKey(row, index) {
   return getNegotiatedPresentationKey(row, index);
+}
+function getNoSalesAbsenceReason(row) {
+  const status = normalizeText(row.estadoInformacionVenta);
+  if (status === "SIN_INFORMACION_VENTA") return "Sin información de venta";
+  if (status === "VENTA_CERO") return "Venta cero";
+  return status ? status.replace(/_/g, " ") : "Sin información de venta";
 }
 function getNoSalesPresentationDetailFields(row) {
   const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : state.noSalesAnalysis;
@@ -4085,6 +4285,7 @@ function getNoSalesPresentationDetailFields(row) {
       ]
     }
   ];
+  sections[0].fields.push(["Región", getDetailExplorerRawValue(row, "region")], ["Canal", getDetailExplorerRawValue(row, "channel")], ["Período", getDetailExplorerRawValue(row, "period")], ["Motivo de ausencia de venta", getNoSalesAbsenceReason(row)]);
   const status = getReliableVigenciaStatus(row);
   const daysRemaining = getDaysRemainingText(row);
   if (status) sections[2].fields.push(["Estado de vigencia", status]);
@@ -4260,8 +4461,13 @@ function destroyDashboard() {
   cancelPendingDashboardRender();
   disposeCharts();
   window.removeEventListener("resize", debouncedResizeCharts);
+  window.removeEventListener("resize", repositionOpenComboboxPanel);
+  window.removeEventListener("scroll", repositionOpenComboboxPanel, true);
   window.removeEventListener("beforeunload", destroyDashboard);
   document.removeEventListener("keydown", handleDetailExplorerDocumentKeydown);
+  document.removeEventListener("click", handlePortalComboboxClick);
+  document.removeEventListener("input", handlePortalComboboxInput);
+  document.removeEventListener("keydown", handlePortalComboboxKeydown);
 }
 function getSapRegionDepartments(region) {
   const key = normalizeMapName(region);

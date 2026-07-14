@@ -79,12 +79,11 @@ const comparableFormulaConsistency = dashboard.reconcileComparablePerformance({
 });
 if (!comparableFormulaConsistency.consistent) throw new Error("Las fórmulas comparables no se reconcilian");
 if (visibleChartDefinitions.some(function (definition) { return definition.id === "salesTrend" || definition.elementId === "chartMes"; })) throw new Error("Evolución de ventas sigue activa");
+if (visibleChartDefinitions.some(function (definition) { return definition.id === "noSales" || definition.elementId === "chartSinVentasCategoria"; })) throw new Error("La gráfica de presentaciones sin ventas sigue activa");
 const visualOptions = measure("visualOptionConstructionMs", function () {
   const categoryType = dashboard.chooseCompositionChartType(fullAnalysis.categorySales, { treemapLimit: 12, fallbackType: "bar" });
-  const noSalesType = dashboard.chooseCompositionChartType(fullAnalysis.noSalesAnalysis.byCategory, { donutLimit: 6, treemapLimit: 18, fallbackType: "bar" });
   return {
     categoryType: categoryType,
-    noSalesType: noSalesType,
     category: dashboard.buildEChartOption(categoryType, fullAnalysis.categorySales, false, true, {}),
     presentations: dashboard.buildEChartOption("lollipop", fullAnalysis.presentationSales, false, true, {})
   };
@@ -169,7 +168,7 @@ console.log(JSON.stringify({
     rowFillCards: adaptiveChartLayout.filter(function (item) { return item.layoutClass.includes("chart-row-fill"); }).length,
     analysisRebuiltForLayout: false,
     categoryVisualType: visualOptions.categoryType,
-    noSalesVisualType: visualOptions.noSalesType,
+    noSalesExplorer: "kpi-modal",
     presentationVisualType: "lollipop"
   },
   indicatorConsistency: {
@@ -181,6 +180,7 @@ console.log(JSON.stringify({
     formulaConsistent: comparableFormulaConsistency.consistent,
     activeChartCount: visibleChartDefinitions.length,
     salesTrendAbsent: !dashboard.getChartRegistry().some(function (definition) { return definition.id === "salesTrend" || definition.elementId === "chartMes"; }),
+    noSalesChartAbsent: !dashboard.getChartRegistry().some(function (definition) { return definition.id === "noSales" || definition.elementId === "chartSinVentasCategoria"; }),
     previousPhaseReferenceChartCount: 12,
     currentChartCount: visibleChartDefinitions.length
   },
