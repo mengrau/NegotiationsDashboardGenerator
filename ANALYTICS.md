@@ -116,7 +116,7 @@ Los umbrales de cumplimiento son: favorable desde 100 %, atención desde 90 % ha
 - Región, canal, cliente y CEDI requieren al menos dos valores.
 - Categoría y presentación requieren al menos dos grupos con valores analizables.
 - Estado de presentaciones requiere al menos dos estados con conteo positivo.
-- Presentaciones sin ventas por categoría requiere presentaciones y al menos dos categorías válidas; el detalle sigue disponible desde la gráfica.
+- Presentaciones sin ventas se consulta desde el KPI: agrupa las presentaciones únicas sin información de venta por categoría y conserva el detalle dentro del mismo modal, sin alterar filtros ni población.
 
 ## Riesgos corregidos
 

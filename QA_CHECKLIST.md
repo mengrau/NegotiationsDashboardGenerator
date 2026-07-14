@@ -57,7 +57,8 @@ En cada combinación revisar:
 - [ ] Histórico previo con marcador hueco, comparable con mayor peso y posterior al fin con diamante atenuado.
 - [ ] Cliente multiactividad conserva Gantt y no mezcla negociaciones en una línea única.
 - [ ] Donut con leyenda legible; treemap sin bloques caóticos ni texto cortado; lollipop con etiquetas completas o tooltip accesible.
-- [ ] Drill-down de presentaciones sin ventas abre la categoría correcta desde donut, treemap y fallback nativo.
+- [ ] El KPI de presentaciones sin ventas abre un único modal con categorías, detalle, búsqueda, ordenamiento, paginación de 25 y CSV en ambos niveles.
+- [ ] Los combobox de Actividad y Cliente SAP permanecen sobre gráficas, timeline y tarjetas después de hacer scroll; el modal permanece por encima del dropdown.
 
 ## Errores y fallbacks
 

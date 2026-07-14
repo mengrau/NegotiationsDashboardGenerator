@@ -13,7 +13,7 @@
 | Estado de presentaciones | ¿Qué proporción tiene venta, cero o falta información? | `presentationStatus` | donut | Tooltip y leyenda; fallback donut. Compact. |
 | Ventas por categoría | ¿Cómo se compone la venta física? | `categorySales` | treemap hasta 12, barra después | Filtra categoría; fallback equivalente. Standard. |
 | Presentaciones con mayor venta | ¿Cuál es el ranking de presentaciones? | `presentationSales` | lollipop horizontal | Filtra presentación; top 10; fallback lollipop. Standard. |
-| Presentaciones sin ventas por categoría | ¿Dónde se concentra la ausencia de venta? | `noSalesAnalysis.byCategory` | donut ≤6, treemap ≤18, barra >18 | Abre drill-down; fallback conserva acción. Standard. |
+| Presentaciones sin ventas (KPI explorador) | ¿Dónde se concentra la ausencia de venta y qué presentaciones la explican? | análisis de presentaciones únicas sin venta | Modal con resumen por categoría y tabla paginada | No usa ECharts: abre desde el KPI, conserva filtros globales y ofrece CSV en ambos niveles. |
 | Ventas por cliente | ¿Qué clientes concentran venta general? | `chartData.clients` | barras horizontales | Filtra cliente; top 10. Standard. |
 | Ventas por Región SAP | ¿Cómo se distribuye la venta por macrozona? | `chartData.regions` | mapa + ranking | Filtra región; si falla GeoJSON muestra ranking. Featured. |
 | Ventas por canal | ¿Cómo se comparan canales? | `chartData.channels` | barras horizontales | Filtra canal; hasta 10. Standard. |
@@ -28,6 +28,10 @@
 - **Línea/Gantt:** secuencia temporal con una actividad o vigencias distintas.
 
 No se usan 3D, rose charts ni efectos decorativos que reduzcan legibilidad.
+
+## Exploración de presentaciones sin ventas
+
+La gráfica por categoría se retiró para evitar duplicar la información del KPI. El KPI **Presentaciones sin ventas** es clicable y abre un único modal: primero muestra categoría, cantidad, porcentaje, actividades y clientes relacionados; después muestra las presentaciones de la categoría seleccionada. La búsqueda, el ordenamiento, la paginación de 25 registros y la exportación CSV se realizan sobre el análisis ya preparado por los filtros actuales. Volver a categorías no abre un modal anidado ni modifica los filtros.
 
 ## Eliminación de la gráfica temporal redundante
 

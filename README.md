@@ -41,7 +41,9 @@ El Excel se procesa localmente en el navegador. No se sube a ningún servidor, n
 
 El dashboard descargado incluye los datos procesados como JSON dentro del HTML. El título se construye con la columna `Región SAP`: si hay una sola región se muestra como `Negociaciones Antioquia`, si hay varias se muestra `Negociaciones múltiples regiones`, y si no hay región disponible se mantiene `Negociaciones`.
 
-El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, drill-down de presentaciones sin ventas, explorador de contribución multicliente y exportación CSV. No genera comparativos para dimensiones con un único valor; esos valores se muestran como contexto. El encabezado incluye un indicador discreto de calidad y no clasifica las presentaciones sin información de venta como datos corruptos.
+El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, explorador de presentaciones sin ventas desde KPI, explorador de contribución multicliente y exportación CSV. No genera comparativos para dimensiones con un único valor; esos valores se muestran como contexto. El encabezado incluye un indicador discreto de calidad y no clasifica las presentaciones sin información de venta como datos corruptos.
+
+Los desplegables de Actividad y Cliente SAP se portalan temporalmente al documento y se posicionan con coordenadas del viewport; así quedan fuera de los contextos de apilamiento de tarjetas y gráficas. Se recalculan al desplazarse o redimensionar la ventana, y el modal conserva una capa superior.
 
 Los KPI se adaptan al contexto. Una actividad compartida presenta ventas conjuntas, objetivo, cumplimiento y contribuciones; una actividad individual omite la contribución de 100 % y la posición 1 de 1. Al filtrar un cliente, el objetivo continúa identificado como objetivo completo de la actividad. Para varias actividades, los objetivos únicos y las ventas comparables se agregan mediante totales, sin promediar porcentajes.
 
@@ -55,7 +57,7 @@ La línea de tiempo se activa al seleccionar una o varias actividades o un únic
 
 ## Tipos de visualización
 
-La selección visual se declara en el registro de gráficas y consume los arreglos analíticos ya preparados. Estado de presentaciones usa donut porque compara tres proporciones; ventas por categoría usa treemap con hasta doce categorías y vuelve a barra si la cardinalidad exige comparación por eje; el top de presentaciones usa lollipop horizontal para conservar el ranking; y presentaciones sin ventas usa donut hasta seis categorías, treemap hasta dieciocho y barra cuando hay más. El drill-down por categoría funciona en las tres variantes.
+La selección visual se declara en el registro de gráficas y consume los arreglos analíticos ya preparados. Estado de presentaciones usa donut porque compara tres proporciones; ventas por categoría usa treemap con hasta doce categorías y vuelve a barra si la cardinalidad exige comparación por eje; y el top de presentaciones usa lollipop horizontal para conservar el ranking. Las presentaciones sin ventas se exploran desde su KPI: el mismo modal presenta primero categorías y después el detalle paginado, sin cambiar los filtros globales ni requerir ECharts.
 
 Se mantienen barras para ventas frente al objetivo, contribución por cliente, cumplimiento por actividad, ventas por cliente y canal y cumplimiento por CEDI. En esos casos la lectura exacta contra un eje o el ranking comparativo es más importante que la variedad estética. La visualización temporal independiente fue eliminada porque la timeline explica la evolución con vigencia, objetivo y estados. Donut, treemap y lollipop tienen fallback HTML/CSS navegable por teclado y no añaden dependencias.
 
