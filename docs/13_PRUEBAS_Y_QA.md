@@ -101,3 +101,8 @@ Las auditorías Node no equivalen a inspección visual. Si el entorno responde q
 ## Cobertura automatizada del seguimiento
 
 La suite verifica estructura, granularidad cliente–actividad, selección mensual, filtros descriptivos, numerador conjunto en compartidas, contrato del detalle, LRU, paginación por `slice()`, navegación central y responsive sin duplicar tabla/tarjetas. Los CSV se prueban con todas las coincidencias, columnas dinámicas, BOM y protección de fórmulas. Encabezado fijo, scroll, contraste y modal en 1440/1024/768/390 requieren inspección manual.
+# Organización de la suite
+
+La suite se revisa en quince bloques: normalización del workbook; ventas y objetivos; cumplimiento mensual; objetivo total; composición negociada/no negociada; actividades compartidas; multiactividad; KPI; tabla de seguimiento; modales y navegación; gráficas y timeline; CSV; seguridad; rendimiento; y regresiones reales.
+
+Las pruebas de presentación validan IDs y entradas de `UI_COPY`, encabezados, títulos, estados visibles, ausencia de textos obsoletos y consistencia entre interfaz y CSV. No comparan el HTML completo.

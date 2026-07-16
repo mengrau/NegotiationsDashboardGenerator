@@ -6,7 +6,7 @@
 
 | Visualización | Pregunta | Fuente | Tipo | Interacción y fallback |
 | --- | --- | --- | --- | --- |
-| Ventas atribuibles frente al objetivo | ¿Cómo se compara el numerador con el objetivo? | `kpis.comparableSales` y `comparableObjective` | barras horizontales | Etiquetas; fallback de barras. Layout featured. |
+| Evolución de la negociación | ¿Cómo cambian ventas, objetivo y vigencia por período? | timeline analítico | línea o Gantt | El detalle temporal se conserva en tooltips. |
 | Línea de tiempo | ¿Qué ocurrió antes, durante y después? | `analysis.timeline` | línea suavizada, Gantt o resumen | Filtros/explorador; fallback temporal. Layout timeline. |
 | Ventas por cliente asociado | ¿Quién aporta a una actividad compartida? | `selectedActivity.contributionRows` | barras | Abre explorador; fallback navegable. Featured. |
 | Cumplimiento por actividad | ¿Qué actividades comparables tienen mayor cumplimiento? | `activityPerformance` comparable | barras horizontales | Filtra actividad; hasta 12. Standard. |
@@ -32,6 +32,8 @@ No se usan 3D, rose charts ni efectos decorativos que reduzcan legibilidad.
 ## Exploración de presentaciones sin ventas
 
 La gráfica por categoría se retiró para evitar duplicar la información del KPI. El KPI **Presentaciones sin ventas** es clicable y abre un único modal: primero muestra categoría, cantidad, porcentaje, actividades y clientes relacionados; después muestra las presentaciones de la categoría seleccionada. La búsqueda, el ordenamiento, la paginación de 25 registros y la exportación CSV se realizan sobre el análisis ya preparado por los filtros actuales. Volver a categorías no abre un modal anidado ni modifica los filtros.
+
+Los títulos visibles son **Evolución de la negociación**, **Contribución por cliente**, **Cumplimiento por negociación**, **Estado de ventas por presentación**, **Ventas por categoría**, **Presentaciones con mayor venta**, **Ventas por cliente**, **Ventas por región**, **Ventas por canal** y **Ventas por CEDI**. Los subtítulos describen el resultado y evitan reglas internas de deduplicación o atribución.
 
 ## Eliminación de la gráfica temporal redundante
 

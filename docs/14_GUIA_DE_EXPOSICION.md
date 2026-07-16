@@ -14,7 +14,7 @@ El dashboard no suma columnas repetidas: respeta la granularidad de venta, objet
 
 1. **Problema:** el Excel repite ventas y objetivos en filas de presentaciones; una suma directa duplica cifras.
 2. **Solución:** el generador valida y normaliza el workbook, resuelve venta general por cliente-período y objetivo por actividad, y genera un HTML interactivo.
-3. **Diferencia clave:** Ventas del período es venta general; Ventas atribuibles comparables es el numerador de cumplimiento.
+3. **Diferencia clave:** Ventas totales muestra el resultado registrado; Ventas comparables es el valor utilizado para medir cumplimiento.
 4. **Caso:** `947124` es compartida: 541 conjuntos contra 1.100, cumplimiento 49,18 %, con aportes 371 y 170.
 5. **Resultado:** filtros, KPI, timeline y explorador usan el mismo análisis, con cachés, seguridad y fallbacks.
 
@@ -81,7 +81,7 @@ Resuma: cifras reconciliables, reglas explícitas, distribución portable y audi
 
 1. Cargar archivo y confirmar validación.
 2. Mostrar vista global con ocho KPI.
-3. Comparar Ventas del período y Ventas atribuibles comparables.
+3. Comparar Ventas totales y Ventas comparables.
 4. Filtrar actividad compartida `947124`.
 5. Abrir contribuciones y explicar 371/170.
 6. Filtrar actividad individual `874894`.
@@ -174,3 +174,9 @@ Ejecute las cuatro auditorías, complete la matriz visual y tenga disponibles lo
 6. Descargue el resumen: incluye todas las coincidencias y períodos, no solo 25 filas.
 
 Frase recomendada: “La tabla resume una relación cliente–negociación; el estado mensual evalúa el mes activo y el avance total informa cuánto falta para completar el contrato”.
+
+Frases ejecutivas recomendadas:
+
+- “El tablero compara la venta total del cliente contra el objetivo mensual durante la vigencia de la negociación”.
+- “La composición permite identificar qué parte de la venta corresponde a presentaciones negociadas y no negociadas”.
+- “El resultado mensual y el avance del objetivo total se presentan por separado”.

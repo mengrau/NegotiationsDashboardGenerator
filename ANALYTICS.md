@@ -65,7 +65,7 @@ Los estados analíticos son `OK`, `SIN_OBJETIVO`, `SIN_VENTAS`, `OBJETIVO_CONFLI
 
 ## Métricas ejecutivas
 
-- Ventas del período: suma de los valores de `TotalVentaMes` resueltos una vez por cliente-período.
+- Ventas totales: suma de los valores de `TotalVentaMes` resueltos una vez por cliente-período.
 - Ventas del último mes: valores resueltos para el período canónico máximo.
 
 ## Selección contextual de KPI
@@ -169,7 +169,11 @@ Los cambios de la Fase 8 son exclusivamente de visualización. La línea suaviza
 
 La Fase 9 expone `comparableSales` como **Ventas atribuibles comparables** y usa `comparableObjective` en la tarjeta de objetivo reconciliable. No introduce una fórmula: muestra el numerador y denominador que ya consumían `compliance` y `objectiveDifference`.
 
-`Ventas del período` continúa resolviendo `TotalVentaMes` por cliente y período. La cobertura comparable se conserva como texto secundario `X de Y actividades`, no como KPI principal. `reconcileComparablePerformance()` comprueba las dos identidades con valores completos y tolerancia `1e-9`.
+`Ventas totales` continúa resolviendo `TotalVentaMes` por cliente y período. La cobertura comparable se conserva como texto secundario, no como KPI principal. `reconcileComparablePerformance()` comprueba las dos identidades con valores completos y tolerancia `1e-9`.
+
+## Copia ejecutiva
+
+Los títulos visibles se resuelven desde `UI_COPY`. La vista global presenta **Ventas totales**, **Ventas último mes**, **Ventas comparables**, **Objetivo mensual**, **Cumplimiento mensual** y **Diferencia frente al objetivo**. Las descripciones identifican ventas y objetivos en cajas físicas, y la diferencia usa un mensaje coherente con el signo; ninguna etiqueta modifica poblaciones, fórmulas o estados analíticos.
 
 ## Contrato analítico de cliente–negociación
 

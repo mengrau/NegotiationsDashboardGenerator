@@ -68,7 +68,7 @@ function generateDashboardHtml(payload) {
           <div class="header-actions">
             <span id="healthBadge" class="badge badge-success"><i data-lucide="check-circle-2"></i> Datos cargados</span>
             <button id="themeToggle" class="button button-ghost theme-toggle" type="button" aria-label="Cambiar a modo oscuro"><i data-lucide="moon"></i> Oscuro</button>
-            <button id="exportCsvButton" class="button button-primary" type="button"><i data-lucide="download"></i> Exportar CSV</button>
+            <button id="exportCsvButton" class="button button-primary" type="button"><i data-lucide="download"></i> Descargar CSV</button>
             <button id="clearFiltersButton" class="button button-ghost" type="button"><i data-lucide="filter-x"></i> Limpiar filtros</button>
           </div>
         </header>
@@ -93,7 +93,7 @@ function generateDashboardHtml(payload) {
             <div>
               <p class="eyebrow">Seguimiento comercial</p>
               <h2 id="clientTrackingTitle">Seguimiento de clientes y negociaciones</h2>
-              <p>Listado cliente–negociación con cumplimiento mensual, avance total, ventas, descuentos e inversión.</p>
+              <p>Resultado mensual y avance total por cliente y negociación.</p>
             </div>
             <div class="client-tracking-meta" aria-live="polite">
               <span id="clientTrackingPeriod" class="badge badge-muted">Período no disponible</span>
@@ -870,6 +870,84 @@ tbody tr:hover { background: var(--primary-soft); }
 
 function dashboardScript() {
   return `
+const UI_COPY = Object.freeze({
+  kpis: {
+    global: {
+      periodSales: { title: "Ventas totales", description: "Ventas registradas en cajas f\u00edsicas durante el per\u00edodo seleccionado." },
+      latestSales: { title: "Ventas \u00faltimo mes", description: "Resultado en cajas f\u00edsicas del per\u00edodo m\u00e1s reciente." },
+      comparableSales: { title: "Ventas comparables", description: "Ventas en cajas f\u00edsicas utilizadas para medir el cumplimiento." },
+      monthlyObjective: { title: "Objetivo mensual", description: "Meta en cajas f\u00edsicas de las negociaciones evaluadas." },
+      monthlyCompliance: { title: "Cumplimiento mensual", description: "Resultado de ventas en cajas f\u00edsicas frente al objetivo del mes en cajas f\u00edsicas." },
+      objectiveGap: { title: "Diferencia frente al objetivo", positive: "Cajas f\u00edsicas por encima del objetivo.", negative: "Cajas f\u00edsicas pendientes para alcanzar el objetivo.", neutral: "Sin diferencia en cajas f\u00edsicas frente al objetivo." },
+      withoutSales: { title: "Presentaciones sin ventas", description: "Presentaciones sin resultado de venta.", action: "Ver detalle" },
+      activeNegotiations: { title: "Negociaciones vigentes", description: "Negociaciones activas a la fecha." }
+    },
+    shared: {
+      sales: "Ventas conjuntas", objective: "Objetivo mensual", compliance: "Cumplimiento mensual", gap: "Diferencia frente al objetivo",
+      clients: "Clientes asociados", presentations: "Presentaciones negociadas", status: "Estado", validity: "Vigencia"
+    },
+    individual: {
+      sales: "Ventas del mes", objective: "Objetivo mensual", compliance: "Cumplimiento mensual", gap: "Diferencia frente al objetivo",
+      presentations: "Presentaciones negociadas", status: "Estado", validity: "Vigencia", client: "Cliente"
+    },
+    sharedClient: {
+      sales: "Ventas del cliente", objective: "Objetivo mensual", contribution: "Aporte a la negociaci\u00f3n",
+      contributionDescription: "Participaci\u00f3n en la venta conjunta.", jointSales: "Ventas conjuntas",
+      compliance: "Cumplimiento mensual", gap: "Diferencia frente al objetivo", clients: "Clientes asociados", rank: "Posici\u00f3n por aporte"
+    }
+  },
+  charts: {
+    negotiationTimeline: { title: "Evoluci\u00f3n de la negociaci\u00f3n", subtitle: "Ventas y objetivos en cajas f\u00edsicas, con su vigencia por per\u00edodo." },
+    activityContribution: { title: "Contribuci\u00f3n por cliente", subtitle: "Participaci\u00f3n de cada cliente en la venta conjunta expresada en cajas f\u00edsicas." },
+    activityPerformance: { title: "Cumplimiento por negociaci\u00f3n", subtitle: "Ventas en cajas f\u00edsicas frente a los objetivos de las negociaciones evaluadas." },
+    presentationStatus: { title: "Estado de ventas por presentaci\u00f3n", subtitle: "Distribuci\u00f3n de presentaciones seg\u00fan sus ventas en cajas f\u00edsicas." },
+    category: { title: "Ventas por categor\u00eda", subtitle: "Participaci\u00f3n de cada categor\u00eda en las ventas de cajas f\u00edsicas." },
+    presentations: { title: "Presentaciones con mayor venta", subtitle: "Ranking por volumen de cajas f\u00edsicas." },
+    clients: { title: "Ventas por cliente", subtitle: "Resultado en cajas f\u00edsicas por cliente." },
+    regions: { title: "Ventas por regi\u00f3n", subtitle: "Resultado en cajas f\u00edsicas por regi\u00f3n comercial." },
+    channels: { title: "Ventas por canal", subtitle: "Resultado en cajas f\u00edsicas por canal." },
+    cedi: { title: "Ventas por CEDI", subtitle: "Resultado en cajas f\u00edsicas por centro de distribuci\u00f3n." }
+  },
+  tables: {
+    tracking: ["Estado mensual", "Estado total", "Cliente", "Negociaci\u00f3n", "Objetivo mensual", "Venta del mes", "Mix de venta", "Dcto. mes", "Cumplimiento", "Avance total", "Inversi\u00f3n", "Acci\u00f3n"],
+    monthly: ["Per\u00edodo", "Venta total", "Venta negociada", "Venta no negociada", "% negociada", "Dcto. mes", "Objetivo", "Cumplimiento", "Estado"],
+    contribution: ["Posici\u00f3n", "Cliente", "Ventas", "Participaci\u00f3n", "Presentaciones", "Detalle"]
+  },
+  statuses: {
+    monthly: { CUMPLE_MES: "Cumple", NO_CUMPLE_MES: "No cumple", NO_EVALUABLE_MES: "No evaluable" },
+    total: { CUMPLIO_OBJETIVO_TOTAL: "Objetivo cumplido", EN_PROGRESO_OBJETIVO_TOTAL: "En progreso", NO_EVALUABLE_TOTAL: "No evaluable" }
+  },
+  tooltips: {
+    salesMix: "Distribuci\u00f3n de la venta entre presentaciones negociadas y no negociadas.",
+    monthlyCompliance: "El cumplimiento considera la venta total del cliente durante el per\u00edodo v\u00e1lido."
+  },
+  emptyStates: {
+    filters: "No hay resultados para los filtros seleccionados.",
+    negotiations: "No hay negociaciones evaluables en este per\u00edodo.",
+    withoutSales: "No hay presentaciones sin ventas.",
+    visualization: "No fue posible cargar esta visualizaci\u00f3n.",
+    unavailable: "Informaci\u00f3n no disponible."
+  },
+  actions: {
+    detail: "Ver detalle", client: "Ver cliente", negotiation: "Ver negociaci\u00f3n", contribution: "Ver contribuci\u00f3n",
+    back: "Volver", downloadCsv: "Descargar CSV"
+  },
+  modal: {
+    summary: "Resumen de la negociaci\u00f3n", clientLocation: "Cliente y ubicaci\u00f3n", objectives: "Objetivos e inversi\u00f3n",
+    monthlyResult: "Resultado mensual", salesComposition: "Composici\u00f3n de la venta", accumulated: "Avance acumulado", warnings: "Advertencias"
+  },
+  csv: {
+    monthlyStatus: "Estado mensual", totalStatus: "Estado objetivo total", clientSap: "Cliente SAP", clientName: "Nombre del cliente",
+    negotiationId: "ID negociaci\u00f3n", monthlyObjective: "Objetivo mensual", monthlySales: "Venta total del mes",
+    negotiatedSales: "Venta negociada", nonNegotiatedSales: "Venta no negociada", negotiatedShare: "Porcentaje negociado",
+    nonNegotiatedShare: "Porcentaje no negociado", monthlyDiscount: "Descuento del mes", monthlyCompliance: "Cumplimiento mensual",
+    totalProgress: "Avance objetivo total", investment: "Porcentaje de inversi\u00f3n"
+  }
+});
+function getUiCopy() { return UI_COPY; }
+function getObjectiveGapDescription(value) {
+  return value > 0 ? UI_COPY.kpis.global.objectiveGap.positive : value < 0 ? UI_COPY.kpis.global.objectiveGap.negative : UI_COPY.kpis.global.objectiveGap.neutral;
+}
 const FILTER_FIELDS = [
   { field: "ID Actividad", label: "Actividad" },
   { field: "Cliente SAP - Clave", label: "Cliente SAP" },
@@ -1995,7 +2073,7 @@ function getClientTrackingComposition(row, periodKey) {
 function buildClientTrackingCompositionMarkup(row, periodKey) {
   const composition = getClientTrackingComposition(row, periodKey);
   const warning = composition.status === "DESCUADRE_COMPOSICION_VENTA" ? "<small class=\\"tracking-composition-warning\\">Revisar descuadre de fuentes</small>" : "";
-  return "<span class=\\"tracking-composition\\" title=\\"El cumplimiento utiliza toda la venta del cliente durante la vigencia. La composici&oacute;n indica cu&aacute;nto provino de presentaciones negociadas y no negociadas.\\"><span>Negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.negotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.negotiatedShare)) + "</span><span>No negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.nonNegotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.nonNegotiatedShare)) + "</span>" + warning + "</span>";
+  return "<span class=\\"tracking-composition\\" title=\\"" + escapeHtml(UI_COPY.tooltips.salesMix) + "\\"><span>Negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.negotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.negotiatedShare)) + "</span><span>No negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.nonNegotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.nonNegotiatedShare)) + "</span>" + warning + "</span>";
 }
 function getClientTrackingMonthlyDiscountDisplay(row, periodKey) {
   if (!periodKey || !row) return "No disponible";
@@ -2058,7 +2136,7 @@ function renderClientTrackingTable() {
   if (!controls || !body || !pagination) return;
   ensureClientTrackingRelationIndex(state.analyses && state.analyses.clientActivitySummary || []);
   if (count) count.textContent = formatInteger(projection.rows.length) + " de " + formatInteger(projection.globalCount) + " relaciones";
-  if (periodBadge) periodBadge.textContent = projection.period ? "Estado mensual — " + projection.period.label : "Período no disponible";
+  if (periodBadge) periodBadge.textContent = projection.period ? UI_COPY.tables.tracking[0] + " · " + projection.period.label : UI_COPY.emptyStates.unavailable;
   controls.innerHTML = buildClientTrackingControlsMarkup();
   const pageCount = Math.max(1, Math.ceil(projection.rows.length / tableState.pageSize));
   tableState.page = Math.max(1, Math.min(pageCount, tableState.page));
@@ -2082,19 +2160,19 @@ function buildClientTrackingControlsMarkup() {
     "<label>Estado objetivo total<select id=\\"clientTrackingTotalStatus\\">" + optionMarkup(totals, value.totalStatus) + "</select></label>" +
     "<label class=\\"tracking-sort\\">Ordenar por<select id=\\"clientTrackingSort\\">" + optionMarkup(sorts, value.sortField) + "</select></label>" +
     "<label class=\\"tracking-page-size\\">Filas<select id=\\"clientTrackingPageSize\\">" + [25, 50, 100].map(function (size) { return "<option value=\\"" + size + "\\"" + (size === value.pageSize ? " selected" : "") + ">" + size + "</option>"; }).join("") + "</select></label>" +
-    "<div class=\\"client-tracking-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"sort-direction\\"><i data-lucide=\\"" + (value.sortDirection === "asc" ? "arrow-up" : "arrow-down") + "\\"></i> " + (value.sortDirection === "asc" ? "Ascendente" : "Descendente") + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"export-summary\\"><i data-lucide=\\"download\\"></i> Descargar CSV</button></div>";
+    "<div class=\\"client-tracking-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"sort-direction\\"><i data-lucide=\\"" + (value.sortDirection === "asc" ? "arrow-up" : "arrow-down") + "\\"></i> " + (value.sortDirection === "asc" ? "Ascendente" : "Descendente") + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"export-summary\\"><i data-lucide=\\"download\\"></i> " + UI_COPY.actions.downloadCsv + "</button></div>";
 }
 function buildClientTrackingDesktopTable(rows, period) {
-  const headers = ["Estado mes", "Estado total", "Cliente / CodSAP", "ID Actividad", "Objetivo mes", "Venta comparable del mes", "Composición de venta", "Dcto. mes", "Cumplimiento mes", "Avance total", "% inversión", "Acción"];
+  const headers = UI_COPY.tables.tracking;
   return "<div class=\\"client-tracking-table-wrap\\"><table class=\\"client-tracking-table\\"><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>CodSAP: " + escapeHtml(row.clientSap) + (row.clientNit ? " · NIT: " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></td></tr>";
+    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>" + escapeHtml(row.clientSap) + (row.clientNit ? " · " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></td></tr>";
   }).join("") + "</tbody></table></div>";
 }
 function buildClientTrackingCards(rows, period) {
   return "<div class=\\"client-tracking-cards\\">" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Actividad " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta comparable " + escapeHtml(period ? period.label : "del mes") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-composition\\"><small>Composición de venta</small>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || "Ubicación no disponible") + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></div></article>";
+    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Negociación " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta del mes " + escapeHtml(period ? period.label : "") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-composition\\"><small>Mix de venta</small>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || UI_COPY.emptyStates.unavailable) + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></div></article>";
   }).join("") + "</div>";
 }
 function buildClientTrackingPagination(total, start, visibleCount, pageCount) {
@@ -2102,24 +2180,24 @@ function buildClientTrackingPagination(total, start, visibleCount, pageCount) {
   return "<span>Mostrando " + formatInteger(from) + "–" + formatInteger(to) + " de " + formatInteger(total) + " relaciones cliente–negociación</span><div class=\\"client-tracking-pagination-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"page-prev\\"" + (state.clientTrackingTable.page <= 1 ? " disabled" : "") + "><i data-lucide=\\"chevron-left\\"></i> Anterior</button><span class=\\"badge badge-muted\\">Página " + formatInteger(state.clientTrackingTable.page) + " de " + formatInteger(pageCount) + "</span><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"page-next\\"" + (state.clientTrackingTable.page >= pageCount ? " disabled" : "") + ">Siguiente <i data-lucide=\\"chevron-right\\"></i></button></div>";
 }
 function buildClientTrackingEmptyState(projection) {
-  let title = "No hay relaciones cliente–negociación para los filtros actuales.";
-  if (state.clientTrackingTable.monthlyStatus === "CUMPLE_MES") title = "No hay clientes que cumplan el objetivo mensual en el período seleccionado.";
-  else if (projection.globalCount && (state.clientTrackingTable.monthlyStatus !== "ALL" || state.clientTrackingTable.totalStatus !== "ALL")) title = "No hay relaciones con los estados locales seleccionados.";
-  return "<div class=\\"empty-state empty-state-info\\" role=\\"status\\"><i data-lucide=\\"info\\"></i><strong>" + escapeHtml(title) + "</strong><span>Los estados no evaluables no se sustituyen por cero.</span><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"clear-local\\">Limpiar filtros de la tabla</button></div>";
+  let title = UI_COPY.emptyStates.filters;
+  if (state.clientTrackingTable.monthlyStatus === "CUMPLE_MES") title = "No hay clientes con cumplimiento en el período seleccionado.";
+  else if (projection.globalCount && (state.clientTrackingTable.monthlyStatus !== "ALL" || state.clientTrackingTable.totalStatus !== "ALL")) title = "No hay resultados para los estados seleccionados.";
+  return "<div class=\\"empty-state empty-state-info\\" role=\\"status\\"><i data-lucide=\\"info\\"></i><strong>" + escapeHtml(title) + "</strong><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"clear-local\\">Limpiar filtros de la tabla</button></div>";
 }
 function clientTrackingMonthlyBadge(status) {
-  const map = { CUMPLE_MES: ["Cumple mes", "is-positive", "check-circle-2"], NO_CUMPLE_MES: ["No cumple mes", "is-negative", "x-circle"], NO_EVALUABLE_MES: ["No evaluable", "is-neutral", "circle-help"] };
+  const map = { CUMPLE_MES: [UI_COPY.statuses.monthly.CUMPLE_MES, "is-positive", "check-circle-2"], NO_CUMPLE_MES: [UI_COPY.statuses.monthly.NO_CUMPLE_MES, "is-negative", "x-circle"], NO_EVALUABLE_MES: [UI_COPY.statuses.monthly.NO_EVALUABLE_MES, "is-neutral", "circle-help"] };
   const item = map[status] || map.NO_EVALUABLE_MES;
   return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
 }
 function clientTrackingTotalBadge(status) {
-  const map = { CUMPLIO_OBJETIVO_TOTAL: ["Objetivo total cumplido", "is-positive", "badge-check"], EN_PROGRESO_OBJETIVO_TOTAL: ["Objetivo total en progreso", "is-progress", "clock-3"], NO_EVALUABLE_TOTAL: ["Objetivo total no evaluable", "is-neutral", "circle-help"] };
+  const map = { CUMPLIO_OBJETIVO_TOTAL: [UI_COPY.statuses.total.CUMPLIO_OBJETIVO_TOTAL, "is-positive", "badge-check"], EN_PROGRESO_OBJETIVO_TOTAL: [UI_COPY.statuses.total.EN_PROGRESO_OBJETIVO_TOTAL, "is-progress", "clock-3"], NO_EVALUABLE_TOTAL: [UI_COPY.statuses.total.NO_EVALUABLE_TOTAL, "is-neutral", "circle-help"] };
   const item = map[status] || map.NO_EVALUABLE_TOTAL;
   return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
 }
 function renderClientTrackingFailureState() {
   const body = document.getElementById("clientTrackingBody");
-  if (body) body.innerHTML = '<div class="empty-state empty-state-error" role="alert"><strong>Seguimiento no disponible</strong><span>Los modelos analíticos no fueron sustituidos ni recalculados.</span></div>';
+  if (body) body.innerHTML = '<div class="empty-state empty-state-error" role="alert"><strong>' + escapeHtml(UI_COPY.emptyStates.visualization) + '</strong></div>';
 }
 function getCachedActivityAnalytics(scopeRows, filters) {
   const scopeFilters = getScopeFilters(filters);
@@ -2341,7 +2419,6 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
   container.dataset.tail = String(gridLayout.tail);
   container.dataset.odd = String(gridLayout.odd);
   container.innerHTML = model.items.map(function (item) {
-    item = normalizeKpiDisplayCopy(item);
     const secondary = (item.className || "").indexOf("kpi-secondary") !== -1;
     const className = "kpi-card " + (secondary ? "" : "kpi-primary ") + (item.className || "");
     const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
@@ -2350,48 +2427,6 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
     return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
   refreshIcons(container, "data-kpi-icon");
-}
-function normalizeKpiDisplayCopy(item) {
-  const normalized = Object.assign({}, item);
-  const title = normalizeMojibakeText(normalized.title) || "";
-  const description = normalizeMojibakeText(normalized.description) || "";
-  normalized.status = normalizeMojibakeText(normalized.status);
-  normalized.actionLabel = normalizeMojibakeText(normalized.actionLabel);
-  if (normalized.id === "comparableSales" && title === "Ventas comparables") {
-    normalized.title = "Ventas atribuibles comparables";
-    normalized.description = description
-      .replace("Ventas totales de clientes asociadas", "Ventas atribuibles asociadas")
-      .replace("ventas totales comparables", "ventas atribuibles comparables");
-  } else if (normalized.id === "aggregateDifference" || normalized.id === "objectiveDifference") {
-    normalized.title = "Diferencia atribuible frente al objetivo";
-    normalized.description = description.replace("Ventas totales comparables", "Ventas atribuibles comparables");
-  } else if (normalized.id === "aggregateCompliance" || normalized.id === "activityCompliance") {
-    normalized.title = title;
-    normalized.description = description
-      .replace("Ventas totales comparables", "Ventas atribuibles comparables")
-      .replace("Venta total comparable", "Venta atribuible");
-  } else if (normalized.id === "activitySales") {
-    normalized.title = title;
-    normalized.description = description
-      .replace("Ventas totales conjuntas", "Ventas conjuntas atribuibles")
-      .replace("Venta total comparable", "Ventas atribuibles comparables");
-  } else if (normalized.id === "clientSales") {
-    normalized.title = title;
-    normalized.description = description.replace("Venta total comparable", "Venta atribuible");
-  } else {
-    normalized.title = title;
-    normalized.description = description;
-  }
-  if (normalized.title === "Ventas comparables de las actividades") normalized.title = "Ventas atribuibles comparables de las actividades";
-  if (normalized.title === "Venta total comparable del cliente") normalized.title = "Venta atribuible comparable del cliente";
-  return normalized;
-}
-function normalizeMojibakeText(value) {
-  if (value === null || value === undefined) return value;
-  return String(value)
-    .replace(/\u00c3\u00a1/g, "\u00e1").replace(/\u00c3\u00a9/g, "\u00e9").replace(/\u00c3\u00ad/g, "\u00ed").replace(/\u00c3\u00b3/g, "\u00f3").replace(/\u00c3\u00ba/g, "\u00fa")
-    .replace(/\u00c3\u0081/g, "\u00c1").replace(/\u00c3\u0089/g, "\u00c9").replace(/\u00c3\u008d/g, "\u00cd").replace(/\u00c3\u0093/g, "\u00d3").replace(/\u00c3\u009a/g, "\u00da")
-    .replace(/\u00c3\u00b1/g, "\u00f1").replace(/\u00c3\u0091/g, "\u00d1").replace(/\u00c2\u00ba/g, "\u00ba").replace(/\u00c2\u00b7/g, "\u00b7").replace(/\u00e2\u0080\u00a2/g, "\u2022");
 }
 function getKpiGridLayoutMetadata(count) {
   const normalized = Math.max(0, Number(count) || 0);
@@ -2447,9 +2482,9 @@ function buildSharedActivityKpis(context) {
   return [
     buildActivitySalesKpi(activity, k, true, false),
     buildObjectiveKpi(activity, false),
-    buildComplianceKpi(activity, "Cumplimiento de la actividad compartida", "Resultado conjunto de todos los clientes frente al objetivo mensual."),
-    buildDifferenceKpi(activity, "Ventas conjuntas menos el objetivo mensual de la actividad."),
-    { id: "associatedClients", icon: "users", title: "Clientes asociados", value: formatInteger(activity.associatedClientCount), description: "Actividad compartida entre " + activity.associatedClientCount + " clientes." },
+    buildComplianceKpi(activity, UI_COPY.kpis.shared.compliance, UI_COPY.kpis.global.monthlyCompliance.description),
+    buildDifferenceKpi(activity),
+    { id: "associatedClients", icon: "users", title: UI_COPY.kpis.shared.clients, value: formatInteger(activity.associatedClientCount), description: "Clientes vinculados a la negociación." },
     buildPresentationsKpi(k),
     buildActivityStatusKpi(activity),
     buildActivityValidityKpi(activity)
@@ -2460,35 +2495,35 @@ function buildIndividualActivityKpis(context) {
   return [
     buildActivitySalesKpi(activity, k, false, false),
     buildObjectiveKpi(activity, false),
-    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Venta total comparable de la actividad frente a su objetivo mensual."),
-    buildDifferenceKpi(activity, "Ventas de la actividad menos su objetivo mensual."),
+    buildComplianceKpi(activity, UI_COPY.kpis.individual.compliance, UI_COPY.kpis.global.monthlyCompliance.description),
+    buildDifferenceKpi(activity),
     buildPresentationsKpi(k),
     buildActivityStatusKpi(activity),
     buildActivityValidityKpi(activity),
-    { id: "associatedClient", icon: "users", title: "Cliente asociado", value: activity.associatedClientIds[0] || "No disponible", description: "Único cliente SAP vinculado a la actividad.", className: "kpi-secondary" }
+    { id: "associatedClient", icon: "users", title: UI_COPY.kpis.individual.client, value: activity.associatedClientIds[0] || "No disponible", description: "Cliente vinculado a la negociación.", className: "kpi-secondary" }
   ];
 }
 function buildSharedActivityClientKpis(context) {
   const k = context.kpis, activity = context.activity, contribution = context.selectedContribution;
   return [
-    { id: "clientSales", icon: "shopping-bag", title: k.selectedClientIds.length > 1 ? "Ventas de los clientes seleccionados" : "Ventas del cliente", value: formatAvailableMetric(k.selectedContributionSales), description: "Venta atribuible del cliente dentro de la actividad seleccionada." },
+    { id: "clientSales", icon: "shopping-bag", title: UI_COPY.kpis.sharedClient.sales, value: formatAvailableMetric(k.selectedContributionSales), description: "Resultado del cliente en cajas físicas durante el período." },
     buildObjectiveKpi(activity, true),
-    { id: "clientContribution", icon: "pie-chart", title: "Contribución a la actividad", value: formatAvailablePercent(k.selectionContribution), description: "Participación del cliente en las ventas conjuntas de la negociación.", shouldRender: function () { return activity.associatedClientCount > 1 && isFiniteNumber(k.selectionContribution); } },
-    { id: "jointActivitySales", icon: "package-check", title: "Ventas conjuntas de la actividad", value: formatAvailableMetric(k.relevantJointSales), description: "Suma de las ventas de todos los clientes asociados." },
-    buildComplianceKpi(activity, "Cumplimiento de la actividad compartida", "Resultado conjunto de todos los clientes frente al objetivo mensual."),
-    buildDifferenceKpi(activity, "Ventas conjuntas menos el objetivo mensual de la actividad."),
-    { id: "associatedClients", icon: "users", title: "Clientes asociados a la negociación", value: formatInteger(activity.associatedClientCount), description: "Clientes SAP que participan en la actividad compartida." },
-    { id: "clientRank", icon: "list-ordered", title: "Posición del cliente por aporte", value: contribution && contribution.rank ? contribution.rank + ".º de " + activity.associatedClientCount : "No disponible", description: "Ranking neutral por ventas aportadas; no evalúa cumplimiento individual.", className: "kpi-secondary", shouldRender: function () { return activity.associatedClientCount > 1 && Boolean(contribution && contribution.rank); } }
+    { id: "clientContribution", icon: "pie-chart", title: UI_COPY.kpis.sharedClient.contribution, value: formatAvailablePercent(k.selectionContribution), description: UI_COPY.kpis.sharedClient.contributionDescription, shouldRender: function () { return activity.associatedClientCount > 1 && isFiniteNumber(k.selectionContribution); } },
+    { id: "jointActivitySales", icon: "package-check", title: UI_COPY.kpis.sharedClient.jointSales, value: formatAvailableMetric(k.relevantJointSales), description: "Resultado conjunto en cajas físicas de los clientes asociados." },
+    buildComplianceKpi(activity, UI_COPY.kpis.sharedClient.compliance, UI_COPY.kpis.global.monthlyCompliance.description),
+    buildDifferenceKpi(activity),
+    { id: "associatedClients", icon: "users", title: UI_COPY.kpis.sharedClient.clients, value: formatInteger(activity.associatedClientCount), description: "Clientes vinculados a la negociación." },
+    { id: "clientRank", icon: "list-ordered", title: UI_COPY.kpis.sharedClient.rank, value: contribution && contribution.rank ? contribution.rank + ".º de " + activity.associatedClientCount : "No disponible", description: "Lugar del cliente según su aporte.", className: "kpi-secondary", shouldRender: function () { return activity.associatedClientCount > 1 && Boolean(contribution && contribution.rank); } }
   ];
 }
 function buildIndividualActivityClientKpis(context) {
   const k = context.kpis, activity = context.activity;
   const clientSales = isFiniteNumber(k.selectedContributionSales) ? k.selectedContributionSales : context.isContractOnly ? k.salesPeriod : null;
   return [
-    { id: "clientSales", icon: "shopping-bag", title: "Ventas del cliente", value: formatAvailableMetric(clientSales), description: context.isContractOnly ? "Ventas históricas relacionadas; la actividad aún no es comparable." : "Venta total comparable del cliente dentro de la actividad." },
+    { id: "clientSales", icon: "shopping-bag", title: UI_COPY.kpis.sharedClient.sales, value: formatAvailableMetric(clientSales), description: context.isContractOnly ? "Resultado histórico en cajas físicas." : "Resultado del cliente en cajas físicas durante el período." },
     buildObjectiveKpi(activity, true),
-    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Venta total comparable frente al objetivo mensual de la actividad."),
-    buildDifferenceKpi(activity, "Venta total comparable menos el objetivo mensual de la actividad."),
+    buildComplianceKpi(activity, UI_COPY.kpis.individual.compliance, UI_COPY.kpis.global.monthlyCompliance.description),
+    buildDifferenceKpi(activity),
     buildPresentationsKpi(k),
     buildActivityStatusKpi(activity),
     buildActivityValidityKpi(activity),
@@ -2516,10 +2551,10 @@ function buildAggregateActivityKpis(k, sales, objective, achievement, gap, sales
   const comparableObjective = hasComparablePopulation && objective > 0 ? objective : null;
   const coverage = buildComparableCoverageText(k.activityAggregate);
   return [
-    { id: "comparableSales", icon: "package-check", title: salesTitle, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? "Ventas asociadas a actividades válidas dentro de su vigencia; se usan en cumplimiento y diferencia. " + coverage : "No existen actividades con ventas atribuibles dentro de una vigencia válida. " + coverage },
-    { id: "aggregateObjective", icon: "target", title: "Objetivo mensual de las actividades", value: formatAvailableMetric(comparableObjective), description: "Suma de objetivos únicos de las actividades comparables." },
-    { id: "aggregateCompliance", icon: "gauge", title: "Cumplimiento agregado", value: formatAvailablePercent(achievement), description: "Ventas totales comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
-    { id: "aggregateDifference", icon: difference.icon, title: "Diferencia frente al objetivo", value: isFiniteNumber(gap) ? formatSignedNumber(gap) : "No disponible", description: "Ventas totales comparables menos objetivos comparables.", className: difference.className, status: difference.label },
+    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description + " " + coverage : UI_COPY.emptyStates.negotiations + " " + coverage },
+    { id: "aggregateObjective", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: formatAvailableMetric(comparableObjective), description: UI_COPY.kpis.global.monthlyObjective.description },
+    { id: "aggregateCompliance", icon: "gauge", title: UI_COPY.kpis.global.monthlyCompliance.title, value: formatAvailablePercent(achievement), description: UI_COPY.kpis.global.monthlyCompliance.description + " " + coverage, className: compliance.className, status: compliance.label },
+    { id: "aggregateDifference", icon: difference.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(gap) ? formatSignedNumber(gap) : "No disponible", description: isFiniteNumber(gap) ? getObjectiveGapDescription(gap) : UI_COPY.emptyStates.unavailable, className: difference.className, status: difference.label },
     { id: "selectedActivities", icon: "clipboard-list", title: k.selectedActivityIds.length > 1 ? "Actividades seleccionadas" : "Actividades relacionadas", value: formatInteger(k.activityAggregate.totalCount), description: "Actividades evaluadas en el período.", className: "kpi-secondary" }
   ];
 }
@@ -2531,46 +2566,46 @@ function buildExecutiveKpis(context) {
   const comparableObjective = k.activityAggregate.comparableCount > 0 && k.comparableObjective > 0 ? k.comparableObjective : null;
   const coverage = buildComparableCoverageText(k.activityAggregate);
   return [
-    { id: "periodSales", icon: "shopping-bag", title: "Ventas del período", value: formatAvailableMetric(k.salesPeriod), description: "Venta general resuelta una vez por cliente y período; incluye ventas que pueden quedar fuera del cumplimiento." },
-    { id: "latestSales", icon: "calendar-days", title: "Ventas del último mes", value: formatAvailableMetric(k.salesMonth), description: "Venta general cliente-período; no se duplica entre actividades." },
-    { id: "comparableSales", icon: "package-check", title: "Ventas comparables", value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? "Ventas totales de clientes asociadas a actividades válidas dentro de su vigencia; se usan en cumplimiento y diferencia. " + coverage : "No existen actividades con ventas totales comparables dentro de una vigencia válida. " + coverage },
-    { id: "monthlyObjectives", icon: "target", title: "Objetivo mensual de las actividades", value: formatAvailableMetric(comparableObjective), description: "Suma una vez los objetivos de las actividades comparables." },
-    { id: "activityCompliance", icon: "gauge", title: "Cumplimiento de las actividades", value: formatAvailablePercent(k.compliance), description: "Ventas totales comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
-    { id: "objectiveDifference", icon: difference.icon, title: "Diferencia frente al objetivo", value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: "Ventas totales comparables menos objetivos comparables.", className: difference.className, status: difference.label },
-    { id: "withoutSales", icon: "package-x", title: "Presentaciones sin ventas", value: formatInteger(k.presentationsWithoutSales), description: buildWithoutSalesKpiDescription(k) + " · Haz clic para explorar por categoría.", className: "kpi-attention kpi-secondary", action: "open-no-sales-explorer", actionLabel: "Explorar presentaciones sin ventas" },
-    { id: "activeNegotiations", icon: "calendar-check", title: "Negociaciones vigentes", value: formatInteger(k.activeNegotiations), description: "Actividades únicas vigentes a la fecha actual.", className: "kpi-secondary" }
+    { id: "periodSales", icon: "shopping-bag", title: UI_COPY.kpis.global.periodSales.title, value: formatAvailableMetric(k.salesPeriod), description: UI_COPY.kpis.global.periodSales.description },
+    { id: "latestSales", icon: "calendar-days", title: UI_COPY.kpis.global.latestSales.title, value: formatAvailableMetric(k.salesMonth), description: UI_COPY.kpis.global.latestSales.description },
+    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description : UI_COPY.emptyStates.negotiations },
+    { id: "monthlyObjectives", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: formatAvailableMetric(comparableObjective), description: UI_COPY.kpis.global.monthlyObjective.description },
+    { id: "activityCompliance", icon: "gauge", title: UI_COPY.kpis.global.monthlyCompliance.title, value: formatAvailablePercent(k.compliance), description: UI_COPY.kpis.global.monthlyCompliance.description + " " + coverage, className: compliance.className, status: compliance.label },
+    { id: "objectiveDifference", icon: difference.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: isFiniteNumber(k.objectiveDifference) ? getObjectiveGapDescription(k.objectiveDifference) : UI_COPY.emptyStates.unavailable, className: difference.className, status: difference.label },
+    { id: "withoutSales", icon: "package-x", title: UI_COPY.kpis.global.withoutSales.title, value: formatInteger(k.presentationsWithoutSales), description: UI_COPY.kpis.global.withoutSales.description + " · " + UI_COPY.kpis.global.withoutSales.action, className: "kpi-attention kpi-secondary", action: "open-no-sales-explorer", actionLabel: UI_COPY.actions.detail },
+    { id: "activeNegotiations", icon: "calendar-check", title: UI_COPY.kpis.global.activeNegotiations.title, value: formatInteger(k.activeNegotiations), description: UI_COPY.kpis.global.activeNegotiations.description, className: "kpi-secondary" }
   ];
 }
 function buildActivitySalesKpi(activity, k, shared, clientSelected) {
   const contractOnly = !isFiniteNumber(activity.totalSales);
   return {
     id: "activitySales", icon: shared ? "package-check" : "shopping-bag",
-    title: contractOnly ? "Ventas históricas relacionadas" : shared ? "Ventas conjuntas de la actividad" : clientSelected ? "Ventas del cliente" : "Ventas de la actividad",
+    title: contractOnly ? "Ventas históricas" : shared ? UI_COPY.kpis.shared.sales : clientSelected ? UI_COPY.kpis.sharedClient.sales : UI_COPY.kpis.individual.sales,
     value: formatAvailableMetric(contractOnly ? k.salesPeriod : activity.totalSales),
-    description: contractOnly ? "Ventas históricas visibles; el objetivo aún no es comparable con el período." : shared ? "Ventas totales conjuntas utilizadas en el cumplimiento de la actividad." : "Venta total comparable utilizada en el cumplimiento de la actividad."
+    description: contractOnly ? "Resultado anterior en cajas físicas." : shared ? "Resultado conjunto en cajas físicas de los clientes asociados." : "Resultado en cajas físicas del período evaluado."
   };
 }
 function buildObjectiveKpi(activity, clientContext) {
   const display = getObjectiveDisplay(activity);
   return {
-    id: "activityObjective", icon: "target", title: "Objetivo mensual de la actividad", value: display.value,
-    description: display.description || (clientContext ? "Objetivo completo de la negociación. No corresponde individualmente al cliente." : "Objetivo resuelto una sola vez para la actividad."),
+    id: "activityObjective", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: display.value,
+    description: display.description || UI_COPY.kpis.global.monthlyObjective.description,
     className: display.className
   };
 }
 function getObjectiveDisplay(activity) {
-  if (!activity || activity.objectiveStatus === "SIN_OBJETIVO") return { value: "No disponible", description: "La actividad no tiene un objetivo mensual válido en la fuente.", className: "kpi-neutral" };
-  if (activity.objectiveStatus === "OBJETIVO_CONFLICTIVO") return { value: "Revisar", description: "La actividad contiene más de un objetivo mensual diferente.", className: "kpi-attention" };
-  if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return { value: formatAvailableMetric(activity.objectiveMonthly), description: "Objetivo contractual de la actividad, aún no comparable con los períodos de venta disponibles.", className: "kpi-secondary" };
+  if (!activity || activity.objectiveStatus === "SIN_OBJETIVO") return { value: "No disponible", description: "No hay un objetivo mensual válido en cajas físicas.", className: "kpi-neutral" };
+  if (activity.objectiveStatus === "OBJETIVO_CONFLICTIVO") return { value: "Revisar", description: "Hay más de un objetivo mensual en cajas físicas.", className: "kpi-attention" };
+  if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return { value: formatAvailableMetric(activity.objectiveMonthly), description: "Objetivo contractual en cajas físicas, aún no comparable.", className: "kpi-secondary" };
   return { value: formatAvailableMetric(activity.objectiveMonthly), description: "", className: "" };
 }
 function buildComplianceKpi(activity, title, description) {
   const state = getComplianceState(activity.achievement, activity.objectiveStatus === "OK" ? "OK" : "OBJETIVO_AUSENTE");
   return { id: "activityCompliance", icon: "gauge", title: title, value: formatAvailablePercent(activity.achievement), description: isFiniteNumber(activity.achievement) ? description : getNonComparableDescription(activity), className: state.className, status: state.label };
 }
-function buildDifferenceKpi(activity, description) {
+function buildDifferenceKpi(activity) {
   const state = getObjectiveDifferenceState(activity.gap);
-  return { id: "activityDifference", icon: state.icon, title: "Diferencia frente al objetivo", value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : "No disponible", description: isFiniteNumber(activity.gap) ? description : getNonComparableDescription(activity), className: state.className, status: state.label };
+  return { id: "activityDifference", icon: state.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : "No disponible", description: isFiniteNumber(activity.gap) ? getObjectiveGapDescription(activity.gap) : getNonComparableDescription(activity), className: state.className, status: state.label };
 }
 function getNonComparableDescription(activity) {
   if (!activity) return "No existe una actividad comparable en el período.";
@@ -2582,10 +2617,10 @@ function getNonComparableDescription(activity) {
   return "La actividad no es comparable con la información disponible.";
 }
 function buildPresentationsKpi(k) {
-  return { id: "negotiatedPresentations", icon: "boxes", title: "Presentaciones negociadas", value: formatInteger(k.negotiatedPresentations), description: "Presentaciones únicas vinculadas a las actividades del contexto.", className: "kpi-secondary" };
+  return { id: "negotiatedPresentations", icon: "boxes", title: UI_COPY.kpis.shared.presentations, value: formatInteger(k.negotiatedPresentations), description: "Presentaciones incluidas en la negociación.", className: "kpi-secondary" };
 }
 function buildActivityStatusKpi(activity) {
-  return { id: "activityStatus", icon: activity.status === "OK" ? "circle-check" : "circle-dot", title: "Estado de la actividad", value: formatActivityStatus(activity.status), description: activity.ambiguityReasons.join(" · ") || (activity.status === "OK" ? "Fuentes analíticas consistentes." : getNonComparableDescription(activity)), className: activity.status === "OK" ? "kpi-positive kpi-secondary" : "kpi-attention kpi-secondary" };
+  return { id: "activityStatus", icon: activity.status === "OK" ? "circle-check" : "circle-dot", title: UI_COPY.kpis.shared.status, value: formatActivityStatus(activity.status), description: activity.status === "OK" ? "Negociación evaluable." : getNonComparableDescription(activity), className: activity.status === "OK" ? "kpi-positive kpi-secondary" : "kpi-attention kpi-secondary" };
 }
 function buildActivityValidityKpi(activity) {
   return { id: "activityValidity", icon: "calendar-check", title: "Vigencia", value: formatActivityValidity(activity), description: formatCanonicalPeriod(activity.period) + " · " + formatDateRange(activity.startDate, activity.endDate), className: "kpi-secondary" };
@@ -2977,7 +3012,7 @@ function buildTimelineTooltip(period) {
     SIN_INFORMACION: "Sin información"
   };
   const lines = [period.periodLabel];
-  if (isFiniteNumber(period.sales)) lines.push((period.temporalStatus === "PERIODO_COMPARABLE" ? "Ventas atribuibles: " : "Ventas del cliente: ") + formatNumber(period.sales));
+  if (isFiniteNumber(period.sales)) lines.push("Venta: " + formatNumber(period.sales));
   if (isFiniteNumber(period.clientContribution)) lines.push("Aporte del cliente seleccionado: " + formatNumber(period.clientContribution));
   if (isFiniteNumber(period.objective)) lines.push("Objetivo mensual: " + formatNumber(period.objective));
   if (isFiniteNumber(period.achievement)) lines.push("Cumplimiento: " + formatRatioPercent(period.achievement));
@@ -3047,17 +3082,16 @@ function renderContextStrip(analysis) {
 }
 function getChartRegistry() {
   return [
-    { id: "salesTarget", elementId: "chartSalesTarget", title: "Ventas atribuibles frente al objetivo", subtitle: "Comparación sobre la misma población de actividades comparables.", visualType: "bar", layout: "featured", height: "featured", shouldRender: function (a) { return isFiniteNumber(a.kpis.comparableSales) && isFiniteNumber(a.kpis.comparableObjective) && a.kpis.comparableObjective > 0; } },
-    { id: "negotiationTimeline", elementId: "chartNegotiationTimeline", title: "Línea de tiempo de la negociación", subtitle: "Explica qué ocurrió antes, durante y después de la vigencia sin alterar el cumplimiento.", visualType: "smooth-line-or-gantt", layout: "timeline", height: "timeline", shouldRender: function () { return true; } },
-    { id: "activityContribution", elementId: "chartActivityContribution", title: "Ventas por cliente asociado", subtitle: "Contribución neutral de cada cliente a la actividad; no representa cumplimiento individual.", action: "Haz clic para explorar la negociación compartida.", visualType: "bar", layout: "featured", height: "featured", shouldRender: function (a) { return Boolean(a.kpis.selectedActivity && a.kpis.selectedActivity.contributionRows.filter(function (row) { return isFiniteNumber(row.sales); }).length >= 2); } },
-    { id: "activityPerformance", elementId: "chartActivityPerformance", title: "Cumplimiento por actividad", subtitle: "Ranking de actividades comparables calculado con ventas conjuntas y objetivo único.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.activityPerformance.filter(function (item) { return item.comparable; }).length >= 2; } },
-    { id: "presentationStatus", elementId: "chartPresentationStatus", title: "Estado de presentaciones", subtitle: "Presentaciones únicas con venta, venta cero o sin información.", visualType: "donut", layout: "compact", height: "compact", shouldRender: function (a) { return a.presentationStatus.filter(function (item) { return item.value > 0; }).length >= 2; } },
-    { id: "category", elementId: "chartCategoria", title: "Ventas por categoría", subtitle: "Cajas físicas por categoría; no usa TotalVentaMes repetido.", visualType: "treemap-or-bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.categorySales.length >= 2 && hasRenderableChartData(a.categorySales); } },
-    { id: "presentations", elementId: "chartPresentaciones", title: "Presentaciones con mayor venta", subtitle: "Top 10 por cajas físicas registradas.", visualType: "lollipop", layout: "standard", height: "standard", shouldRender: function (a) { return a.presentationSales.length >= 2 && hasRenderableChartData(a.presentationSales); } },
-    { id: "clients", elementId: "chartClientes", title: "Ventas por cliente", subtitle: "Total mensual resuelto por cliente y período.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions["Cliente SAP - Clave"].count >= 2; } },
-    { id: "regions", elementId: "chartRegion", title: "Ventas por Región SAP", subtitle: "Macrozonas comerciales; no atribuye ventas a departamentos.", visualType: "map-and-ranking", layout: "featured", height: "featured", shouldRender: function (a) { return a.dimensions["Región SAP"].count >= 2; } },
-    { id: "channels", elementId: "chartCanal", title: "Ventas por canal", subtitle: "Comparativo entre canales con datos.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions.Canal.count >= 2; } },
-    { id: "cedi", elementId: "chartCedi", title: "Cumplimiento por CEDI", subtitle: "Solo se muestra cuando cada actividad pertenece inequívocamente a un CEDI.", visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.chartData.cediCompliance.length >= 2; } }
+    { id: "negotiationTimeline", elementId: "chartNegotiationTimeline", title: UI_COPY.charts.negotiationTimeline.title, subtitle: UI_COPY.charts.negotiationTimeline.subtitle, visualType: "smooth-line-or-gantt", layout: "timeline", height: "timeline", shouldRender: function () { return true; } },
+    { id: "activityContribution", elementId: "chartActivityContribution", title: UI_COPY.charts.activityContribution.title, subtitle: UI_COPY.charts.activityContribution.subtitle, action: UI_COPY.actions.contribution, visualType: "bar", layout: "featured", height: "featured", shouldRender: function (a) { return Boolean(a.kpis.selectedActivity && a.kpis.selectedActivity.contributionRows.filter(function (row) { return isFiniteNumber(row.sales); }).length >= 2); } },
+    { id: "activityPerformance", elementId: "chartActivityPerformance", title: UI_COPY.charts.activityPerformance.title, subtitle: UI_COPY.charts.activityPerformance.subtitle, visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.activityPerformance.filter(function (item) { return item.comparable; }).length >= 2; } },
+    { id: "presentationStatus", elementId: "chartPresentationStatus", title: UI_COPY.charts.presentationStatus.title, subtitle: UI_COPY.charts.presentationStatus.subtitle, visualType: "donut", layout: "compact", height: "compact", shouldRender: function (a) { return a.presentationStatus.filter(function (item) { return item.value > 0; }).length >= 2; } },
+    { id: "category", elementId: "chartCategoria", title: UI_COPY.charts.category.title, subtitle: UI_COPY.charts.category.subtitle, visualType: "treemap-or-bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.categorySales.length >= 2 && hasRenderableChartData(a.categorySales); } },
+    { id: "presentations", elementId: "chartPresentaciones", title: UI_COPY.charts.presentations.title, subtitle: UI_COPY.charts.presentations.subtitle, visualType: "lollipop", layout: "standard", height: "standard", shouldRender: function (a) { return a.presentationSales.length >= 2 && hasRenderableChartData(a.presentationSales); } },
+    { id: "clients", elementId: "chartClientes", title: UI_COPY.charts.clients.title, subtitle: UI_COPY.charts.clients.subtitle, visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions["Cliente SAP - Clave"].count >= 2; } },
+    { id: "regions", elementId: "chartRegion", title: UI_COPY.charts.regions.title, subtitle: UI_COPY.charts.regions.subtitle, visualType: "map-and-ranking", layout: "featured", height: "featured", shouldRender: function (a) { return a.dimensions["Región SAP"].count >= 2; } },
+    { id: "channels", elementId: "chartCanal", title: UI_COPY.charts.channels.title, subtitle: UI_COPY.charts.channels.subtitle, visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.dimensions.Canal.count >= 2; } },
+    { id: "cedi", elementId: "chartCedi", title: UI_COPY.charts.cedi.title, subtitle: UI_COPY.charts.cedi.subtitle, visualType: "bar", layout: "standard", height: "standard", shouldRender: function (a) { return a.chartData.cediCompliance.length >= 2; } }
   ];
 }
 function assignAdaptiveChartLayout(definitions) {
@@ -3087,7 +3121,7 @@ function renderAdaptiveCharts(analysis) {
     container.innerHTML = "";
     if (summary) {
       summary.hidden = false;
-      summary.textContent = "No hay registros para los filtros seleccionados.";
+      summary.textContent = UI_COPY.emptyStates.filters;
     }
     return;
   }
@@ -3104,7 +3138,7 @@ function renderAdaptiveCharts(analysis) {
   }
   if (summary) {
     summary.hidden = visible.length > 0;
-    summary.textContent = visible.length ? "" : "Los datos existen, pero no tienen suficiente variación para generar comparativos confiables.";
+    summary.textContent = visible.length ? "" : UI_COPY.emptyStates.visualization;
   }
   syncTimelineCardMarkup(analysis.timeline);
   visible.forEach(function (definition) { renderRegisteredChart(definition.id, analysis); });
@@ -3116,12 +3150,12 @@ function buildTimelineCardMarkup(model, index, layoutClass) {
     ? "Línea de tiempo · Actividad " + model.activities[0].activityId
     : model && model.selectedClientId
       ? "Línea de tiempo · Cliente " + model.selectedClientId
-      : "Línea de tiempo de la negociación";
+      : UI_COPY.charts.negotiationTimeline.title;
   const subtitle = shouldRender
-    ? "Las ventas anteriores al inicio son históricas; solo las atribuibles dentro de la vigencia participan en el cumplimiento."
-    : "Selecciona una actividad o un cliente para explorar qué ocurrió antes, durante y después de la negociación.";
+    ? UI_COPY.charts.negotiationTimeline.subtitle
+    : "Selecciona una negociación o un cliente para ver su evolución.";
   const summary = shouldRender ? buildTimelineContextMarkup(model) : "";
-  const legend = shouldRender ? '<div class="timeline-legend" aria-label="Estados de la línea de tiempo"><span><i class="timeline-dot is-history"></i>Histórico previo</span><span><i class="timeline-dot is-comparable"></i>Período comparable</span><span><i class="timeline-dot is-post"></i>Posterior al fin</span><span><i class="timeline-dot is-warning"></i>Ambigüedad o conflicto</span></div>' : "";
+  const legend = shouldRender ? '<div class="timeline-legend" aria-label="Estados de la línea de tiempo"><span><i class="timeline-dot is-history"></i>Histórico</span><span><i class="timeline-dot is-comparable"></i>Período vigente</span><span><i class="timeline-dot is-post"></i>Posterior</span><span><i class="timeline-dot is-warning"></i>Revisar</span></div>' : "";
   const modeClass = getTimelineLayoutModeClass(model);
   return '<article id="negotiationTimelineCard" class="chart-card ' + escapeHtml(layoutClass || "chart-timeline") + ' timeline-card ' + modeClass + compact + '" data-chart-layout="timeline" style="animation-delay:' + Math.min(index * 35, 210) + 'ms"><div class="timeline-heading"><div><h2 id="negotiationTimelineTitle">' + escapeHtml(title) + '</h2><p id="negotiationTimelineSubtitle">' + escapeHtml(subtitle) + '</p></div><div id="negotiationTimelineAction">' + buildTimelineActionMarkup(model) + '</div></div><div id="negotiationTimelineContext">' + summary + '</div><div id="negotiationTimelineLegend">' + legend + '</div><div id="chartNegotiationTimeline" class="chart timeline-chart" role="img" aria-label="' + escapeHtml(model ? model.accessibleSummary : subtitle) + '"></div></article>';
 }
@@ -3137,10 +3171,10 @@ function syncTimelineCardMarkup(model) {
   const shouldRender = Boolean(model && model.shouldRender);
   const title = model && model.activities.length === 1
     ? "Línea de tiempo · Actividad " + model.activities[0].activityId
-    : model && model.selectedClientId ? "Línea de tiempo · Cliente " + model.selectedClientId : "Línea de tiempo de la negociación";
+    : model && model.selectedClientId ? "Evolución · Cliente " + model.selectedClientId : UI_COPY.charts.negotiationTimeline.title;
   const subtitle = shouldRender
-    ? "Las ventas anteriores al inicio son históricas; solo las atribuibles dentro de la vigencia participan en el cumplimiento."
-    : "Selecciona una actividad o un cliente para explorar qué ocurrió antes, durante y después de la negociación.";
+    ? UI_COPY.charts.negotiationTimeline.subtitle
+    : "Selecciona una negociación o un cliente para ver su evolución.";
   const titleElement = document.getElementById("negotiationTimelineTitle");
   const subtitleElement = document.getElementById("negotiationTimelineSubtitle");
   const actionElement = document.getElementById("negotiationTimelineAction");
@@ -3154,7 +3188,7 @@ function syncTimelineCardMarkup(model) {
   if (subtitleElement) subtitleElement.textContent = subtitle;
   if (actionElement) actionElement.innerHTML = shouldRender ? buildTimelineActionMarkup(model) : "";
   if (contextElement) contextElement.innerHTML = shouldRender ? buildTimelineContextMarkup(model) : "";
-  if (legendElement) legendElement.innerHTML = shouldRender ? '<div class="timeline-legend" aria-label="Estados de la línea de tiempo"><span><i class="timeline-dot is-history"></i>Histórico previo</span><span><i class="timeline-dot is-comparable"></i>Período comparable</span><span><i class="timeline-dot is-post"></i>Posterior al fin</span><span><i class="timeline-dot is-warning"></i>Ambigüedad o conflicto</span></div>' : "";
+  if (legendElement) legendElement.innerHTML = shouldRender ? '<div class="timeline-legend" aria-label="Estados de la línea de tiempo"><span><i class="timeline-dot is-history"></i>Histórico</span><span><i class="timeline-dot is-comparable"></i>Período vigente</span><span><i class="timeline-dot is-post"></i>Posterior</span><span><i class="timeline-dot is-warning"></i>Revisar</span></div>' : "";
   if (chartElement) chartElement.setAttribute("aria-label", model ? model.accessibleSummary : subtitle);
 }
 function buildTimelineContextMarkup(model) {
@@ -3252,7 +3286,7 @@ function buildNegotiationTimelineOption(model) {
     yAxis: { type: "value", axisLabel: { color: theme.muted, formatter: compactNumber }, splitLine: { lineStyle: { color: theme.grid, type: "dashed" } } },
     series: [
       {
-        name: activity.isShared ? "Ventas conjuntas de la actividad" : "Ventas atribuibles",
+        name: activity.isShared ? "Venta conjunta" : "Venta",
         type: "line", smooth: 0.25, connectNulls: false, showSymbol: true, symbol: "circle", symbolSize: 9,
         lineStyle: { color: "#0d9488", width: 3 }, areaStyle: { color: "rgba(13, 148, 136, 0.12)" },
         data: model.periods.map(function (period) { return isFiniteNumber(period.sales) ? { value: roundNumber(period.sales), itemStyle: { color: colors[period.temporalStatus] || "#94a3b8", borderColor: getCurrentTheme() === "dark" ? "#0f172a" : "#ffffff", borderWidth: 2 }, symbol: period.temporalStatus === "HISTORICO_PREVIO" ? "emptyCircle" : period.temporalStatus === "POSTERIOR_AL_FIN" ? "diamond" : "circle" } : null; }),
@@ -3312,9 +3346,6 @@ function formatTimelineStatusLabel(status) {
 }
 function renderRegisteredChart(id, analysis) {
   if (id === "negotiationTimeline") return renderNegotiationTimeline(analysis.timeline);
-  if (id === "salesTarget") return renderChart("chartSalesTarget", "bar", [
-    { label: "Ventas atribuibles", value: analysis.kpis.comparableSales }, { label: "Objetivo comparable", value: analysis.kpis.comparableObjective }
-  ], false, true, null, { showLabels: true });
   if (id === "activityContribution") return renderChart("chartActivityContribution", "bar", analysis.kpis.selectedActivity.contributionRows.filter(function (row) { return isFiniteNumber(row.sales); }).map(function (row) {
     return { label: row.clientId, value: row.sales };
   }), false, true, null, { showLabels: true, onClick: function (clientId, eventInfo) { chartDrilldowns.activityContribution.open(analysis.kpis.selectedActivity, eventInfo && eventInfo.sourceElement); }, actionLabel: "Explorar contribuciones de la actividad" });
@@ -4486,15 +4517,15 @@ function renderActivityContributionList(body) {
     const cards = visibleRows.map(function (row, index) {
       const rowKey = config.rowKey(row, index);
       const className = "detail-card contribution-card" + (selected.has(row.clientId) ? " is-selected-client" : "");
-      return "<article class=\\"" + className + "\\"><div class=\\"contribution-card-head\\"><span class=\\"rank-badge\\">" + escapeHtml(formatOrdinal(row.rank)) + "</span><div class=\\"contribution-card-name\\"><strong>" + escapeHtml(row.clientName || "Cliente sin nombre") + "</strong><span>" + escapeHtml(row.clientId) + "</span>" + selectedLabel(row) + "</div></div><div class=\\"contribution-card-metrics\\"><span><small>Ventas atribuibles</small><strong>" + escapeHtml(formatAvailableMetric(row.sales)) + "</strong></span><span><small>Participación</small><strong>" + escapeHtml(formatAvailablePercent(row.share)) + "</strong></span></div><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\" aria-label=\\"Ver detalle del cliente " + escapeHtml(row.clientId) + "\\">Ver detalle</button></article>";
+      return "<article class=\\"" + className + "\\"><div class=\\"contribution-card-head\\"><span class=\\"rank-badge\\">" + escapeHtml(formatOrdinal(row.rank)) + "</span><div class=\\"contribution-card-name\\"><strong>" + escapeHtml(row.clientName || "Cliente sin nombre") + "</strong><span>" + escapeHtml(row.clientId) + "</span>" + selectedLabel(row) + "</div></div><div class=\\"contribution-card-metrics\\"><span><small>Ventas</small><strong>" + escapeHtml(formatAvailableMetric(row.sales)) + "</strong></span><span><small>Participación</small><strong>" + escapeHtml(formatAvailablePercent(row.share)) + "</strong></span></div><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\" aria-label=\\"Ver detalle del cliente " + escapeHtml(row.clientId) + "\\">" + UI_COPY.actions.detail + "</button></article>";
     }).join("");
     body.innerHTML = "<div class=\\"detail-card-list\\">" + cards + "</div>" + footer;
   } else {
-    const headers = ["#", "Cliente SAP", "Nombre del cliente", "Ventas atribuibles", "Participación", "Presentaciones", "Detalle"];
+    const headers = UI_COPY.tables.contribution;
     const tableRows = visibleRows.map(function (row, index) {
       const rowKey = config.rowKey(row, index);
       const className = selected.has(row.clientId) ? " class=\\"is-selected-client\\"" : "";
-      return "<tr" + className + "><td><span class=\\"rank-badge\\">" + escapeHtml(formatOrdinal(row.rank)) + "</span></td><td><div class=\\"client-identity\\"><strong>" + escapeHtml(row.clientId) + "</strong>" + selectedLabel(row) + "</div></td><td>" + escapeHtml(row.clientName || "—") + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.sales)) + "</td><td>" + shareMarkup(row) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.presentationCount)) + "</td><td><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\" aria-label=\\"Ver detalle del cliente " + escapeHtml(row.clientId) + "\\">Ver detalle</button></td></tr>";
+      return "<tr" + className + "><td><span class=\\"rank-badge\\">" + escapeHtml(formatOrdinal(row.rank)) + "</span></td><td><div class=\\"client-identity\\"><strong>" + escapeHtml(row.clientName || row.clientId) + "</strong><small>" + escapeHtml(row.clientId) + "</small>" + selectedLabel(row) + "</div></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.sales)) + "</td><td>" + shareMarkup(row) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.presentationCount)) + "</td><td><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-row-key=\\"" + escapeHtml(rowKey) + "\\" aria-label=\\"Ver detalle del cliente " + escapeHtml(row.clientId) + "\\">" + UI_COPY.actions.detail + "</button></td></tr>";
     }).join("");
     const shortClass = config.compact ? " is-short" : "";
     body.innerHTML = "<div class=\\"detail-table-wrap contribution-table-wrap" + shortClass + "\\"><table class=\\"detail-table contribution-table\\"><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + label + "</th>"; }).join("") + "</tr></thead><tbody>" + tableRows + "</tbody></table></div>" + footer;
@@ -4534,12 +4565,12 @@ function buildClientTrackingDetailConfig(detailModelOrRow) {
     compact: false,
     wide: true,
     standaloneDetail: true,
-    title: "Cliente " + row.clientSap + " · Actividad " + row.activityId,
-    subtitle: "DETALLE CLIENTE–NEGOCIACIÓN",
+    title: UI_COPY.modal.summary,
+    subtitle: "Cliente " + row.clientSap + " · Negociación " + row.activityId,
     rows: [], defaultSortField: "client", defaultSortDir: "asc", searchFields: [],
     summary: [
       { label: "Estado mensual", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus), primary: true, note: row.selectedStatusPeriod ? formatCanonicalPeriod(row.selectedStatusPeriod) : "Período no disponible" },
-      { label: "Cumplimiento del mes", value: formatAvailablePercent(row.selectedMonthlyCompliance), primary: true },
+      { label: "Cumplimiento", value: formatAvailablePercent(row.selectedMonthlyCompliance), primary: true },
       { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress), primary: true },
       { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus), primary: true }
     ]
@@ -4555,29 +4586,29 @@ function renderClientTrackingDetail() {
   const participation = row.isSharedActivity && isFiniteNumber(contribution) && isFiniteNumber(joint) && joint !== 0 ? contribution / joint : null;
   const monthlyRows = detailModel.periods.map(function (period) {
     const discountDisplay = period.monthlyDiscountStatus === "DESCUENTO_MENSUAL_CONFLICTIVO" ? "Revisar" : isFiniteNumber(period.monthlyDiscount) ? formatRatioPercent(period.monthlyDiscount) : "No disponible";
-    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.negotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.nonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.negotiatedShare)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.nonNegotiatedShare)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key])) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(isFiniteNumber(period.comparableSales) && period.comparableSales !== 0 && isFiniteNumber(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key]) ? row.clientContributionSalesByMonth[period.key] / period.comparableSales : null)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
+    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.negotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.nonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.negotiatedShare)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key])) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(isFiniteNumber(period.comparableSales) && period.comparableSales !== 0 && isFiniteNumber(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key]) ? row.clientContributionSalesByMonth[period.key] / period.comparableSales : null)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
   }).join("");
-  const warnings = (row.warnings || []).length ? "<section class=\\"detail-section\\"><h3>Advertencias analíticas</h3><div class=\\"extra-columns\\">" + row.warnings.map(function (warning) { return "<span class=\\"extra-chip\\">" + escapeHtml(formatClientTrackingWarning(warning)) + "</span>"; }).join("") + "</div></section>" : "";
+  const warnings = (row.warnings || []).length ? "<section class=\\"detail-section\\"><h3>" + UI_COPY.modal.warnings + "</h3><div class=\\"extra-columns\\">" + row.warnings.map(function (warning) { return "<span class=\\"extra-chip\\">" + escapeHtml(formatClientTrackingWarning(warning)) + "</span>"; }).join("") + "</div></section>" : "";
   const sharedFields = row.isSharedActivity ? [
-    { label: "Aporte total del cliente", value: formatAvailableMetric(contribution) },
-    { label: "Venta total conjunta", value: formatAvailableMetric(joint) },
-    { label: "Participación del cliente", value: formatAvailablePercent(participation) },
-    { label: "Estado conjunto", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus) }
+    { label: "Aporte del cliente", value: formatAvailableMetric(contribution) },
+    { label: "Venta conjunta", value: formatAvailableMetric(joint) },
+    { label: "Participación", value: formatAvailablePercent(participation) },
+    { label: "Resultado de la negociación", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus) }
   ] : [];
   const sections = [
-    { title: "Identificación", fields: [
+    { title: UI_COPY.modal.clientLocation, fields: [
       { label: "Cliente SAP", value: row.clientSap }, { label: "Nombre", value: row.clientName || "No disponible" }, { label: "NIT", value: row.clientNit || "No disponible" },
       { label: "ID Actividad", value: row.activityId }, { label: "Tipo", value: row.isSharedActivity ? "Actividad compartida" : "Actividad individual" }, { label: "Clientes asociados", value: formatInteger(row.associatedClientCount) },
       { label: "Región", value: row.region || "Sin información" }, { label: "CEDI", value: row.cedi || "Sin información" }, { label: "Canal", value: row.channel || "Sin información" }, { label: "Tipología", value: row.typology || "Sin información" },
       { label: "Fecha inicio", value: formatClientTrackingDate(row.startDate) }, { label: "Fecha fin", value: formatClientTrackingDate(row.endDate) }, { label: "Estado de fechas", value: formatClientTrackingWarning(row.dateStatus) }
     ] },
-    { title: "Objetivos, inversión y contrato", fields: [
+    { title: UI_COPY.modal.objectives, fields: [
       { label: "Objetivo mensual", value: formatAvailableMetric(row.monthlyObjective) }, { label: "Objetivo total", value: formatAvailableMetric(row.totalObjective) },
       { label: "Período de negociación", value: isFiniteNumber(row.negotiationPeriod) ? formatInteger(row.negotiationPeriod) + " meses" : "No disponible" },
       { label: "% de inversión", value: formatAvailablePercent(row.investmentPercentage) }, { label: "% descuento negociación", value: formatNegotiationDiscountSummary(row.negotiationDiscount) },
       { label: "Estado descuento", value: formatClientTrackingWarning(row.negotiationDiscountStatus) }
     ] },
-    { title: row.isSharedActivity ? "Acumulado conjunto y aporte del cliente" : "Acumulado", fields: sharedFields.concat([
+    { title: UI_COPY.modal.accumulated, fields: sharedFields.concat([
       { label: "Ventas generales acumuladas", value: formatAvailableMetric(row.accumulatedGeneralSales) },
       { label: "Venta de presentaciones negociadas acumulada", value: formatAvailableMetric(row.accumulatedAttributableSales) },
       { label: "Numerador comparable acumulado", value: formatAvailableMetric(row.accumulatedComparableSales) },
@@ -4589,8 +4620,11 @@ function renderClientTrackingDetail() {
   const renderSection = function (section) { return "<section class=\\"detail-section\\"><h3>" + escapeHtml(section.title) + "</h3><div class=\\"detail-fields\\">" + section.fields.map(function (field) { return "<article class=\\"detail-field\\"><span>" + escapeHtml(field.label) + "</span><strong>" + escapeHtml(field.value) + "</strong></article>"; }).join("") + "</div></section>"; };
   const identificationMarkup = sections.slice(0, 2).map(renderSection).join("");
   const accumulatedMarkup = renderSection(sections[2]);
-  const sharedAction = row.isSharedActivity ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-open-contribution\\"><i data-lucide=\\"users\\"></i> Ver contribución</button>" : "";
-  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\"><strong>El cumplimiento utiliza toda la venta del cliente durante la vigencia.</strong> La composición indica cuánto provino de presentaciones negociadas y no negociadas; ambas participan en el cumplimiento.</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> Ver cliente</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> Ver negociación</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> Descargar detalle CSV</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>Información mensual</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr><th scope=\\"col\\">Período</th><th scope=\\"col\\">Venta total del cliente</th><th scope=\\"col\\">Venta de presentaciones negociadas</th><th scope=\\"col\\">Venta de presentaciones no negociadas</th><th scope=\\"col\\">% venta negociada</th><th scope=\\"col\\">% venta no negociada</th>" + (row.isSharedActivity ? "<th scope=\\"col\\">Venta total conjunta</th><th scope=\\"col\\">Venta negociada conjunta</th><th scope=\\"col\\">Venta no negociada conjunta</th><th scope=\\"col\\">Aporte total del cliente</th><th scope=\\"col\\">Participación del cliente</th>" : "") + "<th scope=\\"col\\">Dcto. mes</th><th scope=\\"col\\">Objetivo mensual</th><th scope=\\"col\\">Cumplimiento mensual</th><th scope=\\"col\\">Estado mensual</th></tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
+  const sharedAction = row.isSharedActivity ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-open-contribution\\"><i data-lucide=\\"users\\"></i> " + UI_COPY.actions.contribution + "</button>" : "";
+  const renderMonthlyHeaders = function (labels) { return labels.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join(""); };
+  const sharedHeaders = row.isSharedActivity ? "<th scope=\\"col\\">Venta conjunta</th><th scope=\\"col\\">Venta negociada conjunta</th><th scope=\\"col\\">Venta no negociada conjunta</th><th scope=\\"col\\">Aporte del cliente</th><th scope=\\"col\\">Participación</th>" : "";
+  const monthlyHeaders = renderMonthlyHeaders(UI_COPY.tables.monthly.slice(0, 5)) + sharedHeaders + renderMonthlyHeaders(UI_COPY.tables.monthly.slice(5));
+  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\">" + escapeHtml(UI_COPY.tooltips.monthlyCompliance) + "</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> " + UI_COPY.actions.client + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> " + UI_COPY.actions.negotiation + "</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> " + UI_COPY.actions.downloadCsv + "</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>" + UI_COPY.modal.monthlyResult + "</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr>" + monthlyHeaders + "</tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
 }
 function navigateFromClientTrackingDetail(action) {
   const row = state.detailExplorer.config && state.detailExplorer.config.trackingRow;
@@ -4616,10 +4650,10 @@ function openClientTrackingContribution(opener) {
   openActivityContributionDetail(activity, opener || document.activeElement, { selectedClientIds: [row.clientSap] });
 }
 function formatClientTrackingMonthlyStatus(status) {
-  return status === "CUMPLE_MES" ? "Cumple mes" : status === "NO_CUMPLE_MES" ? "No cumple mes" : "No evaluable";
+  return UI_COPY.statuses.monthly[status] || UI_COPY.statuses.monthly.NO_EVALUABLE_MES;
 }
 function formatClientTrackingTotalStatus(status) {
-  return status === "CUMPLIO_OBJETIVO_TOTAL" ? "Objetivo total cumplido" : status === "EN_PROGRESO_OBJETIVO_TOTAL" ? "Objetivo total en progreso" : "Objetivo total no evaluable";
+  return UI_COPY.statuses.total[status] || UI_COPY.statuses.total.NO_EVALUABLE_TOTAL;
 }
 function formatClientTrackingWarning(value) {
   const text = normalizeText(value);
@@ -4779,18 +4813,18 @@ function buildActivityContributionConfig(activity, selectedClientIds) {
     activity: activity,
     selectedClientIds: (selectedClientIds || []).slice(),
     compact: rows.length >= 2 && rows.length <= 4,
-    title: "Actividad " + activity.activityId,
-    subtitle: "NEGOCIACIÓN COMPARTIDA ENTRE " + activity.associatedClientCount + " CLIENTES",
+    title: UI_COPY.charts.activityContribution.title,
+    subtitle: UI_COPY.charts.activityContribution.subtitle,
     rows: rows,
     columns: [
-      { id: "rank", label: "#" }, { id: "client", label: "Cliente SAP" }, { id: "clientName", label: "Nombre del cliente" },
-      { id: "sales", label: "Ventas atribuibles", numeric: true }, { id: "share", label: "Participación", numeric: true },
+      { id: "rank", label: "Posición" }, { id: "client", label: "Cliente" }, { id: "clientName", label: "Nombre del cliente" },
+      { id: "sales", label: "Ventas", numeric: true }, { id: "share", label: "Participación", numeric: true },
       { id: "presentationCount", label: "Presentaciones", numeric: true }
     ],
     exportColumns: [
       { id: "activityId", label: "ID Actividad" }, { id: "activityType", label: "Tipo de actividad" },
       { id: "client", label: "Cliente SAP" }, { id: "clientName", label: "Nombre del cliente" },
-      { id: "sales", label: "Ventas atribuibles" }, { id: "share", label: "Participación" },
+      { id: "sales", label: "Ventas" }, { id: "share", label: "Participación" },
       { id: "rank", label: "Posición por aporte" }, { id: "presentationCount", label: "Presentaciones relacionadas" },
       { id: "source", label: "Fuente de atribución" }
     ],
@@ -4815,14 +4849,14 @@ function buildActivityContributionConfig(activity, selectedClientIds) {
       { label: "Diferencia", value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : "No disponible", primary: true },
       { label: "Clientes asociados", value: formatInteger(activity.associatedClientCount) },
       { label: "Vigencia", value: formatActivityValidity(activity) },
-      { label: "Estado analítico", value: formatActivityStatus(activity.status) }
+      { label: "Estado", value: formatActivityStatus(activity.status) }
     ],
     rowKey: function (row, index) { return row.clientId || "cliente-" + index; },
     cardTitleField: "clientName",
     cardSubtitleField: "sales",
     cardMetaField: "share",
     detailLabel: "Detalle del aporte del cliente",
-    backLabel: "Volver a contribuciones",
+    backLabel: UI_COPY.actions.back,
     detailFields: buildActivityClientDetailFields,
     exportFilename: "contribucion_actividad_" + normalizeFilenamePart(activity.activityId) + ".csv"
   };
@@ -4898,9 +4932,9 @@ function buildIndividualActivityDetailConfig(activity) {
         { label: "Presentaciones relacionadas", value: formatInteger(row.presentationCount) }
       ] },
       { title: "Negociación", fields: [
-        { label: "Ventas atribuibles", value: formatAvailableMetric(activity.totalSales) },
-        { label: "Objetivo mensual de la actividad", value: getObjectiveDisplay(activity).value },
-        { label: "Cumplimiento de la actividad", value: formatAvailablePercent(activity.achievement) },
+        { label: "Ventas del mes", value: formatAvailableMetric(activity.totalSales) },
+        { label: "Objetivo mensual", value: getObjectiveDisplay(activity).value },
+        { label: "Cumplimiento mensual", value: formatAvailablePercent(activity.achievement) },
         { label: "Diferencia frente al objetivo", value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : "No disponible" }
       ] }
     ]
@@ -5560,26 +5594,25 @@ function exportClientTrackingSummaryCsv() {
 }
 function buildClientTrackingSummaryCsv(rows, periods, selectedPeriod) {
   const baseColumns = [
-    ["Estado del mes", function (row) { return formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus); }],
+    [UI_COPY.csv.monthlyStatus, function (row) { return formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus); }],
     ["Período evaluado", function () { return selectedPeriod ? selectedPeriod.label : "No disponible"; }],
-    ["Estado objetivo total", function (row) { return formatClientTrackingTotalStatus(row.totalObjectiveStatus); }],
-    ["Región", function (row) { return row.region; }], ["CEDI", function (row) { return row.cedi; }], ["CodSAP", function (row) { return row.clientSap; }],
-    ["Nombre", function (row) { return row.clientName; }], ["NIT", function (row) { return row.clientNit; }], ["ID Actividad", function (row) { return row.activityId; }],
+    [UI_COPY.csv.totalStatus, function (row) { return formatClientTrackingTotalStatus(row.totalObjectiveStatus); }],
+    ["Región", function (row) { return row.region; }], ["CEDI", function (row) { return row.cedi; }], [UI_COPY.csv.clientSap, function (row) { return row.clientSap; }],
+    [UI_COPY.csv.clientName, function (row) { return row.clientName; }], ["NIT", function (row) { return row.clientNit; }], [UI_COPY.csv.negotiationId, function (row) { return row.activityId; }],
     ["Tipo de negociación", function (row) { return row.isSharedActivity ? "Compartida" : "Individual"; }],
-    ["Venta total del cliente", function (row) { return row.salesByMonth && row.salesByMonth[selectedPeriod && selectedPeriod.key]; }],
-    ["Venta comparable del mes", function (row) { return getClientTrackingComparableSales(row, selectedPeriod && selectedPeriod.key); }],
-    ["Venta de presentaciones negociadas", function (row) { return row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
-    ["Venta de presentaciones no negociadas", function (row) { return row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
-    ["Porcentaje de venta negociada", function (row) { return formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
-    ["Porcentaje de venta no negociada", function (row) { return formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
-    ["Objetivo mensual", function (row) { return row.monthlyObjective; }],
-    ["Cumplimiento mensual", function (row) { return formatAvailablePercent(row.selectedMonthlyCompliance); }],
+    [UI_COPY.csv.monthlyObjective, function (row) { return row.monthlyObjective; }],
+    [UI_COPY.csv.monthlySales, function (row) { return row.salesByMonth && row.salesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    [UI_COPY.csv.negotiatedSales, function (row) { return row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    [UI_COPY.csv.nonNegotiatedSales, function (row) { return row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    [UI_COPY.csv.negotiatedShare, function (row) { return formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
+    [UI_COPY.csv.nonNegotiatedShare, function (row) { return formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
+    [UI_COPY.csv.monthlyDiscount, function (row) { return getClientTrackingMonthlyDiscountDisplay(row, selectedPeriod && selectedPeriod.key); }],
+    [UI_COPY.csv.monthlyCompliance, function (row) { return formatAvailablePercent(row.selectedMonthlyCompliance); }],
     ["Diferencia mensual", function (row) { return row.monthlyDifferenceByMonth && row.monthlyDifferenceByMonth[selectedPeriod && selectedPeriod.key]; }],
-    ["Estado mensual", function (row) { return formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus); }],
-    ["Ventas generales acumuladas", function (row) { return row.accumulatedGeneralSales; }],
-    ["Ventas atribuibles acumuladas", function (row) { return row.accumulatedComparableSales; }], ["Objetivo total", function (row) { return row.totalObjective; }],
-    ["Avance objetivo total", function (row) { return formatAvailablePercent(row.totalProgress); }], ["Diferencia objetivo total", function (row) { return row.totalDifference; }],
-    ["% inversión", function (row) { return formatAvailablePercent(row.investmentPercentage); }], ["% descuento negociación", function (row) { return formatNegotiationDiscountSummary(row.negotiationDiscount); }]
+    ["Venta acumulada", function (row) { return row.accumulatedGeneralSales; }],
+    ["Objetivo total", function (row) { return row.totalObjective; }],
+    [UI_COPY.csv.totalProgress, function (row) { return formatAvailablePercent(row.totalProgress); }], ["Diferencia frente al objetivo total", function (row) { return row.totalDifference; }],
+    [UI_COPY.csv.investment, function (row) { return formatAvailablePercent(row.investmentPercentage); }], ["Descuento de la negociación", function (row) { return formatNegotiationDiscountSummary(row.negotiationDiscount); }]
   ];
   const dynamicColumns = [];
   (periods || []).forEach(function (period) {
@@ -5596,7 +5629,7 @@ function buildClientTrackingSummaryCsv(rows, periods, selectedPeriod) {
   return ["\uFEFF" + columns.map(function (column) { return serializeCsvCell(column[0], column[0]); }).join(",")].concat((rows || []).map(function (row) {
     return columns.map(function (column) {
       const value = column[1](row);
-      const safeValue = value === null || value === undefined || value === "" ? "No disponible" : value;
+      const safeValue = normalizeTrackingCsvValue(value);
       return serializeCsvCell(safeValue, safeValue);
     }).join(",");
   })).join("\\n");
@@ -5620,35 +5653,43 @@ function buildClientTrackingDetailCsv(row, periods) {
     ["Estado objetivo total", formatClientTrackingTotalStatus(row.totalObjectiveStatus)], ["Advertencias", (row.warnings || []).map(formatClientTrackingWarning).join(" | ") || "Ninguna"]
   ];
   const lines = ["\uFEFF" + ["Campo", "Valor"].map(function (value) { return serializeCsvCell(value, value); }).join(",")]
-    .concat(metadata.map(function (item) { return serializeCsvCell(item[0], item[0]) + "," + serializeCsvCell(item[1] === null || item[1] === undefined || item[1] === "" ? "No disponible" : item[1], item[1]); }));
+    .concat(metadata.map(function (item) {
+      const value = normalizeTrackingCsvValue(item[1]);
+      return serializeCsvCell(item[0], item[0]) + "," + serializeCsvCell(value, value);
+    }));
   lines.push("");
-  const headers = ["Período", "Venta total del cliente", "Venta comparable del mes", "Venta de presentaciones negociadas", "Venta de presentaciones no negociadas", "Porcentaje de venta negociada", "Porcentaje de venta no negociada", "Dcto. mes", "Objetivo mensual", "Cumplimiento mensual", "Diferencia mensual", "Estado mensual"];
-  if (row.isSharedActivity) headers.push("Venta total conjunta", "Venta negociada conjunta", "Venta no negociada conjunta", "Aporte total del cliente", "Participación del cliente");
+  const headers = UI_COPY.tables.monthly.slice();
+  if (row.isSharedActivity) headers.splice(5, 0, "Venta conjunta", "Venta negociada conjunta", "Venta no negociada conjunta", "Aporte del cliente", "Participación");
   lines.push(headers.map(function (value) { return serializeCsvCell(value, value); }).join(","));
   (periods || []).forEach(function (period) {
     const comparable = getClientTrackingComparableSales(row, period.key);
     const contribution = row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key];
     const values = [
-      period.label, row.salesByMonth && row.salesByMonth[period.key], comparable,
+      period.label, row.salesByMonth && row.salesByMonth[period.key],
       row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[period.key],
       row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[period.key],
       formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[period.key]),
-      formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[period.key]),
       getClientTrackingMonthlyDiscountDisplay(row, period.key),
       row.monthlyObjective, formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]),
-      row.monthlyDifferenceByMonth && row.monthlyDifferenceByMonth[period.key],
       formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key])
     ];
-    if (row.isSharedActivity) values.push(
+    if (row.isSharedActivity) values.splice(5, 0,
       row.jointActivitySalesByMonth && row.jointActivitySalesByMonth[period.key],
       row.jointNegotiatedPresentationSalesByMonth && row.jointNegotiatedPresentationSalesByMonth[period.key],
       row.jointNonNegotiatedPresentationSalesByMonth && row.jointNonNegotiatedPresentationSalesByMonth[period.key],
       contribution,
       formatAvailablePercent(isFiniteNumber(comparable) && comparable !== 0 && isFiniteNumber(contribution) ? contribution / comparable : null)
     );
-    lines.push(values.map(function (value) { const safe = value === null || value === undefined || value === "" ? "No disponible" : value; return serializeCsvCell(safe, safe); }).join(","));
+    lines.push(values.map(function (value) {
+      const safeValue = normalizeTrackingCsvValue(value);
+      return serializeCsvCell(safeValue, safeValue);
+    }).join(","));
   });
   return lines.join("\\n");
+}
+function normalizeTrackingCsvValue(value) {
+  if (value === null || value === undefined || value === "") return "No disponible";
+  return isFiniteNumber(value) ? roundNumber(value) : value;
 }
 function exportFilteredCsv(rows) {
   return ["\\uFEFF" + TABLE_COLUMNS.map(function (column) { return serializeCsvCell(column, column); }).join(",")].concat(rows.map(function (row) {
@@ -6106,7 +6147,7 @@ function formatMetric(value) { return isFiniteNumber(value) ? formatNumber(value
 function formatMetricPercent(value) { return isFiniteNumber(value) ? formatRatioPercent(value) : "N/A"; }
 function formatActivityStatus(status) {
   const labels = {
-    OK: "Comparable", SIN_OBJETIVO: "Sin objetivo", SIN_VENTAS: "Sin ventas atribuibles",
+    OK: "Válida", SIN_OBJETIVO: "Sin objetivo", SIN_VENTAS: "Sin ventas",
     OBJETIVO_CONFLICTIVO: "Objetivo conflictivo", VENTA_CONFLICTIVA: "Venta conflictiva",
     VENTA_ACTIVIDAD_AMBIGUA: "Venta de actividad ambigua", REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "Requiere distribución multiactividad", FECHAS_CONFLICTIVAS: "Fechas conflictivas",
     ACTIVIDAD_AUN_NO_INICIADA: "Actividad aún no iniciada",

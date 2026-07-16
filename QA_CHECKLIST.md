@@ -47,7 +47,7 @@ En cada combinación revisar:
 - [ ] Sidebar expandida y colapsada.
 - [ ] Encabezado, KPI, filtros, gráficas y timeline alineados.
 - [ ] Vista global con ocho KPI, incluyendo Ventas atribuibles comparables y sin tarjeta Actividades comparables.
-- [ ] Verificar que cumplimiento y diferencia reconcilien con ventas atribuibles y objetivo comparable, no con Ventas del período.
+- [ ] Verificar que cumplimiento y diferencia reconcilien con ventas comparables y objetivo comparable, no con Ventas totales.
 - [ ] Confirmar que no existe tarjeta, hueco, ancla ni canvas de la visualización temporal retirada.
 - [ ] Dropdown dentro del viewport y por debajo del modal.
 - [ ] Modal centrado, cerrable y sin scroll general.
@@ -58,6 +58,10 @@ En cada combinación revisar:
 - [ ] Cliente multiactividad conserva Gantt y no mezcla negociaciones en una línea única.
 - [ ] Donut con leyenda legible; treemap sin bloques caóticos ni texto cortado; lollipop con etiquetas completas o tooltip accesible.
 - [ ] El KPI de presentaciones sin ventas abre un único modal con categorías, detalle, búsqueda, ordenamiento, paginación de 25 y CSV en ambos niveles.
+- [ ] KPI, tabla, modales, gráficas y CSV usan los textos definidos en `UI_COPY`.
+- [ ] La diferencia positiva indica cajas físicas por encima del objetivo y la negativa indica cajas físicas pendientes.
+- [ ] La interfaz no muestra nombres técnicos de estados ni variables internas.
+- [ ] Los encabezados del CSV coinciden con la terminología ejecutiva de la tabla.
 - [ ] Los combobox de Actividad y Cliente SAP permanecen sobre gráficas, timeline y tarjetas después de hacer scroll; el modal permanece por encima del dropdown.
 - [ ] La tabla de seguimiento no muestra buscador local; filtros globales y estados locales determinan tabla y CSV.
 - [ ] **← Volver** recupera detalle, contribución y cliente interno con página, orden, selección y scroll anteriores.

@@ -5,7 +5,7 @@ const path = require("path");
 
 const testPath = path.join(__dirname, "sales-information.test.js");
 let source = fs.readFileSync(testPath, "utf8").replace(/\r\n/g, "\n");
-const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunTotalSalesComplianceRegressionTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
+const marker = /runSyntheticTests\(\);[\s\S]*?console\.log\("sales-information\.test\.js: OK"\);/;
 
 const audit = String.raw`
 const productionWorkbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");
@@ -109,6 +109,6 @@ console.log(JSON.stringify({
 }, null, 2));
 `;
 
-if (!source.includes(marker)) throw new Error("No se encontró el punto de entrada del archivo de pruebas.");
+if (!marker.test(source)) throw new Error("No se encontró el punto de entrada del archivo de pruebas.");
 source = source.replace(marker, audit);
 eval(source);

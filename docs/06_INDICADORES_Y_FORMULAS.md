@@ -20,18 +20,18 @@ Las fórmulas se evalúan con números completos. El formato `es-CO` se aplica d
 
 | KPI | Fuente y población | Fórmula | Exclusiones e interpretación |
 | --- | --- | --- | --- |
-| Ventas del período | `TotalVentaMes` resuelto por cliente + período | suma de grupos resueltos | Incluye venta general que puede quedar fuera del cumplimiento. |
+| Ventas totales | `TotalVentaMes` resuelto por cliente + período | suma de grupos resueltos | Incluye la venta registrada en el período seleccionado. |
 | Ventas del último mes | Igual fuente, solo período máximo filtrado | suma de grupos del último mes | No es venta atribuida a una actividad. |
 | Ventas comparables | `activityAggregate.sales` / `kpis.comparableSales` | suma de `TotalVentaMes` sin duplicar cliente-período | Excluye histórico, posterior al fin, multiactividad sin distribución, fechas u objetivo inválidos. |
-| Objetivo mensual de las actividades | `activityAggregate.objective` / `kpis.comparableObjective` | suma de objetivos únicos comparables | No usa `objectiveAll` en la tarjeta reconciliable. |
-| Cumplimiento de las actividades | mismos numerador y denominador | ventas comparables / objetivo comparable | No promedia porcentajes. |
-| Diferencia atribuible frente al objetivo | misma población | ventas comparables - objetivo comparable | Positiva sobre objetivo; negativa bajo objetivo. |
+| Objetivo mensual | `activityAggregate.objective` / `kpis.comparableObjective` | suma de objetivos únicos comparables | No usa `objectiveAll` en la tarjeta reconciliable. |
+| Cumplimiento mensual | mismos numerador y denominador | ventas comparables / objetivo comparable | No promedia porcentajes. |
+| Diferencia frente al objetivo | misma población | ventas comparables - objetivo comparable | Positiva sobre objetivo; negativa bajo objetivo. Los valores se expresan en cajas físicas. |
 | Presentaciones sin ventas | `noSalesAnalysis.presentationCount` | conteo único de presentaciones negociadas sin contexto de venta | Distingue sin información de venta de venta cero. |
 | Negociaciones vigentes | actividad única con vigencia actual | conteo único | No cuenta filas ni clientes. |
 
 La cobertura se muestra como texto secundario: `Cobertura: X de Y actividades`. Ya no ocupa una tarjeta principal.
 
-## Por qué Ventas del período no coincide con la diferencia
+## Por qué Ventas totales no coincide con la diferencia
 
 `TotalVentaMes` y ventas atribuibles comparables tienen poblaciones distintas:
 
@@ -42,7 +42,7 @@ TotalVentaMes ≠ ventas atribuibles comparables
 La venta general puede incluir períodos previos, posteriores, actividades ambiguas o venta sin actividad comparable. Por tanto, esta operación no es la fórmula del sistema:
 
 ```text
-Ventas del período - objetivo
+Ventas totales - objetivo
 ```
 
 En el workbook de referencia, la última auditoría produjo venta general del período de 662.713,715 y venta general del último mes de 361.527,007. Para las actividades comparables del último mes, el numerador fue 254.043,659 y el objetivo comparable 242.422. Así:

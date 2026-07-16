@@ -40,12 +40,16 @@ const REQUIRED_COLUMNS = [
 const app = loadAppContext();
 const dashboard = loadDashboardContext();
 
+// 1-7. Workbook, ventas, objetivos, cumplimiento, composición y actividades
 runSyntheticTests();
 runClientNegotiationModelTests();
 runTotalSalesComplianceRegressionTests();
+// 8-12. KPI, seguimiento, modales, gráficas, timeline y CSV
 runClientTrackingTableTests();
 runTimelineModelTests();
 runLayoutPresentationTests();
+runExecutiveCopyTests();
+// 13-15. Seguridad, rendimiento y regresiones reales
 runProductionHardeningTests();
 runDocumentationTests();
 runAttachedWorkbookValidation();
@@ -541,7 +545,7 @@ function runSyntheticTests() {
   ]);
   assert.strictEqual(globalMultiModel.items.find((item) => item.id === "comparableSales").value, "No disponible");
   assert.strictEqual(globalMultiModel.items.find((item) => item.id === "monthlyObjectives").value, "No disponible");
-  assert(globalMultiModel.items.find((item) => item.id === "periodSales").description.toLocaleLowerCase("es-CO").includes("venta general"));
+  assert.strictEqual(globalMultiModel.items.find((item) => item.id === "periodSales").description, "Ventas registradas en cajas físicas durante el período seleccionado.");
   assert(globalMultiModel.items.find((item) => item.id === "activityCompliance").description.includes("Cobertura: 0 de 2 actividades"));
   assert(!globalMultiModel.items.some((item) => item.id === "comparableActivities"));
   const consistentPerformance = dashboard.reconcileComparablePerformance({ comparableSales: 100, comparableObjective: 300, compliance: 1 / 3, objectiveDifference: -200 });
@@ -599,10 +603,10 @@ function runSyntheticTests() {
   assert.strictEqual(clientAnalysis.kpis.selectionContribution, 4000 / 9500);
   const clientKpiElement = makeElement();
   withDashboardElement("kpis", clientKpiElement, () => dashboard.renderKpis(clientRows, dashboard.getNoSalesAnalysis(clientRows), clientAnalysis));
-  assert(/Contribuci.*n a la actividad/.test(clientKpiElement.innerHTML));
-  assert(clientKpiElement.innerHTML.includes("Objetivo mensual de la actividad"));
-  assert(clientKpiElement.innerHTML.includes("Cumplimiento de la actividad compartida"));
-  assert(clientKpiElement.innerHTML.includes("Posición del cliente por aporte"));
+  assert(clientKpiElement.innerHTML.includes("Aporte a la negociación"));
+  assert(clientKpiElement.innerHTML.includes("Objetivo mensual"));
+  assert(clientKpiElement.innerHTML.includes("Cumplimiento mensual"));
+  assert(clientKpiElement.innerHTML.includes("Posición por aporte"));
   assert(!clientKpiElement.innerHTML.includes("Cumplimiento del cliente"));
   assert(!clientKpiElement.innerHTML.includes("Objetivo del cliente"));
 
@@ -627,7 +631,7 @@ function runSyntheticTests() {
   });
   const individualActivityModel = dashboard.buildContextualKpiModel(individualActivityAnalysis, { "ID Actividad": "A-ONE" });
   assert.strictEqual(individualActivityModel.contextType, "SINGLE_INDIVIDUAL_ACTIVITY");
-  assert(individualActivityModel.items.some((item) => item.title === "Objetivo mensual de la actividad" && item.value === "100"));
+  assert(individualActivityModel.items.some((item) => item.title === "Objetivo mensual" && item.value === "100"));
   assert(!individualActivityModel.items.some((item) => /Contribución|Posición/.test(item.title)));
   assert(!individualActivityModel.items.some((item) => item.value === "100 %" || /1\.º de 1/.test(item.value)));
   assert.strictEqual(individualActivityModel.items.filter((item) => /Ventas/.test(item.title)).length, 1);
@@ -639,9 +643,9 @@ function runSyntheticTests() {
   const individualClientModel = dashboard.buildContextualKpiModel(individualClientAnalysis, { "Cliente SAP - Clave": "C-ONE" });
   assert.strictEqual(individualClientModel.contextType, "SINGLE_CLIENT_INDIVIDUAL_ACTIVITY");
   assert.strictEqual(individualClientModel.items[0].title, "Ventas del cliente");
-  assert(individualClientModel.items.some((item) => item.title === "Objetivo mensual de la actividad"));
+  assert(individualClientModel.items.some((item) => item.title === "Objetivo mensual"));
   assert(!individualClientModel.items.some((item) => /Contribución|Posición|Ventas conjuntas|Clientes asociados/.test(item.title)));
-  assert.strictEqual(individualClientModel.items.filter((item) => /Ventas del cliente|Ventas de la actividad/.test(item.title)).length, 1);
+  assert.strictEqual(individualClientModel.items.filter((item) => /Ventas del cliente|Ventas del mes/.test(item.title)).length, 1);
 
   const multiClientAnalysis = dashboard.buildDashboardAnalyses(multiActivityRows, dashboard.getNoSalesAnalysis(multiActivityRows), {
     scopeRows: multiActivityRows,
@@ -666,7 +670,7 @@ function runSyntheticTests() {
   assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityObjective").value, "150");
   assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityCompliance").value, "No disponible");
   assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityDifference").value, "No disponible");
-  assert(notStartedModel.items.some((item) => item.title === "Ventas históricas relacionadas"));
+  assert(notStartedModel.items.some((item) => item.title === "Ventas históricas"));
 
   const conflictRows = [
     normalizeActivityRow({ activityId: "A-CONFLICT-KPI", clientId: "C-CONFLICT", presentationCode: "P-C1", totalSales: "10", objectiveMonth: "100" }),
@@ -739,14 +743,14 @@ function runSyntheticTests() {
   assert.strictEqual(activityAnalysis.kpis.mode, "ACTIVITY");
   const activityKpiElement = makeElement();
   withDashboardElement("kpis", activityKpiElement, () => dashboard.renderKpis(sharedActivityRows, dashboard.getNoSalesAnalysis(sharedActivityRows), activityAnalysis));
-  assert(activityKpiElement.innerHTML.includes("Ventas conjuntas de la actividad"));
-  assert(activityKpiElement.innerHTML.includes("Objetivo mensual de la actividad"));
-  assert(activityKpiElement.innerHTML.includes("Actividad compartida entre 3 clientes"));
+  assert(activityKpiElement.innerHTML.includes("Ventas conjuntas"));
+  assert(activityKpiElement.innerHTML.includes("Objetivo mensual"));
+  assert(activityKpiElement.innerHTML.includes("Clientes vinculados a la negociación"));
 
   const activityDetailConfig = dashboard.buildActivityContributionConfig(sharedPerformance);
   assert.strictEqual(activityDetailConfig.rows.length, 3);
   assert.strictEqual(activityDetailConfig.compact, true);
-  assert(activityDetailConfig.subtitle.includes("COMPARTIDA ENTRE 3 CLIENTES"));
+  assert.strictEqual(activityDetailConfig.subtitle, "Participación de cada cliente en la venta conjunta expresada en cajas físicas.");
   assert(activityDetailConfig.columns.some((column) => column.id === "share"));
   assert(!activityDetailConfig.columns.some((column) => column.label === "Objetivo del cliente"));
   assert.strictEqual(activityDetailConfig.summary.filter((item) => item.primary).length, 4);
@@ -760,11 +764,11 @@ function runSyntheticTests() {
   const activityExplorerElements = makeDetailExplorerElements();
   withDashboardElements(activityExplorerElements, () => {
     dashboard.openActivityContributionDetail(sharedPerformance, makeElement(), { selectedClientIds: ["C-A"] });
-    assert(activityExplorerElements.detailExplorerTitle.textContent.includes("A-SHARED"));
-    assert(activityExplorerElements.detailExplorerSubtitle.textContent.includes("COMPARTIDA ENTRE 3 CLIENTES"));
+    assert.strictEqual(activityExplorerElements.detailExplorerTitle.textContent, "Contribución por cliente");
+    assert.strictEqual(activityExplorerElements.detailExplorerSubtitle.textContent, "Participación de cada cliente en la venta conjunta expresada en cajas físicas.");
     assert(activityExplorerElements.detailExplorerSummary.innerHTML.includes("Objetivo mensual"));
     assert(activityExplorerElements.detailExplorerSummary.innerHTML.includes("Ventas conjuntas"));
-    assert(activityExplorerElements.detailExplorerSummary.innerHTML.includes("Estado analítico"));
+    assert(activityExplorerElements.detailExplorerSummary.innerHTML.includes("Estado"));
     assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Cliente A"));
     assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Cliente B"));
     assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Cliente C"));
@@ -785,7 +789,7 @@ function runSyntheticTests() {
     assert(contributionCsv.includes("Cliente A"));
     assert.strictEqual(contributionFilename, "contribucion_actividad_a_shared.csv");
     dashboard.selectDetailExplorerRow("C-A");
-    assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Volver a contribuciones"));
+    assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Volver"));
     assert(activityExplorerElements.detailExplorerBody.innerHTML.includes("Fuente de atribución"));
     dashboard.closeDetailExplorer();
   });
@@ -1137,8 +1141,8 @@ function runSyntheticTests() {
     dashboard.openActivityContributionDetail(individualPerformanceForDetail, makeElement());
     assert.strictEqual(dashboard.getDetailExplorerState().type, "activityDetail");
     assert(individualExplorerElements.detailExplorerSubtitle.textContent.includes("ACTIVIDAD INDIVIDUAL"));
-    assert(individualExplorerElements.detailExplorerBody.innerHTML.includes("Ventas atribuibles"));
-    assert(individualExplorerElements.detailExplorerBody.innerHTML.includes("Objetivo mensual de la actividad"));
+    assert(individualExplorerElements.detailExplorerBody.innerHTML.includes("Ventas del mes"));
+    assert(individualExplorerElements.detailExplorerBody.innerHTML.includes("Objetivo mensual"));
     assert(!individualExplorerElements.detailExplorerBody.innerHTML.includes("Participación"));
     assert(!individualExplorerElements.detailExplorerBody.innerHTML.includes("Posición"));
     assert(!individualExplorerElements.detailExplorerBody.innerHTML.includes("100 %"));
@@ -1204,8 +1208,8 @@ function runSyntheticTests() {
   withDashboardElement("kpis", kpiElement, () => {
     dashboard.renderKpis([normalizeKpiRow({ sales: "120", objectiveMonth: "100", yearMonth: "202607" })]);
   });
-  assert(kpiElement.innerHTML.includes("Ventas del período"));
-  assert(kpiElement.innerHTML.includes("Diferencia atribuible frente al objetivo"));
+  assert(kpiElement.innerHTML.includes("Ventas totales"));
+  assert(kpiElement.innerHTML.includes("Diferencia frente al objetivo"));
   assert(kpiElement.innerHTML.includes("Por encima del objetivo"));
   assert(!kpiElement.innerHTML.includes("Cajas faltantes"));
   assert(!kpiElement.innerHTML.includes("Clientes SAP únicos"));
@@ -1631,7 +1635,7 @@ function runClientTrackingTableTests() {
   assert.strictEqual(dashboard.getClientTrackingComparableSales(base, 202606), 140);
   assert.strictEqual(dashboard.getClientTrackingComparableSales(shared, 202606), 120, "La actividad compartida debe usar la venta conjunta");
   const compositionMarkup = dashboard.buildClientTrackingCompositionMarkup(base, 202606);
-  assert(compositionMarkup.includes("&middot;") && compositionMarkup.includes("composici&oacute;n") && compositionMarkup.includes("cu&aacute;nto"));
+  assert(compositionMarkup.includes("&middot;") && compositionMarkup.includes("Distribución de la venta"));
   assert(!compositionMarkup.includes("Â") && !compositionMarkup.includes("Ã"));
   const detailModelCold = dashboard.getClientTrackingDetailModel(shared, periods);
   const detailModelCached = dashboard.getClientTrackingDetailModel(shared, periods);
@@ -1647,9 +1651,21 @@ function runClientTrackingTableTests() {
   assert(csv.includes('"9 %"') && !csv.includes('"900 %"'), "El CSV debe formatear el descuento mensual normalizado");
   assert(csv.includes("'=C-001"), "El resumen debe conservar protección contra inyección CSV");
   assert.strictEqual((csv.match(/A-00[12]/g) || []).length, 2, "El CSV debe incluir todas las coincidencias, no una sola página");
+  assert.strictEqual(dashboard.normalizeTrackingCsvValue(25.49899999999999), 25.5);
+  assert.strictEqual(dashboard.normalizeTrackingCsvValue(106.16300000000001), 106.16);
+  const floatingPointRow = Object.assign({}, base, {
+    clientSap: "C-003",
+    activityId: "A-003",
+    salesByMonth: { 202605: 106.16300000000001, 202606: 104.49600000000001 },
+    negotiatedPresentationSalesByMonth: { 202605: 80.664, 202606: 77.497 },
+    nonNegotiatedPresentationSalesByMonth: { 202605: 25.49899999999999, 202606: 26.99899999999999 }
+  });
+  const roundedCsv = dashboard.buildClientTrackingSummaryCsv([floatingPointRow], periods, periods[1]);
+  assert(roundedCsv.includes('"25.5"') && roundedCsv.includes('"27"'));
+  assert(!roundedCsv.includes("25.49899999999999") && !roundedCsv.includes("26.99899999999999"));
   const detailCsv = dashboard.buildClientTrackingDetailCsv(shared, periods);
-  assert(detailCsv.includes("Venta comparable del mes") && detailCsv.includes("Venta de presentaciones negociadas"));
-  assert(detailCsv.includes("Venta total conjunta") && detailCsv.includes("Aporte total del cliente"));
+  assert(detailCsv.includes("Venta total") && detailCsv.includes("Venta negociada"));
+  assert(detailCsv.includes("Venta conjunta") && detailCsv.includes("Aporte del cliente"));
   assert(detailCsv.includes("MAY 2026") && detailCsv.includes("JUN 2026"));
   assert(detailCsv.includes('"9 %"'));
   const source = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
@@ -1659,7 +1675,7 @@ function runClientTrackingTableTests() {
   assert(source.includes("ensureClientTrackingRelationIndex(rows).get(rowKey)") && !source.includes("clientActivitySummary.find(function (item) { return getClientTrackingRowKey(item)"));
   assert.strictEqual((source.match(/panel\.addEventListener\("click"/g) || []).length, 1, "La tabla debe conservar un único listener delegado de clic");
   assert(source.includes("white-space: nowrap") && source.includes("client-tracking-table-wrap { max-width: 100%; overflow: auto"));
-  assert(source.includes('const headers = ["Estado mes", "Estado total", "Cliente / CodSAP"'));
+  assert(source.includes("const headers = UI_COPY.tables.tracking"));
   assert(!source.includes("Relaciones cliente–negociación para "));
   assert(source.includes('.detail-explorer-dialog[data-layout="wide"]'));
   assert(source.includes(".tracking-period-table {") && source.includes("min-width: 1480px"));
@@ -2063,27 +2079,6 @@ function runLayoutPresentationTests() {
     assert.strictEqual(metadata.tail, count % 4);
     assert.strictEqual(metadata.odd, count % 2 === 1);
   });
-  const comparableCopy = dashboard.normalizeKpiDisplayCopy({
-    id: "comparableSales",
-    title: "Ventas comparables",
-    description: "Ventas totales de clientes asociadas a actividades v\u00e1lidas dentro de su vigencia."
-  });
-  assert.strictEqual(comparableCopy.title, "Ventas atribuibles comparables");
-  assert(comparableCopy.description.includes("Ventas atribuibles asociadas"));
-  const differenceCopy = dashboard.normalizeKpiDisplayCopy({
-    id: "objectiveDifference",
-    title: "Diferencia frente al objetivo",
-    description: "Ventas totales comparables menos objetivos comparables."
-  });
-  assert.strictEqual(differenceCopy.title, "Diferencia atribuible frente al objetivo");
-  assert(differenceCopy.description.includes("Ventas atribuibles comparables"));
-  const mojibakeCopy = dashboard.normalizeKpiDisplayCopy({
-    id: "withoutSales",
-    title: "Presentaciones sin ventas",
-    description: "Haz clic para explorar por categor\u00c3\u00ada. \u00c2\u00b7"
-  });
-  assert(!mojibakeCopy.description.includes("\u00c3") && !mojibakeCopy.description.includes("\u00c2"));
-  assert(mojibakeCopy.description.includes("categor\u00eda") && mojibakeCopy.description.includes("\u00b7"));
   const one = dashboard.assignAdaptiveChartLayout([{ id: "one", layout: "standard" }]);
   assert(one[0].layoutClass.includes("chart-standard"));
   assert(one[0].layoutClass.includes("chart-row-fill"));
@@ -2101,14 +2096,14 @@ function runLayoutPresentationTests() {
   assert.strictEqual(separated[1].layoutClass, "chart-timeline");
   assert(separated[2].layoutClass.includes("chart-row-fill"));
   const registry = dashboard.getChartRegistry();
-  assert.deepStrictEqual(plain(registry.slice(0, 2).map((item) => item.id)), ["salesTarget", "negotiationTimeline"]);
+  assert.deepStrictEqual(plain(registry.slice(0, 2).map((item) => item.id)), ["negotiationTimeline", "activityContribution"]);
   assert.strictEqual(registry.find((item) => item.id === "negotiationTimeline").layout, "timeline");
   assert(registry.every((item) => ["compact", "standard", "featured", "timeline"].includes(item.layout)));
   assert.strictEqual(registry.find((item) => item.id === "presentationStatus").visualType, "donut");
   assert.strictEqual(registry.find((item) => item.id === "category").visualType, "treemap-or-bar");
   assert.strictEqual(registry.find((item) => item.id === "presentations").visualType, "lollipop");
   assert.strictEqual(registry.some((item) => item.id === "noSales" || item.elementId === "chartSinVentasCategoria"), false);
-  assert.strictEqual(registry.find((item) => item.id === "salesTarget").visualType, "bar");
+  assert.strictEqual(registry.some((item) => item.id === "salesTarget"), false);
   assert.strictEqual(registry.some((item) => item.id === "salesTrend" || item.elementId === "chartMes" || item.title === "Evolución de ventas"), false);
   assert.strictEqual(dashboard.chooseCompositionChartType([{ label: "A", value: 2 }, { label: "B", value: 1 }], { donutLimit: 6, treemapLimit: 18 }), "donut");
   assert.strictEqual(dashboard.chooseCompositionChartType(Array.from({ length: 8 }, (_, index) => ({ label: String(index), value: index + 1 })), { donutLimit: 6, treemapLimit: 18 }), "treemap");
@@ -2154,6 +2149,36 @@ function runLayoutPresentationTests() {
   assert(!templateSource.includes('"chartMes"'));
   assert(!templateSource.includes('if (type === "line")'));
   assert(!templateSource.includes("Evolución de ventas"));
+}
+
+function runExecutiveCopyTests() {
+  const copy = plain(dashboard.getUiCopy());
+  assert.strictEqual(copy.kpis.global.periodSales.title, "Ventas totales");
+  assert.strictEqual(copy.kpis.global.monthlyCompliance.title, "Cumplimiento mensual");
+  assert.strictEqual(copy.kpis.global.objectiveGap.title, "Diferencia frente al objetivo");
+  assert(copy.kpis.global.periodSales.description.includes("cajas físicas"));
+  assert(copy.kpis.global.monthlyObjective.description.includes("cajas físicas"));
+  assert.deepStrictEqual(copy.tables.tracking, [
+    "Estado mensual", "Estado total", "Cliente", "Negociación", "Objetivo mensual", "Venta del mes",
+    "Mix de venta", "Dcto. mes", "Cumplimiento", "Avance total", "Inversión", "Acción"
+  ]);
+  assert.strictEqual(copy.statuses.monthly.CUMPLE_MES, "Cumple");
+  assert.strictEqual(copy.statuses.total.EN_PROGRESO_OBJETIVO_TOTAL, "En progreso");
+  assert.strictEqual(copy.tooltips.salesMix, "Distribución de la venta entre presentaciones negociadas y no negociadas.");
+  assert.strictEqual(dashboard.getObjectiveGapDescription(10), "Cajas físicas por encima del objetivo.");
+  assert.strictEqual(dashboard.getObjectiveGapDescription(-10), "Cajas físicas pendientes para alcanzar el objetivo.");
+  const registry = dashboard.getChartRegistry();
+  assert.strictEqual(registry.find((item) => item.id === "negotiationTimeline").title, "Evolución de la negociación");
+  assert.strictEqual(registry.find((item) => item.id === "presentationStatus").title, "Estado de ventas por presentación");
+  assert(registry.every((item) => item.subtitle.includes("cajas físicas")));
+  const source = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
+  [
+    "Ventas atribuibles frente al objetivo",
+    "Venta atribuible del mes",
+    "Cumplimiento de las actividades",
+    "Diferencia atribuible frente al objetivo",
+    "Solo presentaciones negociadas participan en el cumplimiento"
+  ].forEach((obsolete) => assert(!source.includes(obsolete), "Texto obsoleto visible: " + obsolete));
 }
 
 function runProductionHardeningTests() {
@@ -2405,7 +2430,7 @@ function runSharedWorkbookValidation() {
   const activity947124Layout = dashboard.assignAdaptiveChartLayout(dashboard.getChartRegistry().filter((definition) => definition.shouldRender(activity947124Analysis)));
   assert.strictEqual(activity947124Model.items.length, 8);
   assert.strictEqual(activity947124Layout.find((item) => item.id === "negotiationTimeline").layoutClass, "chart-timeline");
-  assert.strictEqual(activity947124Layout[0].id, "salesTarget");
+  assert.strictEqual(activity947124Layout[0].id, "negotiationTimeline");
   const activity947124Timeline = activity947124Analysis.timeline;
   const activity947124June = activity947124Timeline.periods.find((item) => item.periodKey === 202606);
   assert.strictEqual(activity947124Timeline.mode, "SINGLE_ACTIVITY");
