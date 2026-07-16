@@ -111,3 +111,27 @@ Coexisten venta del cliente y ventas conjuntas. Solo las ventas conjuntas son el
 - `947124`: 541 / 1.100 = 49,18 %; diferencia -559.
 - `874894`: 549,252 / 500 = 109,85 %; diferencia 49,252.
 - `1002559342`: mayo y junio suman 121.357 como histórico, pero no forman el numerador de actividades que empiezan el 1 de julio.
+
+## Indicadores preparados para la tabla cliente–negociación
+
+| Campo | Población | Fórmula o resolución |
+| --- | --- | --- |
+| Ventas acumuladas generales | cliente + períodos disponibles | Suma de `TotalVentaMes` resuelto una vez por cliente–período. |
+| Ventas atribuibles acumuladas | cliente + actividad + períodos | Suma de ventas físicas resueltas por presentación; no copia la venta general. |
+| Avance frente al objetivo total | negociación comparable | Venta atribuible comparable acumulada / objetivo total único. |
+| Diferencia frente al objetivo total | misma población | Venta atribuible comparable acumulada - objetivo total único. |
+| Descuento mensual | cliente + actividad + período | Valor único resuelto; no suma ni promedio. |
+| Inversión | actividad | Valor único contractual; conflicto si existen varios. |
+
+```text
+Cumplimiento mensual = ventas atribuibles comparables del mes / objetivo mensual
+Avance objetivo total = ventas atribuibles comparables acumuladas / objetivo total
+```
+
+El primer cociente produce `CUMPLE_MES`, `NO_CUMPLE_MES` o `NO_EVALUABLE_MES` y alimentará el filtro principal. El segundo produce `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`. Ninguno reemplaza al otro. En ausencia de filtro se presenta el último mes disponible y el encabezado identifica su etiqueta.
+
+Para una actividad compartida, la columna de avance representa el estado conjunto de la negociación y usa `jointActivitySalesByMonth`; no convierte la contribución del cliente en cumplimiento individual. En el resumen por cliente, objetivos se suman una vez por `activityId` y porcentajes distintos se conservan como `VARIOS`.
+
+## Lectura en la tabla de seguimiento
+
+**Venta atribuible del mes** es el numerador del estado mostrado. En una actividad individual corresponde a `attributableSalesByMonth[periodo]`; en una compartida, a `jointActivitySalesByMonth[periodo]`. El detalle agrega el aporte del cliente por separado. **Ventas atribuibles acumuladas** y **Avance objetivo total** siguen el contrato comparable y nunca usan directamente `TotalVentaMes`.

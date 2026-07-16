@@ -157,3 +157,20 @@ cumplimiento = ventas atribuibles comparables / objetivo comparable
 ```
 
 La tolerancia predeterminada es `1e-9`. Un contexto sin objetivo comparable devuelve consistencia no aplicable, no un éxito artificial.
+
+## 12. Avance contra el objetivo total
+
+La futura tabla usa un contrato adicional, sin sustituir el KPI mensual existente:
+
+```text
+avance total = ventas atribuibles comparables acumuladas / objetivo total
+diferencia total = ventas atribuibles comparables acumuladas - objetivo total
+```
+
+`Objetivo cajas total`, `Objetivo mes` y `% De inversión` se resuelven una vez por actividad. Si `objetivo mes × Periodo negociacion` no coincide con el total fuente, se conserva el total fuente y se registra `OBJETIVO_TOTAL_NO_COINCIDE_CON_FORMULA`. Inversión repetida igual se conserva; vacío más un único valor adopta el valor; valores distintos producen `INVERSION_CONFLICTIVA`.
+
+`Porcentaje descuento mes` se resuelve por cliente + actividad + período. Cero junto con un único positivo conserva el positivo; positivos distintos producen `DESCUENTO_MENSUAL_CONFLICTIVO`. `Porcentaje descuento negociación` puede variar por presentación y se resume sin promedio como `UNICO`, `VARIOS` o `SIN_DATO`.
+
+El estado principal se resuelve por período: `CUMPLE_MES` con venta atribuible comparable / objetivo mensual mayor o igual a 1; `NO_CUMPLE_MES` con cociente válido inferior a 1; y `NO_EVALUABLE_MES` sin objetivo mensual, vigencia o atribución confiable. Los porcentajes mensuales nunca se promedian: un resumen multiactividad divide la suma de ventas comparables entre la suma de objetivos mensuales únicos.
+
+El objetivo total conserva un estado independiente: `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`. En actividad compartida ambos numeradores usan la venta conjunta y los estados pertenecen a la negociación; el aporte individual queda separado. Por eso son válidas combinaciones como “cumple mes y total en progreso” o “no cumple mes y objetivo total cumplido”.

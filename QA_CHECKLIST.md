@@ -59,6 +59,9 @@ En cada combinación revisar:
 - [ ] Donut con leyenda legible; treemap sin bloques caóticos ni texto cortado; lollipop con etiquetas completas o tooltip accesible.
 - [ ] El KPI de presentaciones sin ventas abre un único modal con categorías, detalle, búsqueda, ordenamiento, paginación de 25 y CSV en ambos niveles.
 - [ ] Los combobox de Actividad y Cliente SAP permanecen sobre gráficas, timeline y tarjetas después de hacer scroll; el modal permanece por encima del dropdown.
+- [ ] La tabla de seguimiento no muestra buscador local; filtros globales y estados locales determinan tabla y CSV.
+- [ ] **← Volver** recupera detalle, contribución y cliente interno con página, orden, selección y scroll anteriores.
+- [ ] Con el modal abierto, rueda, teclado y tacto no desplazan el dashboard; al cerrar se restaura la posición exacta.
 
 ## Errores y fallbacks
 
@@ -76,3 +79,13 @@ En cada combinación revisar:
 | Fecha | Navegador/versión | Responsable | Resultado | Evidencia/incidencias |
 | --- | --- | --- | --- | --- |
 | Pendiente | Pendiente | Pendiente | No ejecutado | El entorno automatizado no dispone de navegador |
+
+## Tabla de seguimiento
+
+- [ ] Confirmar período predeterminado y período seleccionado desde Mes.
+- [ ] Probar los tres estados mensuales y los tres estados del objetivo total.
+- [ ] Filtrar por SAP, nombre/NIT, actividad, región y CEDI desde los controles globales; ordenar y cambiar 25/50/100 en la tabla.
+- [ ] Verificar que el CSV contiene todas las coincidencias y columnas de cada período.
+- [ ] Abrir un detalle individual y uno compartido; separar venta general, aporte y venta conjunta.
+- [ ] Usar Ver cliente, Ver negociación y Ver contribución; confirmar chips sincronizados.
+- [ ] En 390 × 844 confirmar tarjetas únicas, modal usable y scroll interno mensual.

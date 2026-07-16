@@ -48,3 +48,7 @@ Los tooltips usan `es-CO`, `escapeHtml()` y etiquetas semánticas. Donut y treem
 Cada contenedor tiene `role="img"` y `aria-label`. Los fallbacks nativos usan botones o elementos con `role="button"`, `tabindex="0"` y activación por Enter/Espacio. Las leyendas se adaptan, y etiquetas largas usan espacio controlado y tooltip.
 
 La validación automática comprueba estructura y fallbacks. La pintura en 1440, 1024, 768 y 390 px permanece en la matriz manual cuando no hay navegador disponible.
+
+## Tabla de seguimiento
+
+Aunque no es una gráfica, funciona como visualización ejecutiva de entrada. En escritorio usa tabla compacta con encabezado fijo y scroll horizontal interno; hasta 820 px renderiza únicamente tarjetas de la página activa. Los badges combinan icono, texto y tono. El modal presenta períodos dinámicos y separa venta general, aporte del cliente y venta conjunta.

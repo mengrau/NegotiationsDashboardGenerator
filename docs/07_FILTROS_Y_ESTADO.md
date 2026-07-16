@@ -94,3 +94,11 @@ Las banderas `filterPanelEventsBound`, `detailExplorerEventsBound` y `dashboardI
 ## Limpieza
 
 `initializeDashboardDataset()` cancela el render pendiente, limpia filtros, facetas, firmas y cachés, libera gráficas y cierra el explorador. El tema puede conservarse como preferencia global, pero no las selecciones del workbook anterior.
+
+## Estado local de seguimiento
+
+`state.clientTrackingTable` mantiene estados mensual/total, orden, página, tamaño y relación seleccionada. No lee el DOM como fuente y no posee consulta local. Cliente, NIT, actividad, región, canal, categoría y CEDI se segmentan mediante los filtros globales; Mes define el período evaluado. Los controles locales de estado no cambian filtros globales. Solo **Ver cliente** y **Ver negociación** invocan `updateDashboardFilters()`, cierran el detalle y sincronizan chips, combobox y análisis.
+
+## Navegación dentro del modal
+
+`state.modalNavigation.stack` guarda cada nivel antes de abrir el siguiente: tipo de modal, cliente/actividad, página, orden, período, selección y scroll. **← Volver** restaura esa instantánea sin llamar a `updateDashboardFilters()` ni reconstruir el workbook. El nivel base conserva también la página, orden, fila seleccionada y posición del dashboard.

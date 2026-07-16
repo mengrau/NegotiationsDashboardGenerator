@@ -4,7 +4,7 @@ Esta fase optimiza el costo de interacción sin alterar las reglas documentadas 
 
 ## Perfil de referencia
 
-Medición realizada con Node.js sobre INSUMO DASHBOARD (1).xlsx (18.319 filas). Los tiempos no incluyen pintura del navegador ni trabajo interno de ECharts y pueden variar entre ejecuciones.
+Medición realizada con Node.js sobre `INSUMO DASHBOARD (3).xlsx` (14.623 filas en la auditoría actual). Las cantidades se descubren del archivo y no están codificadas en producción. Los tiempos no incluyen pintura del navegador ni trabajo interno de ECharts y pueden variar entre ejecuciones.
 
 | Etapa | Antes | Después |
 | --- | ---: | ---: |
@@ -90,7 +90,7 @@ El cambio de barras a línea suavizada, donut, treemap o lollipop solo sustituye
 
 En la última auditoría Node.js del 13 de julio de 2026, construir las opciones visuales de categoría y presentaciones tomó 0,86 ms y construir la opción de timeline tomó 0,81 ms. La medición confirmó `treemap`, `donut`, `lollipop` y una serie principal `line` con suavizado 0,25, sin inicializaciones ECharts ni reconstrucciones analíticas. Estos tiempos son orientativos y varían entre ejecuciones.
 
-El KPI de ventas atribuibles comparables lee `activityAggregate.sales`; objetivo, cumplimiento y diferencia leen el mismo agregado. La reconciliación añade únicamente restas, división y comparaciones con tolerancia, sin recorrer las 18.319 filas. `audit:performance` informa ambas poblaciones, consistencia y cantidad de gráficas.
+El KPI de ventas atribuibles comparables lee `activityAggregate.sales`; objetivo, cumplimiento y diferencia leen el mismo agregado. La reconciliación añade únicamente restas, división y comparaciones con tolerancia, sin recorrer nuevamente las filas normalizadas. `audit:performance` informa ambas poblaciones, consistencia y cantidad de gráficas.
 
 ## Diagnóstico y estabilidad
 
@@ -102,7 +102,7 @@ La prueba de endurecimiento simula 50 cambios de filtro, 20 limpiezas, 20 ciclos
 
 ## Validación manual en navegador
 
-1. Generar el dashboard con el libro de 18.319 filas.
+1. Generar el dashboard con `INSUMO DASHBOARD (3).xlsx` y confirmar que el conteo mostrado coincide con el workbook cargado.
 2. Activar el modo de depuración y guardar la instantánea inicial.
 3. Cambiar rápidamente actividad, cliente, período y CEDI; verificar que rendersCancelled crece y no se bloquea la interfaz.
 4. Repetir una combinación de filtros; comprobar que analysesExecuted no aumenta.
@@ -126,6 +126,24 @@ La disponibilidad facetada se obtiene con una pasada sobre el resultado completo
 
 En escritorio el panel usa cuatro columnas y los combobox ocupan dos; en tablet pasa a dos columnas y en móvil a una. El desplegable móvil usa posición fija dentro del viewport con z-index inferior al modal.
 
+## Modelo cliente–negociación
+
+El nuevo modelo se construye una vez en `processCurrentSheet()` después de normalizar e indexar el workbook. Utiliza `Map` y `Set` para resolver relaciones, objetivos, ventas y descuentos. En la auditoría actual produjo 386 relaciones y 382 resúmenes de cliente en aproximadamente 511 ms en frío. `audit:performance` separa `clientNegotiationModelColdMs` de `clientNegotiationModelReadMs`; la segunda medición solo accede a los arreglos ya construidos.
+
+El resultado se serializa dentro de `DASHBOARD_META.clientNegotiationModels` y `buildDashboardAnalyses()` lo incorpora a `state.analyses`. La caché LRU de análisis, limitada a ocho firmas, conserva la referencia al modelo; filtros de estado, ordenamientos y paginación de la tabla no recorren las 14.623 filas. Al procesar otro workbook, `resetProcessedOutput()` elimina el modelo anterior, el HTML nuevo reemplaza sus metadatos y `initializeDashboardDataset()` invalida todas las cachés por `datasetVersion`.
+
+Las columnas mensuales se crean recorriendo únicamente `availablePeriods`, no el workbook. Para dos meses se obtienen 25 columnas: 17 base y ocho dinámicas —venta, descuento, cumplimiento y estado por mes—. El costo escala con el número real de períodos y no contiene casos especiales para mayo o junio. Cambiar el mes seleccionado proyecta los campos `selectedMonthly*` sobre 386 relaciones ya preparadas; no reconstruye índices ni atribución.
+
 ## Limitaciones de esta medición
 
 El repositorio no contiene un último dashboard descargado; la prueba automatizada compila el HTML en memoria desde el workbook. En la sesión de auditoría el controlador devolvió exactamente "No browser is available", por lo que quedan pendientes la pintura real, el tiempo interno de ECharts, la respuesta tras 20 cambios y el perfil de memoria. Las cifras anteriores demuestran costos de cálculo y reutilización de caché en Node.js, no garantizan por sí solas que el aviso de página sin respuesta haya desaparecido en todos los navegadores.
+
+## Proyección de seguimiento
+
+`clientTrackingCache` es una LRU de ocho firmas. La clave combina versión del dataset, filtros globales, período, estados locales y ordenamiento. Cada fallo filtra y ordena las relaciones preparadas sin mutarlas; paginar solo aplica `slice()` y renderiza 25/50/100 elementos. La tabla no mantiene búsqueda local: cliente, NIT, actividad, región y CEDI se segmentan con los filtros globales. Exportar reutiliza la proyección completa y abrir el detalle referencia la relación: ninguna acción recorre las 14.623 filas.
+
+El snapshot expone tamaño de la LRU, proyecciones, aciertos y filas renderizadas. `initializeDashboardDataset()` invalida caché, pila modal y estado local al cambiar de workbook.
+
+La apertura del detalle usa `clientTrackingRelationIndex`, un `Map` construido cuando se renderiza la proyección, para localizar `Cliente SAP + ID Actividad` sin buscar filas del workbook. `clientTrackingDetailCache` conserva hasta 16 modelos por versión de dataset, relación y firma de períodos. Cada modelo contiene únicamente el registro preparado, sus períodos contractuales y valores mensuales. Abrir o cerrar no agrega listeners, no llama a `updateDashboardFilters()` y no renderiza nuevamente KPI o gráficas.
+
+El overlay registra una sola vez eventos delegados de clic, teclado, rueda y tacto. No existe listener de `scroll`: desplazarse no modifica el DOM ni consulta análisis. Se retiraron `backdrop-filter` y el encabezado sticky redundante; tarjetas y secciones independientes limitan su pintura. `state.modalNavigation.stack` conserva referencias a modelos ya preparados y estados de vista, por lo que **Volver** solo renderiza el nivel recuperado. `lockPageScroll()` fija el body, compensa la barra lateral y usa contador para cadenas de vistas; `unlockPageScroll()` restaura estilos y coordenadas exactas.

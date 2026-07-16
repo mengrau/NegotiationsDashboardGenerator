@@ -108,3 +108,11 @@ Una actividad participa si tiene fechas válidas, está vigente en el período, 
 `initDashboard()` es idempotente. Una interacción llama `updateDashboardFilters()`, cambia la firma y programa `scheduleDashboardRender()`. `renderAll()` consume cachés e índices, actualiza `state.analyses` y sincroniza KPI, gráficas, timeline y explorador.
 
 Al inicializar otro dataset, `initializeDashboardDataset()` cancela renders, libera gráficas, limpia cachés, filtros, modal, timeline y diagnósticos del dataset anterior.
+
+## 17. Construcción del modelo para la futura tabla
+
+Después de `normalizeWorkbookRow()` e `initializeProcessedDataIndexes()`, `processCurrentSheet()` invoca `buildClientNegotiationModels()` una sola vez. La función agrupa filas con `Map`, resuelve objetivos e inversión por actividad, `TotalVentaMes` por cliente–período, venta física por presentación, descuentos mensuales por relación y período y descuentos de negociación por sus valores conservados.
+
+El resultado contiene `clientActivitySummary`, `clientSummary`, `availablePeriods`, `summaryTableColumns` y `diagnostics`. `buildMetadata()` lo entrega a `generateDashboardHtml()`; `safeJson()` mantiene la serialización segura. Dentro del HTML, `buildDashboardAnalyses()` lo expone en `state.analyses` sin reconstruirlo. Cargar otro archivo ejecuta `resetProcessedOutput()`, elimina el modelo previo e invalida las cachés del dashboard mediante un nuevo `datasetVersion`.
+
+`projectClientNegotiationModelPeriod()` selecciona el mes indicado por `state.filters.Mes` y `state.filters.Año`; sin selección usa el último período disponible. Solo crea una proyección ligera de campos `selectedMonthly*`. Cumplimiento mensual y avance total ya están calculados y permanecen independientes.

@@ -19,9 +19,24 @@ La primera fila debe contener encabezados. La validación tolera espacios al ini
 
 Columnas requeridas:
 
-`Año`, `Mes`, `Año Mes`, `Centro - Clave`, `Canal`, `Categoría AS400 de la venta`, `Nit cliente - Clave`, `Presentación AS400 de la venta - Texto`, `Presentación AS400 de la venta - Clave`, `Región SAP`, `Tipología`, `Cliente AS400 - Texto`, `Cliente SAP - Clave`, `Cliente AS400 - Nombre negocio (Texto)`, `Ventas cajas físicas (sin rep)`, `TotalVentaMes`, `Objetivo mes `, `ID Actividad`, `Fecha inicio`, `Fecha fin`, `Objetivo cajas total`, `Tipo descuento`, `Porcentaje descuento`, `Periodo negociacion` y `Cedi`.
+`Año`, `Mes`, `Año Mes`, `Centro - Clave`, `Canal`, `Categoría AS400 de la venta`, `Nit cliente - Clave`, `Presentación AS400 de la venta - Texto`, `Presentación AS400 de la venta - Clave`, `Región SAP`, `Tipología`, `Cliente AS400 - Texto`, `Cliente SAP - Clave`, `Cliente AS400 - Nombre negocio (Texto)`, `Ventas cajas físicas (sin rep)`, `Objetivo mes`, `% De inversión`, `ID Actividad`, `Fecha inicio`, `Fecha fin`, `Objetivo cajas total`, `Tipo descuento`, `Porcentaje descuento negociación`, `Porcentaje descuento venta`, `Porcentaje descuento mes`, `Periodo negociacion`, `Cedi` y `TotalVentaMes`.
 
 Por compatibilidad, la herramienta también acepta `Ventas cajas físicas mes (sin rep)`, `Objetivo mes` sin espacio final y variantes como `Total venta mes`.
+
+`normalizeWorkbookRow()` centraliza el esquema y crea nombres internos estables (`clientSap`, `activityId`, `periodKey`, `physicalSales`, `monthlyObjective`, `totalObjective`, `investmentPercentage` y los tres descuentos). Las claves originales permanecen temporalmente como compatibilidad de las vistas existentes. `Año Mes` admite formas como `52026` y `62026`, que se convierten en `202605` y `202606`, junto con etiquetas `MAY 2026` y `JUN 2026`. Las filas con negociación pero sin período se conservan como `SIN_PERIODO_DE_VENTA` y `NO_EVALUABLE`.
+
+## Modelo preparado para la tabla de clientes
+
+La Fase 10A incorpora dos modelos analíticos, todavía sin añadir la interfaz final:
+
+- `clientActivitySummary`: una fila segura por `Cliente SAP + ID Actividad`, con descriptores resueltos, objetivos, inversión, descuentos, ventas generales y atribuibles por mes, avance frente al objetivo total, estado y advertencias.
+- `clientSummary`: una fila por cliente construida desde las relaciones anteriores y objetivos únicos por actividad; nunca suma directamente filas del Excel ni promedia porcentajes.
+
+`availablePeriods` se obtiene de los datos y `summaryTableColumns` añade por cada período columnas de venta, descuento, cumplimiento y estado. Cada relación conserva `clientSap` y `activityId` para que la futura acción navegue mediante `updateDashboardFilters()` sin crear otro estado. El modelo se construye durante el procesamiento, se serializa de forma segura en el HTML y se incorpora a `state.analyses`; las interacciones futuras consumirán esa estructura y la caché analítica LRU, no las filas originales.
+
+El estado principal se calcula por mes: venta atribuible comparable del período dividida por objetivo mensual. Produce `CUMPLE_MES`, `NO_CUMPLE_MES` o `NO_EVALUABLE_MES`. Sin filtro de mes se usa el último período disponible; con un mes seleccionado, `state.analyses` proyecta ese período sobre el modelo ya preparado. El avance acumulado contra `Objetivo cajas total` se conserva por separado como `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`.
+
+Por cada período, `summaryTableColumns` prepara venta, descuento, cumplimiento y estado. Las columnas base incluyen estado y cumplimiento del mes seleccionado, ventas atribuibles acumuladas, objetivo total, avance y estado del objetivo total. La interfaz completa de la tabla permanece fuera del alcance de esta fase.
 
 Los KPI principales usan un período canónico construido con `Año` y `Mes`, con `Año Mes` validado como respaldo. `Ventas del período` resuelve `TotalVentaMes` una sola vez por `Cliente SAP - Clave` y período; si coexisten ceros y un único valor no cero, conserva el valor no cero, y si hay dos valores no cero distintos marca conflicto. El objetivo mensual y el objetivo total se resuelven una sola vez por `ID Actividad`.
 
@@ -91,7 +106,7 @@ El dashboard generado puede requerir internet para cargar Apache ECharts, Lucide
 
 ## Auditoría analítica
 
-`npm.cmd run audit:workbook` valida por defecto `Downloads/INSUMO DASHBOARD (1).xlsx`. También puede recibir `INSUMO_DASHBOARD_XLSX` o `PRUEBA_DASHBOARD_XLSX`. El reporte incluye actividades individuales y compartidas, relaciones cliente-período, atribución granular, ambigüedades, conflictos, cobertura y ejemplos de contribución.
+`npm.cmd run audit:workbook` valida por defecto `Downloads/INSUMO DASHBOARD (3).xlsx`. También puede recibir `INSUMO_DASHBOARD_XLSX` o `PRUEBA_DASHBOARD_XLSX`. El reporte incluye actividades individuales y compartidas, relaciones cliente-período, atribución granular, filas sin período, inversión, descuentos, estados del modelo cliente-negociación, conflictos y tiempos de construcción.
 
 ## Auditoría de rendimiento
 
@@ -126,3 +141,13 @@ Si las gráficas no cargan, revisa la conexión a internet o el bloqueo de CDN e
 Si GitHub Pages muestra 404, confirma que Pages esté configurado con **GitHub Actions**, que el workflow haya terminado correctamente y que el repositorio tenga `index.html` en la raíz.
 
 Si cambia el Excel de origen, genera un nuevo HTML. El dashboard descargado contiene una copia de los datos del momento en que fue creado.
+
+## Seguimiento de clientes y negociaciones
+
+El HTML generado incluye, después de KPI y filtros, una tabla cuya fila representa `Cliente SAP + ID Actividad`. El estado mensual usa el mes filtrado o el último período disponible; el avance contra el objetivo total se presenta como un estado independiente. Los filtros locales de estado, el ordenamiento y la paginación operan sobre `clientActivitySummary`, no sobre las filas del Excel. La segmentación por cliente, NIT, actividad, región o CEDI se hace exclusivamente con los filtros globales superiores.
+
+La tabla muestra 25 relaciones por página de forma predeterminada y permite 50 o 100. En móvil genera únicamente tarjetas de la página visible. **Ver detalle** abre el modal único con contrato, resultados mensuales dinámicos y advertencias. **Ver cliente** y **Ver negociación** actualizan los filtros centrales. El CSV de resumen exporta todas las coincidencias y agrega cuatro columnas por período real; el CSV de detalle conserva meses y advertencias.
+
+La tabla compacta prioriza estado mensual/total, cliente, actividad, objetivo, venta y descuento del mes, cumplimiento, avance e inversión. Región, CEDI y acumulados permanecen en el detalle. Los porcentajes se muestran desde decimales normalizados, evitando que un `10` contractual aparezca como `1.000 %`.
+
+Los flujos **Ver detalle → Ver contribución → detalle del cliente** comparten un único modal. El botón **← Volver** recupera el nivel, página, orden, relación seleccionada y posición de scroll anteriores sin reaplicar filtros. Mientras el modal está abierto, el documento queda fijado en su posición y solo se desplaza el contenido interno; al cerrar se restaura exactamente el scroll original.

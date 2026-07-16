@@ -16,7 +16,10 @@ Las visualizaciones originales se renderizaban siempre: Región SAP, canal, cate
 | `TotalVentaMes` | Cliente y período; puede repetirse solo en algunas filas y coexistir con ceros | Se agrupa por cliente + período canónico. Se ignoran ceros cuando existe un único valor positivo. Dos valores positivos distintos generan conflicto; nunca se suman las filas. |
 | `Objetivo mes` | Actividad o negociación | Se resuelve una sola vez por `ID Actividad`. El objetivo se aplica en cada período en que la actividad está vigente; nunca se multiplica por clientes o presentaciones. |
 | `Objetivo cajas total` | Actividad o negociación | Se resuelve una sola vez por `ID Actividad`. Se conserva como contexto contractual y cualquier valor diferente dentro de la actividad genera conflicto. |
-| `Porcentaje descuento` | Condición de negociación; puede variar dentro de una actividad | No se promedia por fila ni se muestra como KPI ejecutivo. Solo se conserva como atributo de detalle hasta contar con una regla de ponderación de negocio. |
+| `% De inversión` | Actividad | Se resuelve una vez por actividad; valores distintos generan `INVERSION_CONFLICTIVA`. No se suma ni promedia. |
+| `Porcentaje descuento negociación` | Presentación dentro de la negociación | Se conserva como resumen `UNICO`, `VARIOS` o `SIN_DATO`, con todos los valores. No se promedia. |
+| `Porcentaje descuento venta` | Fila informativa | Se conserva para detalle; no interviene en cumplimiento. |
+| `Porcentaje descuento mes` | Cliente + actividad + período | Se resuelve sin sumar ni promediar; valores positivos distintos generan `DESCUENTO_MENSUAL_CONFLICTIVO`. |
 | `ID Actividad` | Negociación | Se usa para deduplicar negociaciones, vigencia y presentaciones negociadas; no para multiplicar el objetivo mensual. |
 | `Cliente SAP - Clave` | Cliente | Participa en la clave de venta mensual. Frente a una actividad compartida, su venta representa contribución, no cumplimiento individual. |
 | `Presentación AS400 de la venta - Clave` | Producto/presentación | Se conserva como texto alfanumérico. El estado consolidado prioriza `CON_VENTA`, luego `VENTA_CERO`, luego `SIN_INFORMACION_VENTA`. |
@@ -128,11 +131,11 @@ Los umbrales de cumplimiento son: favorable desde 100 %, atención desde 90 % ha
 - Filtros y gráficas de cardinalidad uno ocupaban espacio sin aportar comparación.
 - La tabla completa contradecía el patrón de detalle bajo demanda.
 
-## Auditoría de `INSUMO DASHBOARD (1).xlsx`
+## Auditoría de `INSUMO DASHBOARD (3).xlsx`
 
-La auditoría reproducible (`npm.cmd run audit:workbook`) encontró 370 actividades: 333 individuales y 37 compartidas, con un máximo de 14 clientes. Existen 58 relaciones observadas cliente-período con varias actividades; al aplicar vigencia confiable quedan 12 relaciones simultáneas activas. La venta física granular resuelve 17 contribuciones que no podían usar `TotalVentaMes` completo.
+La auditoría reproducible (`npm.cmd run audit:workbook`) encontró 14.623 filas, 382 clientes, 326 actividades y 386 relaciones cliente–actividad. De las actividades, 304 son individuales y 22 compartidas; cuatro clientes participan en más de una actividad. Los períodos disponibles se descubren dinámicamente y, en el archivo auditado, son mayo y junio de 2026.
 
-Permanecen 3 casos actividad-período con `VENTA_ACTIVIDAD_AMBIGUA`. También existen 7 actividades con fechas conflictivas, equivalentes a 14 registros actividad-período en los dos meses analizados. Estos casos no forman parte del cumplimiento comparable y permanecen disponibles para revisión.
+Se conservaron 161 filas sin período de venta. El modelo nuevo no detectó conflictos de venta mensual, objetivo, inversión ni descuento mensual. En mayo, 47 relaciones cumplen el objetivo mensual, 191 no lo cumplen y 148 no son evaluables. En junio, 92 cumplen, 276 no cumplen y 18 no son evaluables. Frente al objetivo total, 364 negociaciones están en progreso y 22 no son evaluables; ninguna lo ha completado todavía. Estos conteos son resultados de auditoría, no constantes de producción.
 
 ## Línea de tiempo analítica
 
@@ -161,3 +164,24 @@ Los cambios de la Fase 8 son exclusivamente de visualización. La línea suaviza
 La Fase 9 expone `comparableSales` como **Ventas atribuibles comparables** y usa `comparableObjective` en la tarjeta de objetivo reconciliable. No introduce una fórmula: muestra el numerador y denominador que ya consumían `compliance` y `objectiveDifference`.
 
 `Ventas del período` continúa resolviendo `TotalVentaMes` por cliente y período. La cobertura comparable se conserva como texto secundario `X de Y actividades`, no como KPI principal. `reconcileComparablePerformance()` comprueba las dos identidades con valores completos y tolerancia `1e-9`.
+
+## Contrato analítico de cliente–negociación
+
+`normalizeWorkbookRow()` crea aliases internos estables sin retirar las claves usadas por las vistas vigentes. `buildClientNegotiationModels()` construye:
+
+- `clientActivitySummary`, a granularidad `Cliente SAP + ID Actividad`;
+- `clientSummary`, a granularidad `Cliente SAP`, derivado del anterior;
+- `availablePeriods`, ordenado mediante claves `AAAAMM`;
+- `summaryTableColumns`, con venta, descuento, cumplimiento y estado por cada período real.
+
+`TotalVentaMes` permanece a nivel cliente–período. La venta atribuible se resuelve primero por cliente, actividad, período y presentación, y luego se agrega. El objetivo mensual, objetivo total e inversión se resuelven una sola vez por actividad. El descuento mensual pertenece a cliente + actividad + período; el descuento de negociación conserva un resumen `UNICO`, `VARIOS` o `SIN_DATO` y no se promedia.
+
+El estado principal es mensual. `CUMPLE_MES` significa venta atribuible comparable del mes mayor o igual al objetivo mensual; `NO_CUMPLE_MES`, un cociente válido inferior a uno; y `NO_EVALUABLE_MES`, ausencia de objetivo, vigencia o atribución confiable. `monthlyComplianceByMonth` y `monthlyStatusByMonth` conservan todos los períodos sin promediar porcentajes. `selectedStatusPeriod` usa el mes filtrado o, por defecto, el último período disponible.
+
+El objetivo total responde otra pregunta. `CUMPLIO_OBJETIVO_TOTAL` indica avance acumulado mayor o igual a uno; `EN_PROGRESO_OBJETIVO_TOTAL`, avance válido inferior a uno; y `NO_EVALUABLE_TOTAL`, cálculo acumulado no confiable. Para una actividad compartida ambos estados usan ventas conjuntas y pertenecen a la negociación completa; la contribución del cliente permanece separada.
+
+## Contrato de la tabla de seguimiento
+
+La tabla consume `clientActivitySummary` a granularidad cliente–actividad. La venta mostrada para reconciliar cumplimiento usa el numerador comparable: aporte atribuible en actividad individual y venta conjunta en actividad compartida. El detalle conserva además `TotalVentaMes` del cliente y su aporte individual, con una advertencia explícita de que venta general y venta atribuible no son equivalentes. Los filtros locales solo cambian la proyección; las acciones de navegación llaman a `updateDashboardFilters()`.
+
+Los campos `% De inversión`, `Porcentaje descuento mes`, `Porcentaje descuento venta` y `Porcentaje descuento negociación` se normalizan al cargar mediante `normalizePercentage()`. Internamente siempre son decimales: un `10`, `10.00`, `10,00` o `10%` se convierte en `0.10`; un `0.10` permanece `0.10`. La tabla y el detalle formatean el decimal al presentar. Valores diferentes conservan el estado de conflicto o `VARIOS` y no se promedian.

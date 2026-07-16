@@ -157,3 +157,14 @@ Se escapa al presentar, se serializa con `safeJson()` y se protege CSV contra f�
 ## Preparación previa
 
 Ejecute las cuatro auditorías, complete la matriz visual y tenga disponibles los tres casos reales. Si una cifra cambia por un workbook nuevo, explique la regla y no memorice el valor anterior como constante.
+
+## Demostración de la tabla de seguimiento
+
+1. Señale el período y explique que **Cumple mes** se evalúa contra el objetivo mensual.
+2. Combine un estado mensual con **Objetivo total en progreso** para mostrar que responden preguntas distintas.
+3. Busque un cliente, ordene por cumplimiento y abra **Ver detalle**.
+4. Compare venta general, aporte atribuible y, si es compartida, venta conjunta.
+5. Use **Ver cliente** o **Ver negociación** para mostrar navegación mediante filtros centrales.
+6. Descargue el resumen: incluye todas las coincidencias y períodos, no solo 25 filas.
+
+Frase recomendada: “La tabla resume una relación cliente–negociación; el estado mensual evalúa el mes activo y el avance total informa cuánto falta para completar el contrato”.

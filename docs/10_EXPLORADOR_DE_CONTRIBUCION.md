@@ -45,7 +45,7 @@ Con dos a cuatro clientes, la configuración marca `compact`. En móvil se prese
 
 ## Drill-down interno
 
-Una fila puede abrir detalle del cliente o presentación sin cerrar el contexto completo. La acción de volver restaura la vista y el foco.
+Una fila puede abrir detalle del cliente o presentación sin cerrar el contexto completo. Antes del cambio se guarda una instantánea en `state.modalNavigation.stack`; **← Volver** restaura consulta, orden, página, selección, scroll y foco sin recalcular la actividad ni reaplicar filtros.
 
 ## CSV
 
@@ -58,3 +58,5 @@ El diálogo tiene `role="dialog"`, `aria-modal`, título y descripción. El foco
 ## Caché y rendimiento
 
 `contributionModelCache` es LRU de ocho entradas por dataset, actividad y selección. Reabrir, buscar, ordenar o paginar reutiliza el modelo y no recorre el workbook. Los listeners se delegan una sola vez sobre el overlay estable y el debounce se cancela al cerrar o cambiar dataset.
+
+El fondo se bloquea con `lockPageScroll()` mientras el flujo está abierto. El contador evita desbloquearlo al pasar de detalle a contribución; rueda, teclado y tacto permanecen dentro del contenedor desplazable. No hay listeners de scroll ni render durante el desplazamiento normal.

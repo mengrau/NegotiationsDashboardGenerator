@@ -23,6 +23,8 @@ Ejecuta `tests/sales-information.test.js`. Carga `app.js` y el script generado e
 - filtros, facetas, chips y scheduler;
 - timeline, Gantt y fallback;
 - modal, búsqueda, orden, paginación y CSV;
+- tabla de seguimiento sin búsqueda local y con filtros globales;
+- pila de navegación modal, restauración de página/orden/selección/scroll y bloqueo encadenado del fondo;
 - seguridad HTML/CSV;
 - cachés, listeners e inicialización idempotente;
 - layout, temas y marcadores estáticos.
@@ -95,3 +97,7 @@ Comprobar encabezado, sidebar, ocho KPI globales, ausencia de hueco, timeline, d
 ## Estado honesto
 
 Las auditorías Node no equivalen a inspección visual. Si el entorno responde que no hay navegador, el resultado se registra como pendiente y se sigue `../QA_CHECKLIST.md` en un navegador real.
+
+## Cobertura automatizada del seguimiento
+
+La suite verifica estructura, granularidad cliente–actividad, selección mensual, filtros descriptivos, numerador conjunto en compartidas, contrato del detalle, LRU, paginación por `slice()`, navegación central y responsive sin duplicar tabla/tarjetas. Los CSV se prueban con todas las coincidencias, columnas dinámicas, BOM y protección de fórmulas. Encabezado fijo, scroll, contraste y modal en 1440/1024/768/390 requieren inspección manual.
