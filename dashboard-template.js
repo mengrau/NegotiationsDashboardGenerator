@@ -377,6 +377,10 @@ label, .kpi-label {
 .client-tracking-table .tracking-action .button { white-space: nowrap; }
 .tracking-client { display: grid; gap: 2px; min-width: 250px; max-width: 360px; }
 .tracking-client small { color: var(--muted); }
+.tracking-composition { display: grid; gap: 3px; min-width: 185px; font-size: .76rem; white-space: nowrap; }
+.tracking-composition > span { color: var(--muted); }
+.tracking-composition > span strong { color: var(--ink); }
+.tracking-composition-warning { color: var(--amber); font-weight: 900; white-space: normal; }
 .tracking-status { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.72rem; font-weight: 900; white-space: nowrap; }
 .tracking-status.is-positive { border-color: rgba(16,185,129,.34); background: var(--emerald-soft); color: var(--emerald); }
 .tracking-status.is-negative { border-color: rgba(239,68,68,.34); background: var(--red-soft); color: var(--red); }
@@ -394,9 +398,39 @@ label, .kpi-label {
 .client-tracking-card-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
 .client-tracking-card-metrics span { display: grid; gap: 3px; }
 .client-tracking-card-metrics small { color: var(--muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+.client-tracking-card-composition { display: grid; gap: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft-bg); }
+.client-tracking-card-composition > small { color: var(--muted); font-size: .68rem; font-weight: 900; text-transform: uppercase; }
 .client-tracking-detail-note { margin: 0; padding: 11px 13px; border-left: 4px solid var(--primary); border-radius: 8px; background: var(--primary-soft); color: var(--ink); }
 .tracking-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.tracking-period-table { min-width: 980px; }
+.client-tracking-detail .detail-table-wrap {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-gutter: stable;
+}
+.tracking-period-table {
+  width: max-content;
+  min-width: 1480px;
+  table-layout: fixed;
+}
+.tracking-period-table th,
+.tracking-period-table td {
+  min-width: 128px;
+  vertical-align: middle;
+}
+.tracking-period-table th {
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+.tracking-period-table th:first-child,
+.tracking-period-table td:first-child { min-width: 92px; width: 92px; }
+.tracking-period-table th:nth-child(2),
+.tracking-period-table th:nth-child(3),
+.tracking-period-table th:nth-child(4) { min-width: 170px; width: 170px; }
+.tracking-period-table th:last-child,
+.tracking-period-table td:last-child { min-width: 154px; width: 154px; }
 .quick-search {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center;
   min-height: 46px; margin-bottom: 14px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft-bg); color: var(--muted);
@@ -654,6 +688,7 @@ tbody tr:hover { background: var(--primary-soft); }
   animation: detailDialogIn 0.16s ease-out;
 }
 .detail-explorer-dialog[data-layout="compact"] { width: min(920px, 100%); }
+.detail-explorer-dialog[data-layout="wide"] { width: min(1440px, 100%); }
 @keyframes detailDialogIn { from { opacity: 0; transform: translateY(10px) scale(0.985); } to { opacity: 1; transform: none; } }
 .detail-explorer-header { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: 18px 20px 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
 .detail-explorer-header h2 { margin: 4px 0 0; font-size: clamp(1.15rem, 2vw, 1.45rem); }
@@ -1945,8 +1980,22 @@ function getClientTrackingSortValue(row, field, period) {
 }
 function getClientTrackingComparableSales(row, periodKey) {
   if (!periodKey) return null;
-  const source = row.isSharedActivity ? row.jointActivitySalesByMonth : row.attributableSalesByMonth;
+  const source = row.comparableSalesByMonth || (row.isSharedActivity ? row.jointActivitySalesByMonth : row.salesByMonth);
   return source && isFiniteNumber(source[periodKey]) ? source[periodKey] : null;
+}
+function getClientTrackingComposition(row, periodKey) {
+  return {
+    negotiated: row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[periodKey],
+    nonNegotiated: row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[periodKey],
+    negotiatedShare: row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[periodKey],
+    nonNegotiatedShare: row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[periodKey],
+    status: row.compositionStatusByMonth && row.compositionStatusByMonth[periodKey] || "COMPOSICION_NO_DISPONIBLE"
+  };
+}
+function buildClientTrackingCompositionMarkup(row, periodKey) {
+  const composition = getClientTrackingComposition(row, periodKey);
+  const warning = composition.status === "DESCUADRE_COMPOSICION_VENTA" ? "<small class=\\"tracking-composition-warning\\">Revisar descuadre de fuentes</small>" : "";
+  return "<span class=\\"tracking-composition\\" title=\\"El cumplimiento utiliza toda la venta del cliente durante la vigencia. La composici&oacute;n indica cu&aacute;nto provino de presentaciones negociadas y no negociadas.\\"><span>Negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.negotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.negotiatedShare)) + "</span><span>No negociadas: <strong>" + escapeHtml(formatAvailableMetric(composition.nonNegotiated)) + "</strong> &middot; " + escapeHtml(formatAvailablePercent(composition.nonNegotiatedShare)) + "</span>" + warning + "</span>";
 }
 function getClientTrackingMonthlyDiscountDisplay(row, periodKey) {
   if (!periodKey || !row) return "No disponible";
@@ -1979,8 +2028,15 @@ function getClientTrackingDetailModel(row, periods) {
       return {
         key: period.key, label: period.label,
         generalSales: row.salesByMonth && row.salesByMonth[period.key],
-        attributableSales: row.attributableSalesByMonth && row.attributableSalesByMonth[period.key],
+        negotiatedSales: row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[period.key],
+        nonNegotiatedSales: row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[period.key],
+        negotiatedShare: row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[period.key],
+        nonNegotiatedShare: row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[period.key],
+        compositionStatus: row.compositionStatusByMonth && row.compositionStatusByMonth[period.key],
         comparableSales: getClientTrackingComparableSales(row, period.key),
+        jointNegotiatedSales: row.jointNegotiatedPresentationSalesByMonth && row.jointNegotiatedPresentationSalesByMonth[period.key],
+        jointNonNegotiatedSales: row.jointNonNegotiatedPresentationSalesByMonth && row.jointNonNegotiatedPresentationSalesByMonth[period.key],
+        difference: row.monthlyDifferenceByMonth && row.monthlyDifferenceByMonth[period.key],
         monthlyDiscount: row.monthlyDiscountByMonth && row.monthlyDiscountByMonth[period.key],
         monthlyDiscountStatus: row.monthlyDiscountStatusByMonth && row.monthlyDiscountStatusByMonth[period.key] || "SIN_DATO",
         compliance: row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key],
@@ -2029,16 +2085,16 @@ function buildClientTrackingControlsMarkup() {
     "<div class=\\"client-tracking-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"sort-direction\\"><i data-lucide=\\"" + (value.sortDirection === "asc" ? "arrow-up" : "arrow-down") + "\\"></i> " + (value.sortDirection === "asc" ? "Ascendente" : "Descendente") + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"export-summary\\"><i data-lucide=\\"download\\"></i> Descargar CSV</button></div>";
 }
 function buildClientTrackingDesktopTable(rows, period) {
-  const headers = ["Estado mes", "Estado total", "Cliente / CodSAP", "ID Actividad", "Objetivo mes", "Venta atribuible del mes", "Dcto. mes", "Cumplimiento mes", "Avance total", "% inversión", "Acción"];
-  return "<div class=\\"client-tracking-table-wrap\\"><table class=\\"client-tracking-table\\"><caption class=\\"sr-only\\">Relaciones cliente–negociación para " + escapeHtml(period ? period.label : "el período disponible") + "</caption><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (row) {
+  const headers = ["Estado mes", "Estado total", "Cliente / CodSAP", "ID Actividad", "Objetivo mes", "Venta comparable del mes", "Composición de venta", "Dcto. mes", "Cumplimiento mes", "Avance total", "% inversión", "Acción"];
+  return "<div class=\\"client-tracking-table-wrap\\"><table class=\\"client-tracking-table\\"><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>CodSAP: " + escapeHtml(row.clientSap) + (row.clientNit ? " · NIT: " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></td></tr>";
+    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>CodSAP: " + escapeHtml(row.clientSap) + (row.clientNit ? " · NIT: " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></td></tr>";
   }).join("") + "</tbody></table></div>";
 }
 function buildClientTrackingCards(rows, period) {
   return "<div class=\\"client-tracking-cards\\">" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Actividad " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta " + escapeHtml(period ? period.label : "del mes") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || "Ubicación no disponible") + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></div></article>";
+    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Actividad " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta comparable " + escapeHtml(period ? period.label : "del mes") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-composition\\"><small>Composición de venta</small>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || "Ubicación no disponible") + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></div></article>";
   }).join("") + "</div>";
 }
 function buildClientTrackingPagination(total, start, visibleCount, pageCount) {
@@ -2152,6 +2208,21 @@ function computeKpis(rows, noSalesAnalysis, options) {
     return item.associatedClientIds.some(function (clientId) { return selectedClientIds.indexOf(clientId) !== -1; });
   });
   const activityAggregate = aggregateActivityPerformance(relevantPerformance);
+  const clientAggregateEligible = selectedClientIds.length === 1 && relevantPerformance.length > 1
+    && relevantPerformance.every(function (item) {
+      return item.objectiveStatus === "OK" && item.dateStatus === "OK"
+        && (item.status === "OK" || item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
+    });
+  const clientAggregateObjective = clientAggregateEligible
+    ? relevantPerformance.reduce(function (sum, item) { return sum + item.objectiveMonthly; }, 0)
+    : null;
+  const clientAggregateSales = clientAggregateEligible && isFiniteNumber(salesMonth) ? salesMonth : null;
+  const clientAggregate = {
+    sales: clientAggregateSales,
+    objective: clientAggregateObjective,
+    achievement: isFiniteNumber(clientAggregateSales) && clientAggregateObjective > 0 ? clientAggregateSales / clientAggregateObjective : null,
+    gap: isFiniteNumber(clientAggregateSales) && clientAggregateObjective > 0 ? clientAggregateSales - clientAggregateObjective : null
+  };
   const performanceConsistency = reconcileComparablePerformance({
     comparableSales: activityAggregate.sales,
     comparableObjective: activityAggregate.objective,
@@ -2234,6 +2305,7 @@ function computeKpis(rows, noSalesAnalysis, options) {
     activityAnalytics: activityAnalytics,
     activityPerformance: relevantPerformance,
     activityAggregate: activityAggregate,
+    clientAggregate: clientAggregate,
     performanceConsistency: performanceConsistency,
     selectedActivity: selectedActivity,
     selectedActivityContract: selectedActivityContract,
@@ -2345,7 +2417,7 @@ function buildIndividualActivityKpis(context) {
   return [
     buildActivitySalesKpi(activity, k, false, false),
     buildObjectiveKpi(activity, false),
-    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Ventas atribuibles de la actividad frente a su objetivo mensual."),
+    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Venta total comparable de la actividad frente a su objetivo mensual."),
     buildDifferenceKpi(activity, "Ventas de la actividad menos su objetivo mensual."),
     buildPresentationsKpi(k),
     buildActivityStatusKpi(activity),
@@ -2370,10 +2442,10 @@ function buildIndividualActivityClientKpis(context) {
   const k = context.kpis, activity = context.activity;
   const clientSales = isFiniteNumber(k.selectedContributionSales) ? k.selectedContributionSales : context.isContractOnly ? k.salesPeriod : null;
   return [
-    { id: "clientSales", icon: "shopping-bag", title: "Ventas del cliente", value: formatAvailableMetric(clientSales), description: context.isContractOnly ? "Ventas históricas relacionadas; la actividad aún no es comparable." : "Venta atribuible del cliente dentro de la actividad." },
+    { id: "clientSales", icon: "shopping-bag", title: "Ventas del cliente", value: formatAvailableMetric(clientSales), description: context.isContractOnly ? "Ventas históricas relacionadas; la actividad aún no es comparable." : "Venta total comparable del cliente dentro de la actividad." },
     buildObjectiveKpi(activity, true),
-    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Ventas atribuibles frente al objetivo mensual de la actividad."),
-    buildDifferenceKpi(activity, "Ventas atribuibles menos el objetivo mensual de la actividad."),
+    buildComplianceKpi(activity, "Cumplimiento de la actividad", "Venta total comparable frente al objetivo mensual de la actividad."),
+    buildDifferenceKpi(activity, "Venta total comparable menos el objetivo mensual de la actividad."),
     buildPresentationsKpi(k),
     buildActivityStatusKpi(activity),
     buildActivityValidityKpi(activity),
@@ -2382,31 +2454,29 @@ function buildIndividualActivityClientKpis(context) {
 }
 function buildMultipleActivitiesClientKpis(context) {
   const k = context.kpis;
-  const sales = k.selectedComparableContributionSales;
-  const objective = k.comparableObjective;
-  const achievement = isFiniteNumber(sales) && objective > 0 ? sales / objective : null;
-  const gap = isFiniteNumber(sales) && objective > 0 ? sales - objective : null;
-  return buildAggregateActivityKpis(k, sales, objective, achievement, gap, "Ventas atribuibles comparables").concat([
+  const aggregate = k.clientAggregate || {};
+  return buildAggregateActivityKpis(k, aggregate.sales, aggregate.objective, aggregate.achievement, aggregate.gap, "Venta total comparable del cliente", true).concat([
     { id: "relatedClients", icon: "users", title: "Clientes relacionados", value: formatInteger(k.associatedClientCount), description: "Clientes vinculados a las actividades del contexto.", className: "kpi-secondary" }
   ]).slice(0, 8);
 }
 function buildMultipleActivitiesKpis(context) {
   const k = context.kpis;
-  return buildAggregateActivityKpis(k, k.comparableSales, k.comparableObjective, k.compliance, k.objectiveDifference, "Ventas atribuibles de las actividades").concat([
+  return buildAggregateActivityKpis(k, k.comparableSales, k.comparableObjective, k.compliance, k.objectiveDifference, "Ventas comparables de las actividades").concat([
     { id: "relatedClients", icon: "users", title: "Clientes relacionados", value: formatInteger(k.associatedClientCount), description: "Clientes únicos vinculados a las actividades seleccionadas.", className: "kpi-secondary" }
   ]).slice(0, 8);
 }
-function buildAggregateActivityKpis(k, sales, objective, achievement, gap, salesTitle) {
+function buildAggregateActivityKpis(k, sales, objective, achievement, gap, salesTitle, forceComparable) {
   const compliance = getComplianceState(achievement, objective > 0 ? "OK" : "OBJETIVO_AUSENTE");
   const difference = getObjectiveDifferenceState(gap);
-  const comparableSales = k.activityAggregate.comparableCount > 0 && objective > 0 && isFiniteNumber(sales) ? sales : null;
-  const comparableObjective = k.activityAggregate.comparableCount > 0 && objective > 0 ? objective : null;
+  const hasComparablePopulation = forceComparable || k.activityAggregate.comparableCount > 0;
+  const comparableSales = hasComparablePopulation && objective > 0 && isFiniteNumber(sales) ? sales : null;
+  const comparableObjective = hasComparablePopulation && objective > 0 ? objective : null;
   const coverage = buildComparableCoverageText(k.activityAggregate);
   return [
     { id: "comparableSales", icon: "package-check", title: salesTitle, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? "Ventas asociadas a actividades válidas dentro de su vigencia; se usan en cumplimiento y diferencia. " + coverage : "No existen actividades con ventas atribuibles dentro de una vigencia válida. " + coverage },
     { id: "aggregateObjective", icon: "target", title: "Objetivo mensual de las actividades", value: formatAvailableMetric(comparableObjective), description: "Suma de objetivos únicos de las actividades comparables." },
-    { id: "aggregateCompliance", icon: "gauge", title: "Cumplimiento agregado", value: formatAvailablePercent(achievement), description: "Ventas atribuibles comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
-    { id: "aggregateDifference", icon: difference.icon, title: "Diferencia atribuible frente al objetivo", value: isFiniteNumber(gap) ? formatSignedNumber(gap) : "No disponible", description: "Ventas atribuibles comparables menos objetivos comparables.", className: difference.className, status: difference.label },
+    { id: "aggregateCompliance", icon: "gauge", title: "Cumplimiento agregado", value: formatAvailablePercent(achievement), description: "Ventas totales comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
+    { id: "aggregateDifference", icon: difference.icon, title: "Diferencia frente al objetivo", value: isFiniteNumber(gap) ? formatSignedNumber(gap) : "No disponible", description: "Ventas totales comparables menos objetivos comparables.", className: difference.className, status: difference.label },
     { id: "selectedActivities", icon: "clipboard-list", title: k.selectedActivityIds.length > 1 ? "Actividades seleccionadas" : "Actividades relacionadas", value: formatInteger(k.activityAggregate.totalCount), description: "Actividades evaluadas en el período.", className: "kpi-secondary" }
   ];
 }
@@ -2420,10 +2490,10 @@ function buildExecutiveKpis(context) {
   return [
     { id: "periodSales", icon: "shopping-bag", title: "Ventas del período", value: formatAvailableMetric(k.salesPeriod), description: "Venta general resuelta una vez por cliente y período; incluye ventas que pueden quedar fuera del cumplimiento." },
     { id: "latestSales", icon: "calendar-days", title: "Ventas del último mes", value: formatAvailableMetric(k.salesMonth), description: "Venta general cliente-período; no se duplica entre actividades." },
-    { id: "comparableSales", icon: "package-check", title: "Ventas atribuibles comparables", value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? "Ventas asociadas a actividades válidas dentro de su vigencia; se usan en cumplimiento y diferencia. " + coverage : "No existen actividades con ventas atribuibles dentro de una vigencia válida. " + coverage },
+    { id: "comparableSales", icon: "package-check", title: "Ventas comparables", value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? "Ventas totales de clientes asociadas a actividades válidas dentro de su vigencia; se usan en cumplimiento y diferencia. " + coverage : "No existen actividades con ventas totales comparables dentro de una vigencia válida. " + coverage },
     { id: "monthlyObjectives", icon: "target", title: "Objetivo mensual de las actividades", value: formatAvailableMetric(comparableObjective), description: "Suma una vez los objetivos de las actividades comparables." },
-    { id: "activityCompliance", icon: "gauge", title: "Cumplimiento de las actividades", value: formatAvailablePercent(k.compliance), description: "Ventas atribuibles comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
-    { id: "objectiveDifference", icon: difference.icon, title: "Diferencia atribuible frente al objetivo", value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: "Ventas atribuibles comparables menos objetivos comparables.", className: difference.className, status: difference.label },
+    { id: "activityCompliance", icon: "gauge", title: "Cumplimiento de las actividades", value: formatAvailablePercent(k.compliance), description: "Ventas totales comparables divididas por los objetivos comparables; no promedia porcentajes. " + coverage, className: compliance.className, status: compliance.label },
+    { id: "objectiveDifference", icon: difference.icon, title: "Diferencia frente al objetivo", value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: "Ventas totales comparables menos objetivos comparables.", className: difference.className, status: difference.label },
     { id: "withoutSales", icon: "package-x", title: "Presentaciones sin ventas", value: formatInteger(k.presentationsWithoutSales), description: buildWithoutSalesKpiDescription(k) + " · Haz clic para explorar por categoría.", className: "kpi-attention kpi-secondary", action: "open-no-sales-explorer", actionLabel: "Explorar presentaciones sin ventas" },
     { id: "activeNegotiations", icon: "calendar-check", title: "Negociaciones vigentes", value: formatInteger(k.activeNegotiations), description: "Actividades únicas vigentes a la fecha actual.", className: "kpi-secondary" }
   ];
@@ -2434,7 +2504,7 @@ function buildActivitySalesKpi(activity, k, shared, clientSelected) {
     id: "activitySales", icon: shared ? "package-check" : "shopping-bag",
     title: contractOnly ? "Ventas históricas relacionadas" : shared ? "Ventas conjuntas de la actividad" : clientSelected ? "Ventas del cliente" : "Ventas de la actividad",
     value: formatAvailableMetric(contractOnly ? k.salesPeriod : activity.totalSales),
-    description: contractOnly ? "Ventas históricas visibles; el objetivo aún no es comparable con el período." : shared ? "Ventas conjuntas atribuibles utilizadas en el cumplimiento de la actividad." : "Ventas atribuibles comparables utilizadas en el cumplimiento de la actividad."
+    description: contractOnly ? "Ventas históricas visibles; el objetivo aún no es comparable con el período." : shared ? "Ventas totales conjuntas utilizadas en el cumplimiento de la actividad." : "Venta total comparable utilizada en el cumplimiento de la actividad."
   };
 }
 function buildObjectiveKpi(activity, clientContext) {
@@ -2464,6 +2534,7 @@ function getNonComparableDescription(activity) {
   if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return "La actividad aún no había iniciado en el período analizado.";
   if (activity.status === "OBJETIVO_CONFLICTIVO") return "No se calcula porque el objetivo mensual es conflictivo.";
   if (activity.status === "SIN_OBJETIVO") return "No se calcula porque falta un objetivo mensual válido.";
+  if (activity.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD") return "No se calcula por actividad porque la venta total del cliente requiere una regla verificable de distribución.";
   if (activity.status === "VENTA_ACTIVIDAD_AMBIGUA") return "No se calcula porque la venta atribuible de la actividad es ambigua.";
   return "La actividad no es comparable con la información disponible.";
 }
@@ -2815,7 +2886,10 @@ function buildTimelinePeriodModel(period, activities, performanceLookup, clientS
     if (clientSale && isFiniteNumber(clientSale.value)) { sales = clientSale.value; salesSource = "TOTAL_VENTA_CLIENTE_PERIODO"; }
   } else if (singleActivity && singleActivity.objectiveStatus === "OBJETIVO_CONFLICTIVO") temporalStatus = "OBJETIVO_CONFLICTIVO";
   else if (singleActivity && singleActivity.objectiveStatus !== "OK") temporalStatus = "SIN_OBJETIVO";
-  else if (performance && (performance.status === "VENTA_ACTIVIDAD_AMBIGUA" || performance.status === "VENTA_CONFLICTIVA")) {
+  else if (performance && performance.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD") {
+    temporalStatus = "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
+    ambiguityStatus = performance.status;
+  } else if (performance && (performance.status === "VENTA_ACTIVIDAD_AMBIGUA" || performance.status === "VENTA_CONFLICTIVA")) {
     temporalStatus = "VENTA_ACTIVIDAD_AMBIGUA";
     ambiguityStatus = performance.status;
   } else if (performance && performance.comparable) {
@@ -2852,6 +2926,7 @@ function buildTimelineTooltip(period) {
     PERIODO_COMPARABLE: "Actividad vigente",
     VIGENTE_SIN_VENTA_ATRIBUIBLE: "Vigente sin venta atribuible",
     VENTA_ACTIVIDAD_AMBIGUA: "Venta no atribuible con certeza",
+    REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "Requiere distribución multiactividad",
     POSTERIOR_AL_FIN: "Posterior al fin de la actividad",
     FECHAS_CONFLICTIVAS: "Fechas conflictivas",
     SIN_OBJETIVO: "Sin objetivo",
@@ -3109,7 +3184,7 @@ function buildNegotiationTimelineOption(model) {
   const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const colors = {
     HISTORICO_PREVIO: "#64748b", PERIODO_COMPARABLE: "#0d9488", POSTERIOR_AL_FIN: "#94a3b8",
-    VIGENTE_SIN_VENTA_ATRIBUIBLE: "#cbd5e1", VENTA_ACTIVIDAD_AMBIGUA: "#f59e0b",
+    VIGENTE_SIN_VENTA_ATRIBUIBLE: "#cbd5e1", VENTA_ACTIVIDAD_AMBIGUA: "#f59e0b", REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "#f59e0b",
     SIN_OBJETIVO: "#60a5fa", OBJETIVO_CONFLICTIVO: "#f59e0b", SIN_INFORMACION: "#cbd5e1"
   };
   const dataZoom = labels.length > 12 ? [
@@ -3189,7 +3264,7 @@ function buildTimelineConflictMarkup(activity) {
   return '<div class="timeline-conflict"><i data-lucide="triangle-alert"></i><div><strong>No se puede construir una línea de tiempo confiable.</strong><p>La actividad ' + escapeHtml(activity.activityId) + ' contiene más de una combinación de fechas de inicio o finalización. No se dibuja una banda falsa.</p></div></div>';
 }
 function formatTimelineStatusLabel(status) {
-  const labels = { HISTORICO_PREVIO: "Histórico previo · no participa en cumplimiento", PERIODO_COMPARABLE: "Período comparable", VIGENTE_SIN_VENTA_ATRIBUIBLE: "Vigente sin venta atribuible", VENTA_ACTIVIDAD_AMBIGUA: "Venta ambigua", POSTERIOR_AL_FIN: "Posterior al fin", FECHAS_CONFLICTIVAS: "Fechas conflictivas", SIN_OBJETIVO: "Sin objetivo", OBJETIVO_CONFLICTIVO: "Objetivo conflictivo", SIN_INFORMACION: "Sin información" };
+  const labels = { HISTORICO_PREVIO: "Histórico previo · no participa en cumplimiento", PERIODO_COMPARABLE: "Período comparable", VIGENTE_SIN_VENTA_ATRIBUIBLE: "Vigente sin venta atribuible", VENTA_ACTIVIDAD_AMBIGUA: "Venta ambigua", REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "Requiere distribución multiactividad", POSTERIOR_AL_FIN: "Posterior al fin", FECHAS_CONFLICTIVAS: "Fechas conflictivas", SIN_OBJETIVO: "Sin objetivo", OBJETIVO_CONFLICTIVO: "Objetivo conflictivo", SIN_INFORMACION: "Sin información" };
   return labels[status] || status;
 }
 function renderRegisteredChart(id, analysis) {
@@ -3916,7 +3991,7 @@ function navigateModalBack() {
   const overlay = document.getElementById("detailExplorerOverlay");
   const dialog = document.getElementById("detailExplorerDialog");
   if (overlay) overlay.hidden = false;
-  if (dialog && dialog.dataset) dialog.dataset.layout = state.detailExplorer.config && state.detailExplorer.config.compact ? "compact" : "standard";
+  if (dialog && dialog.dataset) dialog.dataset.layout = state.detailExplorer.config && state.detailExplorer.config.compact ? "compact" : state.detailExplorer.config && state.detailExplorer.config.wide ? "wide" : "standard";
   const restoreModalView = function () { restoreModalScrollState(snapshot.scroll || {}); if (dialog && dialog.focus) dialog.focus(); };
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(restoreModalView); else restoreModalView();
 }
@@ -4188,7 +4263,7 @@ function openDetailExplorer(config, opener, options) {
   const overlay = document.getElementById("detailExplorerOverlay");
   const dialog = document.getElementById("detailExplorerDialog");
   if (overlay) overlay.hidden = false;
-  if (dialog && dialog.dataset) dialog.dataset.layout = config.compact ? "compact" : "standard";
+  if (dialog && dialog.dataset) dialog.dataset.layout = config.compact ? "compact" : config.wide ? "wide" : "standard";
   if (!wasOpen) lockPageScroll();
   if (!options.skipFocus && dialog && dialog.focus) dialog.focus();
 }
@@ -4414,6 +4489,7 @@ function buildClientTrackingDetailConfig(detailModelOrRow) {
     trackingRow: row,
     trackingDetailModel: detailModel,
     compact: false,
+    wide: true,
     standaloneDetail: true,
     title: "Cliente " + row.clientSap + " · Actividad " + row.activityId,
     subtitle: "DETALLE CLIENTE–NEGOCIACIÓN",
@@ -4431,17 +4507,17 @@ function renderClientTrackingDetail() {
   const detailModel = state.detailExplorer.config && state.detailExplorer.config.trackingDetailModel;
   const row = detailModel && detailModel.row;
   if (!body || !row) return;
-  const contribution = row.accumulatedAttributableSales;
+  const contribution = row.accumulatedGeneralSales;
   const joint = row.accumulatedComparableSales;
   const participation = row.isSharedActivity && isFiniteNumber(contribution) && isFiniteNumber(joint) && joint !== 0 ? contribution / joint : null;
   const monthlyRows = detailModel.periods.map(function (period) {
     const discountDisplay = period.monthlyDiscountStatus === "DESCUENTO_MENSUAL_CONFLICTIVO" ? "Revisar" : isFiniteNumber(period.monthlyDiscount) ? formatRatioPercent(period.monthlyDiscount) : "No disponible";
-    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.attributableSales)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
+    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.negotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.nonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.negotiatedShare)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.nonNegotiatedShare)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key])) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(isFiniteNumber(period.comparableSales) && period.comparableSales !== 0 && isFiniteNumber(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key]) ? row.clientContributionSalesByMonth[period.key] / period.comparableSales : null)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
   }).join("");
   const warnings = (row.warnings || []).length ? "<section class=\\"detail-section\\"><h3>Advertencias analíticas</h3><div class=\\"extra-columns\\">" + row.warnings.map(function (warning) { return "<span class=\\"extra-chip\\">" + escapeHtml(formatClientTrackingWarning(warning)) + "</span>"; }).join("") + "</div></section>" : "";
   const sharedFields = row.isSharedActivity ? [
-    { label: "Aporte atribuible del cliente", value: formatAvailableMetric(contribution) },
-    { label: "Venta conjunta comparable", value: formatAvailableMetric(joint) },
+    { label: "Aporte total del cliente", value: formatAvailableMetric(contribution) },
+    { label: "Venta total conjunta", value: formatAvailableMetric(joint) },
     { label: "Participación del cliente", value: formatAvailablePercent(participation) },
     { label: "Estado conjunto", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus) }
   ] : [];
@@ -4460,7 +4536,7 @@ function renderClientTrackingDetail() {
     ] },
     { title: row.isSharedActivity ? "Acumulado conjunto y aporte del cliente" : "Acumulado", fields: sharedFields.concat([
       { label: "Ventas generales acumuladas", value: formatAvailableMetric(row.accumulatedGeneralSales) },
-      { label: "Ventas atribuibles acumuladas", value: formatAvailableMetric(row.accumulatedAttributableSales) },
+      { label: "Venta de presentaciones negociadas acumulada", value: formatAvailableMetric(row.accumulatedAttributableSales) },
       { label: "Numerador comparable acumulado", value: formatAvailableMetric(row.accumulatedComparableSales) },
       { label: "Objetivo total", value: formatAvailableMetric(row.totalObjective) }, { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress) },
       { label: "Diferencia frente al objetivo total", value: isFiniteNumber(row.totalDifference) ? formatSignedNumber(row.totalDifference) : "No disponible" },
@@ -4471,7 +4547,7 @@ function renderClientTrackingDetail() {
   const identificationMarkup = sections.slice(0, 2).map(renderSection).join("");
   const accumulatedMarkup = renderSection(sections[2]);
   const sharedAction = row.isSharedActivity ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-open-contribution\\"><i data-lucide=\\"users\\"></i> Ver contribución</button>" : "";
-  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\"><strong>Venta general del cliente ≠ venta atribuible de la negociación.</strong> El cumplimiento usa la venta atribuible comparable; en actividades compartidas usa la venta conjunta.</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> Ver cliente</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> Ver negociación</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> Descargar detalle CSV</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>Información mensual</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr><th scope=\\"col\\">Período</th><th scope=\\"col\\">Venta general cliente</th><th scope=\\"col\\">Venta atribuible</th>" + (row.isSharedActivity ? "<th scope=\\"col\\">Venta conjunta negociación</th>" : "") + "<th scope=\\"col\\">% descuento mes</th><th scope=\\"col\\">Cumplimiento mes</th><th scope=\\"col\\">Estado mes</th></tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
+  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\"><strong>El cumplimiento utiliza toda la venta del cliente durante la vigencia.</strong> La composición indica cuánto provino de presentaciones negociadas y no negociadas; ambas participan en el cumplimiento.</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> Ver cliente</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> Ver negociación</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> Descargar detalle CSV</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>Información mensual</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr><th scope=\\"col\\">Período</th><th scope=\\"col\\">Venta total del cliente</th><th scope=\\"col\\">Venta de presentaciones negociadas</th><th scope=\\"col\\">Venta de presentaciones no negociadas</th><th scope=\\"col\\">% venta negociada</th><th scope=\\"col\\">% venta no negociada</th>" + (row.isSharedActivity ? "<th scope=\\"col\\">Venta total conjunta</th><th scope=\\"col\\">Venta negociada conjunta</th><th scope=\\"col\\">Venta no negociada conjunta</th><th scope=\\"col\\">Aporte total del cliente</th><th scope=\\"col\\">Participación del cliente</th>" : "") + "<th scope=\\"col\\">Dcto. mes</th><th scope=\\"col\\">Objetivo mensual</th><th scope=\\"col\\">Cumplimiento mensual</th><th scope=\\"col\\">Estado mensual</th></tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
 }
 function navigateFromClientTrackingDetail(action) {
   const row = state.detailExplorer.config && state.detailExplorer.config.trackingRow;
@@ -4736,12 +4812,14 @@ function buildActivityClientMetadata(activityId) {
 function getActivityContributionEmptyMessage(activity) {
   if (!activity.associatedClientCount) return "La actividad no tiene clientes asociados válidos.";
   if (activity.status === "VENTA_ACTIVIDAD_AMBIGUA") return "La contribución no puede calcularse porque la venta es ambigua.";
+  if (activity.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD") return "La contribución requiere una regla verificable de distribución entre actividades.";
   if (activity.status === "FECHAS_CONFLICTIVAS") return "La actividad tiene fechas conflictivas.";
   if (!activity.contributionRows.some(function (row) { return isFiniteNumber(row.sales); })) return "No existe información atribuible para el período seleccionado.";
   return "No hay contribuciones atribuibles para esta actividad.";
 }
 function getActivityContributionNotice(activity) {
   if (activity.status === "VENTA_ACTIVIDAD_AMBIGUA") return "La contribución no puede calcularse porque la venta es ambigua.";
+  if (activity.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD") return "La contribución requiere una regla verificable de distribución entre actividades.";
   if (activity.status === "FECHAS_CONFLICTIVAS") return "La actividad tiene fechas conflictivas.";
   if (!activity.contributionRows.some(function (row) { return isFiniteNumber(row.sales); })) return "No existe información atribuible para el período seleccionado.";
   return "";
@@ -5445,15 +5523,28 @@ function buildClientTrackingSummaryCsv(rows, periods, selectedPeriod) {
     ["Región", function (row) { return row.region; }], ["CEDI", function (row) { return row.cedi; }], ["CodSAP", function (row) { return row.clientSap; }],
     ["Nombre", function (row) { return row.clientName; }], ["NIT", function (row) { return row.clientNit; }], ["ID Actividad", function (row) { return row.activityId; }],
     ["Tipo de negociación", function (row) { return row.isSharedActivity ? "Compartida" : "Individual"; }],
-    ["Objetivo mes", function (row) { return row.monthlyObjective; }], ["Venta atribuible del mes", function (row) { return getClientTrackingComparableSales(row, selectedPeriod && selectedPeriod.key); }],
-    ["Cumplimiento del mes", function (row) { return formatAvailablePercent(row.selectedMonthlyCompliance); }], ["Ventas generales acumuladas", function (row) { return row.accumulatedGeneralSales; }],
+    ["Venta total del cliente", function (row) { return row.salesByMonth && row.salesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    ["Venta comparable del mes", function (row) { return getClientTrackingComparableSales(row, selectedPeriod && selectedPeriod.key); }],
+    ["Venta de presentaciones negociadas", function (row) { return row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    ["Venta de presentaciones no negociadas", function (row) { return row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[selectedPeriod && selectedPeriod.key]; }],
+    ["Porcentaje de venta negociada", function (row) { return formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
+    ["Porcentaje de venta no negociada", function (row) { return formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[selectedPeriod && selectedPeriod.key]); }],
+    ["Objetivo mensual", function (row) { return row.monthlyObjective; }],
+    ["Cumplimiento mensual", function (row) { return formatAvailablePercent(row.selectedMonthlyCompliance); }],
+    ["Diferencia mensual", function (row) { return row.monthlyDifferenceByMonth && row.monthlyDifferenceByMonth[selectedPeriod && selectedPeriod.key]; }],
+    ["Estado mensual", function (row) { return formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus); }],
+    ["Ventas generales acumuladas", function (row) { return row.accumulatedGeneralSales; }],
     ["Ventas atribuibles acumuladas", function (row) { return row.accumulatedComparableSales; }], ["Objetivo total", function (row) { return row.totalObjective; }],
     ["Avance objetivo total", function (row) { return formatAvailablePercent(row.totalProgress); }], ["Diferencia objetivo total", function (row) { return row.totalDifference; }],
     ["% inversión", function (row) { return formatAvailablePercent(row.investmentPercentage); }], ["% descuento negociación", function (row) { return formatNegotiationDiscountSummary(row.negotiationDiscount); }]
   ];
   const dynamicColumns = [];
   (periods || []).forEach(function (period) {
-    dynamicColumns.push(["Venta " + period.label, function (row) { return getClientTrackingComparableSales(row, period.key); }]);
+    dynamicColumns.push(["Venta total " + period.label, function (row) { return row.salesByMonth && row.salesByMonth[period.key]; }]);
+    dynamicColumns.push(["Venta negociada " + period.label, function (row) { return row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[period.key]; }]);
+    dynamicColumns.push(["% negociada " + period.label, function (row) { return formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[period.key]); }]);
+    dynamicColumns.push(["Venta no negociada " + period.label, function (row) { return row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[period.key]; }]);
+    dynamicColumns.push(["% no negociada " + period.label, function (row) { return formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[period.key]); }]);
     dynamicColumns.push(["Dcto. " + period.label, function (row) { return getClientTrackingMonthlyDiscountDisplay(row, period.key); }]);
     dynamicColumns.push(["Cumplimiento " + period.label, function (row) { return formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]); }]);
     dynamicColumns.push(["Estado " + period.label, function (row) { return formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key]); }]);
@@ -5481,17 +5572,37 @@ function buildClientTrackingDetailCsv(row, periods) {
     ["Fecha inicio", formatClientTrackingDate(row.startDate)], ["Fecha fin", formatClientTrackingDate(row.endDate)], ["Estado fechas", formatClientTrackingWarning(row.dateStatus)],
     ["Objetivo mensual", row.monthlyObjective], ["Objetivo total", row.totalObjective], ["Período negociación", row.negotiationPeriod],
     ["% inversión", formatAvailablePercent(row.investmentPercentage)], ["% descuento negociación", formatNegotiationDiscountSummary(row.negotiationDiscount)],
-    ["Ventas generales acumuladas", row.accumulatedGeneralSales], ["Aporte atribuible acumulado del cliente", row.accumulatedAttributableSales],
+    ["Ventas generales acumuladas", row.accumulatedGeneralSales], ["Venta negociada acumulada del cliente", row.accumulatedAttributableSales],
     ["Venta comparable acumulada de la negociación", row.accumulatedComparableSales], ["Avance objetivo total", formatAvailablePercent(row.totalProgress)], ["Diferencia objetivo total", row.totalDifference],
     ["Estado objetivo total", formatClientTrackingTotalStatus(row.totalObjectiveStatus)], ["Advertencias", (row.warnings || []).map(formatClientTrackingWarning).join(" | ") || "Ninguna"]
   ];
   const lines = ["\uFEFF" + ["Campo", "Valor"].map(function (value) { return serializeCsvCell(value, value); }).join(",")]
     .concat(metadata.map(function (item) { return serializeCsvCell(item[0], item[0]) + "," + serializeCsvCell(item[1] === null || item[1] === undefined || item[1] === "" ? "No disponible" : item[1], item[1]); }));
   lines.push("");
-  const headers = ["Período", "Venta general del cliente", "Aporte atribuible del cliente", "Venta comparable de la negociación", "% descuento mes", "Cumplimiento mes", "Estado mes"];
+  const headers = ["Período", "Venta total del cliente", "Venta comparable del mes", "Venta de presentaciones negociadas", "Venta de presentaciones no negociadas", "Porcentaje de venta negociada", "Porcentaje de venta no negociada", "Dcto. mes", "Objetivo mensual", "Cumplimiento mensual", "Diferencia mensual", "Estado mensual"];
+  if (row.isSharedActivity) headers.push("Venta total conjunta", "Venta negociada conjunta", "Venta no negociada conjunta", "Aporte total del cliente", "Participación del cliente");
   lines.push(headers.map(function (value) { return serializeCsvCell(value, value); }).join(","));
   (periods || []).forEach(function (period) {
-    const values = [period.label, row.salesByMonth && row.salesByMonth[period.key], row.attributableSalesByMonth && row.attributableSalesByMonth[period.key], getClientTrackingComparableSales(row, period.key), getClientTrackingMonthlyDiscountDisplay(row, period.key), formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]), formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key])];
+    const comparable = getClientTrackingComparableSales(row, period.key);
+    const contribution = row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key];
+    const values = [
+      period.label, row.salesByMonth && row.salesByMonth[period.key], comparable,
+      row.negotiatedPresentationSalesByMonth && row.negotiatedPresentationSalesByMonth[period.key],
+      row.nonNegotiatedPresentationSalesByMonth && row.nonNegotiatedPresentationSalesByMonth[period.key],
+      formatAvailablePercent(row.negotiatedSalesShareByMonth && row.negotiatedSalesShareByMonth[period.key]),
+      formatAvailablePercent(row.nonNegotiatedSalesShareByMonth && row.nonNegotiatedSalesShareByMonth[period.key]),
+      getClientTrackingMonthlyDiscountDisplay(row, period.key),
+      row.monthlyObjective, formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]),
+      row.monthlyDifferenceByMonth && row.monthlyDifferenceByMonth[period.key],
+      formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key])
+    ];
+    if (row.isSharedActivity) values.push(
+      row.jointActivitySalesByMonth && row.jointActivitySalesByMonth[period.key],
+      row.jointNegotiatedPresentationSalesByMonth && row.jointNegotiatedPresentationSalesByMonth[period.key],
+      row.jointNonNegotiatedPresentationSalesByMonth && row.jointNonNegotiatedPresentationSalesByMonth[period.key],
+      contribution,
+      formatAvailablePercent(isFiniteNumber(comparable) && comparable !== 0 && isFiniteNumber(contribution) ? contribution / comparable : null)
+    );
     lines.push(values.map(function (value) { const safe = value === null || value === undefined || value === "" ? "No disponible" : value; return serializeCsvCell(safe, safe); }).join(","));
   });
   return lines.join("\\n");
@@ -5806,22 +5917,27 @@ function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivit
         if (clientSale && clientSale.status === "CONFLICTO") status = "VENTA_CONFLICTIVA";
         else if (activeActivities.size <= 1 && clientSale && isFiniteNumber(clientSale.value)) {
           sales = clientSale.value; status = "OK"; source = "TOTAL_VENTA_CLIENTE_PERIODO";
-        } else if (activeActivities.size > 1 && granular && granular.status === "OK") {
-          sales = granular.value; status = "OK"; source = "VENTAS_FISICAS_ACTIVIDAD";
-        } else if (activeActivities.size > 1 && clientSale && clientSale.value === 0) {
-          sales = 0; status = "OK"; source = "TOTAL_VENTA_CERO";
-        } else if (activeActivities.size > 1) status = granular && granular.status === "VENTA_CONFLICTIVA" ? "VENTA_CONFLICTIVA" : "VENTA_ACTIVIDAD_AMBIGUA";
-        return { clientId: clientId, clientName: relations.clientNames.get(clientId) || "", sales: sales, status: status, source: source, activeActivityCount: activeActivities.size, presentationCount: granular ? granular.presentationCount : 0, share: null, rank: null };
+        } else if (activeActivities.size > 1) status = "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
+        return {
+          clientId: clientId, clientName: relations.clientNames.get(clientId) || "", sales: sales,
+          totalClientSales: clientSale && isFiniteNumber(clientSale.value) ? clientSale.value : null,
+          negotiatedPresentationSales: granular && granular.status === "OK" ? granular.value : null,
+          status: status, source: source, activeActivityCount: activeActivities.size,
+          presentationCount: granular ? granular.presentationCount : 0, share: null, rank: null
+        };
       });
       const invalidContribution = contributionRows.find(function (item) { return item.status !== "OK"; });
       const totalSales = invalidContribution ? null : contributionRows.reduce(function (sum, item) { return sum + item.sales; }, 0);
       const attributedSales = contributionRows.reduce(function (sum, item) { return sum + (isFiniteNumber(item.sales) ? item.sales : 0); }, 0);
+      const negotiatedSales = contributionRows.every(function (item) { return isFiniteNumber(item.negotiatedPresentationSales); })
+        ? contributionRows.reduce(function (sum, item) { return sum + item.negotiatedPresentationSales; }, 0)
+        : null;
       let status = "OK";
       if (objective.dateStatus !== "OK") status = "FECHAS_CONFLICTIVAS";
       else if (objective.objectiveStatus === "OBJETIVO_CONFLICTIVO") status = "OBJETIVO_CONFLICTIVO";
       else if (objective.objectiveStatus !== "OK") status = "SIN_OBJETIVO";
       else if (contributionRows.some(function (item) { return item.status === "VENTA_CONFLICTIVA"; })) status = "VENTA_CONFLICTIVA";
-      else if (contributionRows.some(function (item) { return item.status === "VENTA_ACTIVIDAD_AMBIGUA"; })) status = "VENTA_ACTIVIDAD_AMBIGUA";
+      else if (contributionRows.some(function (item) { return item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD"; })) status = "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
       else if (contributionRows.some(function (item) { return item.status === "SIN_VENTAS"; })) status = "SIN_VENTAS";
       if (isFiniteNumber(totalSales) && totalSales > 0) assignContributionRanks(contributionRows, totalSales);
       const comparable = status === "OK" && isFiniteNumber(objective.objectiveMonthly) && objective.objectiveMonthly > 0;
@@ -5829,7 +5945,10 @@ function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivit
         activityId: objective.activityId, period: period, isSharedActivity: associatedClientIds.length > 1,
         associatedClientCount: associatedClientIds.length, associatedClientIds: associatedClientIds,
         objectiveMonthly: objective.objectiveMonthly, objectiveStatus: objective.objectiveStatus, objectiveTotal: objective.objectiveTotal,
-        totalSales: totalSales, attributedSales: attributedSales, salesStatus: invalidContribution ? invalidContribution.status : "OK",
+        totalSales: totalSales, attributedSales: attributedSales,
+        negotiatedPresentationSales: negotiatedSales,
+        nonNegotiatedPresentationSales: isFiniteNumber(totalSales) && isFiniteNumber(negotiatedSales) ? totalSales - negotiatedSales : null,
+        salesStatus: invalidContribution ? invalidContribution.status : "OK",
         achievement: comparable ? totalSales / objective.objectiveMonthly : null, gap: comparable ? totalSales - objective.objectiveMonthly : null,
         comparable: comparable, status: status,
         ambiguityReasons: contributionRows.filter(function (item) { return item.status !== "OK"; }).map(function (item) { return item.clientId + ": " + item.status; }),
@@ -5946,7 +6065,7 @@ function formatActivityStatus(status) {
   const labels = {
     OK: "Comparable", SIN_OBJETIVO: "Sin objetivo", SIN_VENTAS: "Sin ventas atribuibles",
     OBJETIVO_CONFLICTIVO: "Objetivo conflictivo", VENTA_CONFLICTIVA: "Venta conflictiva",
-    VENTA_ACTIVIDAD_AMBIGUA: "Venta de actividad ambigua", FECHAS_CONFLICTIVAS: "Fechas conflictivas",
+    VENTA_ACTIVIDAD_AMBIGUA: "Venta de actividad ambigua", REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "Requiere distribución multiactividad", FECHAS_CONFLICTIVAS: "Fechas conflictivas",
     ACTIVIDAD_AUN_NO_INICIADA: "Actividad aún no iniciada",
     SIN_ACTIVIDAD_COMPARABLE_EN_PERIODO: "Sin actividad comparable en el período"
   };

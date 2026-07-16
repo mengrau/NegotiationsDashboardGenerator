@@ -2,6 +2,12 @@
 
 Este documento registra la auditoría previa al rediseño. Las reglas no dependen del archivo de prueba: se aplican a cualquier libro que cumpla el contrato de columnas.
 
+## Regla vigente de venta comparable
+
+El numerador del cumplimiento mensual es `TotalVentaMes`, resuelto una sola vez por cliente SAP y período, siempre que la actividad esté vigente y sea evaluable. `Ventas cajas físicas (sin rep)` calcula la venta de presentaciones negociadas; la venta no negociada es la diferencia contra la venta total. Esta composición es informativa y no excluye ventas del cumplimiento.
+
+Una actividad compartida suma una sola vez la venta total de cada cliente asociado. Un cliente multiactividad usa su venta total una sola vez en el agregado contra objetivos únicos y queda sin cumplimiento individual por actividad hasta contar con una regla verificable de distribución.
+
 ## Inventario original
 
 Los KPI originales del HTML generado eran ventas del período, ventas del último mes, objetivo del mes, cumplimiento, diferencia frente al objetivo, presentaciones sin ventas y negociaciones vigentes. Clientes, presentaciones, actividades y descuento ya habían dejado de mostrarse como KPI principales, aunque seguían calculándose.

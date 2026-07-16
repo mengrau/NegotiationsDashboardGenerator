@@ -6,6 +6,8 @@ Este documento explica las reglas que implementan `resolveMetricGroups()`, `buil
 
 **Granularidad:** cliente SAP + período canónico.
 
+Durante la vigencia, `TotalVentaMes` es la venta comparable usada como numerador del cumplimiento. Incluye ventas de presentaciones negociadas y no negociadas.
+
 `TotalVentaMes` no pertenece a una presentación ni necesariamente a una actividad. `resolveMetricGroups()` agrupa todas las filas de una clave cliente-período y aplica estas reglas:
 
 | Valores encontrados | Resultado | Estado |
@@ -52,7 +54,7 @@ El caso se descubre desde el workbook y las pruebas; no está codificado como ex
 
 ## 4. Actividad individual
 
-Una actividad con un solo cliente usa la venta atribuible de ese cliente, su objetivo único, cumplimiento y diferencia. No muestra:
+Una actividad con un solo cliente usa la venta total comparable de ese cliente, su objetivo único, cumplimiento y diferencia. No muestra:
 
 - contribución 100 %;
 - posición 1 de 1;

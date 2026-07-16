@@ -1375,21 +1375,15 @@ function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivit
           sales = clientSale.value;
           status = "OK";
           source = "TOTAL_VENTA_CLIENTE_PERIODO";
-        } else if (activeActivities.size > 1 && granular && granular.status === "OK") {
-          sales = granular.value;
-          status = "OK";
-          source = "VENTAS_FISICAS_ACTIVIDAD";
-        } else if (activeActivities.size > 1 && clientSale && clientSale.value === 0) {
-          sales = 0;
-          status = "OK";
-          source = "TOTAL_VENTA_CERO";
         } else if (activeActivities.size > 1) {
-          status = granular && granular.status === "VENTA_CONFLICTIVA" ? "VENTA_CONFLICTIVA" : "VENTA_ACTIVIDAD_AMBIGUA";
+          status = "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
         }
         return {
           clientId,
           clientName: relations.clientNames.get(clientId) || "",
           sales,
+          totalClientSales: clientSale && isFiniteMetric(clientSale.value) ? clientSale.value : null,
+          negotiatedPresentationSales: granular && granular.status === "OK" ? granular.value : null,
           status,
           source,
           activeActivityCount: activeActivities.size,
@@ -1401,13 +1395,16 @@ function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivit
       const invalidContribution = contributionRows.find((item) => item.status !== "OK");
       const totalSales = invalidContribution ? null : contributionRows.reduce((sum, item) => sum + item.sales, 0);
       const attributedSales = contributionRows.reduce((sum, item) => sum + (isFiniteMetric(item.sales) ? item.sales : 0), 0);
+      const negotiatedSales = contributionRows.every((item) => isFiniteMetric(item.negotiatedPresentationSales))
+        ? contributionRows.reduce((sum, item) => sum + item.negotiatedPresentationSales, 0)
+        : null;
       let status = "OK";
       const ambiguityReasons = [];
       if (objective.dateStatus !== "OK") status = "FECHAS_CONFLICTIVAS";
       else if (objective.objectiveStatus === "OBJETIVO_CONFLICTIVO") status = "OBJETIVO_CONFLICTIVO";
       else if (objective.objectiveStatus !== "OK") status = "SIN_OBJETIVO";
       else if (contributionRows.some((item) => item.status === "VENTA_CONFLICTIVA")) status = "VENTA_CONFLICTIVA";
-      else if (contributionRows.some((item) => item.status === "VENTA_ACTIVIDAD_AMBIGUA")) status = "VENTA_ACTIVIDAD_AMBIGUA";
+      else if (contributionRows.some((item) => item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD")) status = "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
       else if (contributionRows.some((item) => item.status === "SIN_VENTAS")) status = "SIN_VENTAS";
       contributionRows.filter((item) => item.status !== "OK").forEach((item) => ambiguityReasons.push(`${item.clientId}: ${item.status}`));
       if (isFiniteMetric(totalSales) && totalSales > 0) assignContributionRanks(contributionRows, totalSales);
@@ -1423,6 +1420,8 @@ function buildActivityPerformance(rows, salesByClientPeriod, objectivesByActivit
         objectiveTotal: objective.objectiveTotal,
         totalSales,
         attributedSales,
+        negotiatedPresentationSales: negotiatedSales,
+        nonNegotiatedPresentationSales: isFiniteMetric(totalSales) && isFiniteMetric(negotiatedSales) ? totalSales - negotiatedSales : null,
         salesStatus: invalidContribution ? invalidContribution.status : "OK",
         achievement: comparable ? totalSales / objective.objectiveMonthly : null,
         gap: comparable ? totalSales - objective.objectiveMonthly : null,
@@ -1500,7 +1499,7 @@ function buildClientNegotiationModels(rows, options = {}) {
     });
   });
   const monthlyDiscounts = buildResolvedMonthlyDiscounts(sourceRows);
-  const jointSalesLookup = buildJointActivitySalesLookup(activityAnalytics.granularSalesByActivity);
+  const activityPerformanceLookup = new Map(activityAnalytics.activityPerformance.map((item) => [`${item.activityId}||${item.period}`, item]));
   const clientActivitySummary = [];
 
   relationRows.forEach((rowsForRelation, relationKey) => {
@@ -1514,6 +1513,16 @@ function buildClientNegotiationModels(rows, options = {}) {
     const salesByMonth = {};
     const attributableSalesByMonth = {};
     const jointActivitySalesByMonth = {};
+    const jointNegotiatedPresentationSalesByMonth = {};
+    const jointNonNegotiatedPresentationSalesByMonth = {};
+    const comparableSalesByMonth = {};
+    const negotiatedPresentationSalesByMonth = {};
+    const nonNegotiatedPresentationSalesByMonth = {};
+    const negotiatedSalesShareByMonth = {};
+    const nonNegotiatedSalesShareByMonth = {};
+    const compositionStatusByMonth = {};
+    const monthlyDifferenceByMonth = {};
+    const clientContributionSalesByMonth = {};
     const monthlyDiscountByMonth = {};
     const monthlyDiscountStatusByMonth = {};
     const monthlyComplianceByMonth = {};
@@ -1527,29 +1536,55 @@ function buildClientNegotiationModels(rows, options = {}) {
       if (general && isFiniteMetric(general.value)) salesByMonth[period.key] = general.value;
       else if (general && general.status === "CONFLICTO") warnings.push(`VENTA_MENSUAL_CONFLICTIVA:${period.key}`);
       const granular = activityAnalytics.granularSalesByActivity.get(`${clientSap}||${period.key}||${activityId}`);
-      if (granular && granular.status === "OK") attributableSalesByMonth[period.key] = granular.value;
+      if (granular && granular.status === "OK") {
+        attributableSalesByMonth[period.key] = granular.value;
+        negotiatedPresentationSalesByMonth[period.key] = granular.value;
+      }
       else if (granular && granular.status !== "OK") {
         warnings.push(`VENTA_ACTIVIDAD_AMBIGUA:${period.key}`);
       }
-      const joint = jointSalesLookup.get(`${activityId}||${period.key}`);
-      if (joint && joint.status === "OK") jointActivitySalesByMonth[period.key] = joint.value;
-      else if (joint && joint.status !== "OK") warnings.push(`VENTA_CONJUNTA_CONFLICTIVA:${period.key}`);
+      const performance = activityPerformanceLookup.get(`${activityId}||${period.key}`);
+      const contribution = performance && performance.contributionRows.find((item) => item.clientId === clientSap);
+      if (contribution && isFiniteMetric(contribution.totalClientSales)) clientContributionSalesByMonth[period.key] = contribution.totalClientSales;
+      if (performance && isFiniteMetric(performance.totalSales)) jointActivitySalesByMonth[period.key] = performance.totalSales;
+      if (performance && isFiniteMetric(performance.negotiatedPresentationSales)) jointNegotiatedPresentationSalesByMonth[period.key] = performance.negotiatedPresentationSales;
+      if (performance && isFiniteMetric(performance.nonNegotiatedPresentationSales)) jointNonNegotiatedPresentationSalesByMonth[period.key] = performance.nonNegotiatedPresentationSales;
       const discount = monthlyDiscounts.get(`${clientSap}||${activityId}||${period.key}`);
       monthlyDiscountStatusByMonth[period.key] = discount ? discount.status : "SIN_DATO";
       if (discount && isFiniteMetric(discount.value)) monthlyDiscountByMonth[period.key] = discount.value;
       else if (discount && discount.status === "DESCUENTO_MENSUAL_CONFLICTIVO") warnings.push(`${discount.status}:${period.key}`);
 
       const active = isActivityActiveInPeriod(objective, period.key);
-      const numerator = isSharedActivity ? jointActivitySalesByMonth[period.key] : attributableSalesByMonth[period.key];
-      const periodAttributionReliable = isSharedActivity
-        ? Boolean(joint && joint.status === "OK" && isFiniteMetric(joint.value))
-        : Boolean(granular && granular.status === "OK" && isFiniteMetric(granular.value));
+      const activeActivities = activityAnalytics.activityClientRelations.activeActivitiesByClientPeriod.get(`${clientSap}||${period.key}`) || new Set();
+      const numerator = isSharedActivity ? jointActivitySalesByMonth[period.key] : salesByMonth[period.key];
+      const periodAttributionReliable = Boolean(performance && performance.status === "OK" && isFiniteMetric(numerator) && activeActivities.size <= 1);
       const comparable = active && objective.dateStatus === "OK" && objective.objectiveStatus === "OK" && objective.objectiveMonthly > 0 && isFiniteMetric(numerator) && periodAttributionReliable;
       const compliance = comparable ? numerator / objective.objectiveMonthly : null;
+      if (comparable) comparableSalesByMonth[period.key] = numerator;
+      monthlyDifferenceByMonth[period.key] = comparable ? numerator - objective.objectiveMonthly : null;
       monthlyComplianceByMonth[period.key] = compliance;
       monthlyStatusByMonth[period.key] = !comparable ? "NO_EVALUABLE_MES" : compliance >= 1 ? "CUMPLE_MES" : "NO_CUMPLE_MES";
       if (comparable) comparableSales.push(numerator);
       if (active && !comparable) hasUnreliableActivePeriod = true;
+      if (activeActivities.size > 1) warnings.push(`REQUIERE_DISTRIBUCION_MULTIACTIVIDAD:${period.key}`);
+
+      const totalClientSales = salesByMonth[period.key];
+      const negotiatedSales = negotiatedPresentationSalesByMonth[period.key];
+      if (isFiniteMetric(totalClientSales) && isFiniteMetric(negotiatedSales)) {
+        nonNegotiatedPresentationSalesByMonth[period.key] = totalClientSales - negotiatedSales;
+        if (negotiatedSales > totalClientSales + 1e-9) {
+          compositionStatusByMonth[period.key] = "DESCUADRE_COMPOSICION_VENTA";
+          warnings.push(`DESCUADRE_COMPOSICION_VENTA:${period.key}`);
+        } else {
+          compositionStatusByMonth[period.key] = totalClientSales === 0 ? "PORCENTAJES_NO_DISPONIBLES" : "OK";
+        }
+        negotiatedSalesShareByMonth[period.key] = totalClientSales !== 0 ? negotiatedSales / totalClientSales : null;
+        nonNegotiatedSalesShareByMonth[period.key] = totalClientSales !== 0 ? (totalClientSales - negotiatedSales) / totalClientSales : null;
+      } else {
+        compositionStatusByMonth[period.key] = "COMPOSICION_NO_DISPONIBLE";
+        negotiatedSalesShareByMonth[period.key] = null;
+        nonNegotiatedSalesShareByMonth[period.key] = null;
+      }
     });
 
     const accumulatedGeneralSales = sumFiniteObjectValues(salesByMonth);
@@ -1607,8 +1642,19 @@ function buildClientNegotiationModels(rows, options = {}) {
       negotiationDiscount: settings.negotiationDiscount || buildNegotiationDiscountSummary([]),
       negotiationDiscountStatus: settings.negotiationDiscount ? settings.negotiationDiscount.status : "SIN_DATO",
       salesByMonth,
+      totalClientSalesByMonth: salesByMonth,
       attributableSalesByMonth,
+      negotiatedPresentationSalesByMonth,
+      nonNegotiatedPresentationSalesByMonth,
+      negotiatedSalesShareByMonth,
+      nonNegotiatedSalesShareByMonth,
+      compositionStatusByMonth,
+      comparableSalesByMonth,
+      monthlyDifferenceByMonth,
+      clientContributionSalesByMonth,
       jointActivitySalesByMonth,
+      jointNegotiatedPresentationSalesByMonth,
+      jointNonNegotiatedPresentationSalesByMonth,
       monthlyDiscountByMonth,
       monthlyDiscountStatusByMonth,
       accumulatedGeneralSales,
@@ -1788,13 +1834,13 @@ function buildClientSummaryFromRelations(relations, availablePeriods, selectedSt
       if (sales.length) salesByMonth[period.key] = sales[0];
       const discounts = Array.from(new Set(clientRelations.map((row) => row.monthlyDiscountByMonth[period.key]).filter(isFiniteMetric)));
       monthlyDiscountByMonth[period.key] = !discounts.length ? null : discounts.length === 1 ? discounts[0] : "VARIOS";
-      const allEvaluable = clientRelations.length > 0 && clientRelations.every((row) => row.monthlyStatusByMonth[period.key] !== "NO_EVALUABLE_MES");
-      const comparableSales = clientRelations.reduce((sum, row) => {
-        const value = row.isSharedActivity ? row.jointActivitySalesByMonth[period.key] : row.attributableSalesByMonth[period.key];
-        return sum + (isFiniteMetric(value) ? value : 0);
-      }, 0);
-      const comparableObjective = clientRelations.reduce((sum, row) => sum + (isFiniteMetric(row.monthlyObjective) ? row.monthlyObjective : 0), 0);
-      const compliance = allEvaluable && comparableObjective > 0 ? comparableSales / comparableObjective : null;
+      const activeRelations = clientRelations.filter((row) => isActivityActiveInPeriod({
+        dateStatus: row.dateStatus, startDate: row.startDate, endDate: row.endDate
+      }, period.key));
+      const allEvaluable = activeRelations.length > 0 && activeRelations.every((row) => row.dateStatus === "OK" && row.monthlyObjectiveStatus === "OK" && isFiniteMetric(row.monthlyObjective));
+      const comparableSales = sales.length ? sales[0] : null;
+      const comparableObjective = activeRelations.reduce((sum, row) => sum + (isFiniteMetric(row.monthlyObjective) ? row.monthlyObjective : 0), 0);
+      const compliance = allEvaluable && isFiniteMetric(comparableSales) && comparableObjective > 0 ? comparableSales / comparableObjective : null;
       monthlyComplianceByMonth[period.key] = compliance;
       monthlyStatusByMonth[period.key] = !isFiniteMetric(compliance) ? "NO_EVALUABLE_MES" : compliance >= 1 ? "CUMPLE_MES" : "NO_CUMPLE_MES";
     });
@@ -1851,11 +1897,15 @@ function buildSummaryTableColumns(availablePeriods, selectedStatusPeriod) {
     ["clientName", "Nombre del cliente"], ["activityId", "ID Actividad"], ["negotiationType", "Tipo de negociación"],
     ["monthlyObjective", "Objetivo mes"], ["totalObjective", "Objetivo total"], ["investmentPercentage", "% de inversión"],
     ["negotiationDiscount", "% descuento negociación"], ["accumulatedGeneralSales", "Ventas acumuladas"],
-    ["accumulatedComparableSales", "Ventas acumuladas atribuibles"], ["totalProgress", "Avance objetivo total"],
+    ["accumulatedComparableSales", "Ventas comparables acumuladas"], ["totalProgress", "Avance objetivo total"],
     ["totalObjectiveStatus", "Estado objetivo total"], ["totalDifference", "Diferencia frente al objetivo total"]
   ].map(([id, label]) => ({ id, label, kind: "base" }));
   availablePeriods.forEach((period) => {
-    base.push({ id: `sales_${period.key}`, label: `Venta ${period.label}`, kind: "periodSales", periodKey: period.key });
+    base.push({ id: `sales_${period.key}`, label: `Venta total ${period.label}`, kind: "periodSales", periodKey: period.key });
+    base.push({ id: `negotiatedSales_${period.key}`, label: `Venta negociada ${period.label}`, kind: "periodNegotiatedSales", periodKey: period.key });
+    base.push({ id: `negotiatedShare_${period.key}`, label: `% negociada ${period.label}`, kind: "periodNegotiatedShare", periodKey: period.key });
+    base.push({ id: `nonNegotiatedSales_${period.key}`, label: `Venta no negociada ${period.label}`, kind: "periodNonNegotiatedSales", periodKey: period.key });
+    base.push({ id: `nonNegotiatedShare_${period.key}`, label: `% no negociada ${period.label}`, kind: "periodNonNegotiatedShare", periodKey: period.key });
     base.push({ id: `discount_${period.key}`, label: `Dcto. ${period.label}`, kind: "periodDiscount", periodKey: period.key });
     base.push({ id: `compliance_${period.key}`, label: `Cumplimiento ${period.label}`, kind: "periodCompliance", periodKey: period.key });
     base.push({ id: `status_${period.key}`, label: `Estado ${period.label}`, kind: "periodStatus", periodKey: period.key });

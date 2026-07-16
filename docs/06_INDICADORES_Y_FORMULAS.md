@@ -1,11 +1,17 @@
 # Indicadores y fórmulas
 
+## Regla central
+
+La venta comparable mensual es `TotalVentaMes` dentro de la vigencia. La venta negociada se obtiene de `Ventas cajas físicas (sin rep)` y la venta no negociada es la diferencia; sus porcentajes explican composición, pero ambas porciones participan en cumplimiento.
+
+En multiactividad el total del cliente se usa una sola vez contra la suma de objetivos únicos y no se copia a cada actividad.
+
 ## Contrato central
 
 ```text
-Cumplimiento = Ventas atribuibles comparables / Objetivo comparable
+Cumplimiento = Venta total comparable / Objetivo comparable
 
-Diferencia atribuible = Ventas atribuibles comparables - Objetivo comparable
+Diferencia = Venta total comparable - Objetivo comparable
 ```
 
 Las fórmulas se evalúan con números completos. El formato `es-CO` se aplica después.
@@ -16,7 +22,7 @@ Las fórmulas se evalúan con números completos. El formato `es-CO` se aplica d
 | --- | --- | --- | --- |
 | Ventas del período | `TotalVentaMes` resuelto por cliente + período | suma de grupos resueltos | Incluye venta general que puede quedar fuera del cumplimiento. |
 | Ventas del último mes | Igual fuente, solo período máximo filtrado | suma de grupos del último mes | No es venta atribuida a una actividad. |
-| Ventas atribuibles comparables | `activityAggregate.sales` / `kpis.comparableSales` | suma de `totalSales` de actividades comparables | Excluye histórico, posterior al fin, venta ambigua, fechas u objetivo inválidos. |
+| Ventas comparables | `activityAggregate.sales` / `kpis.comparableSales` | suma de `TotalVentaMes` sin duplicar cliente-período | Excluye histórico, posterior al fin, multiactividad sin distribución, fechas u objetivo inválidos. |
 | Objetivo mensual de las actividades | `activityAggregate.objective` / `kpis.comparableObjective` | suma de objetivos únicos comparables | No usa `objectiveAll` en la tarjeta reconciliable. |
 | Cumplimiento de las actividades | mismos numerador y denominador | ventas comparables / objetivo comparable | No promedia porcentajes. |
 | Diferencia atribuible frente al objetivo | misma población | ventas comparables - objetivo comparable | Positiva sobre objetivo; negativa bajo objetivo. |
@@ -134,4 +140,4 @@ Para una actividad compartida, la columna de avance representa el estado conjunt
 
 ## Lectura en la tabla de seguimiento
 
-**Venta atribuible del mes** es el numerador del estado mostrado. En una actividad individual corresponde a `attributableSalesByMonth[periodo]`; en una compartida, a `jointActivitySalesByMonth[periodo]`. El detalle agrega el aporte del cliente por separado. **Ventas atribuibles acumuladas** y **Avance objetivo total** siguen el contrato comparable y nunca usan directamente `TotalVentaMes`.
+**Venta comparable del mes** es el numerador del estado mostrado. En una actividad individual corresponde a `totalClientSalesByMonth[periodo]`; en una compartida, a `jointActivitySalesByMonth[periodo]`. El detalle agrega el aporte del cliente y la composición por separado.

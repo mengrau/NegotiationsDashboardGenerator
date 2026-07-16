@@ -5,7 +5,7 @@ const path = require("path");
 
 const testPath = path.join(__dirname, "sales-information.test.js");
 let source = fs.readFileSync(testPath, "utf8").replace(/\r\n/g, "\n");
-const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
+const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunTotalSalesComplianceRegressionTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
 
 const audit = String.raw`
 const productionWorkbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");
@@ -15,6 +15,9 @@ dashboard.initializeDashboardDataset(productionRows);
 const productionAnalytics = dashboard.buildActivityAnalytics(productionRows);
 const productionQuality = app.buildDataQualityReport(productionRows);
 const clientNegotiationModels = app.buildClientNegotiationModels(productionRows);
+const activity947878 = clientNegotiationModels.clientActivitySummary.find(function (row) {
+  return row.activityId === "947878" && Number.isFinite(row.totalClientSalesByMonth && row.totalClientSalesByMonth[202606]);
+});
 const productionHtml = dashboard.generatedHtml({ rows: productionRows, metadata: { qualityWarnings: productionQuality, sourceFileName: "INSUMO DASHBOARD (3).xlsx", clientNegotiationModels: clientNegotiationModels } });
 const criticalErrors = [];
 const warnings = ["Validación visual pendiente: el entorno automatizado de Node.js no inspecciona pintura, contraste ni overflow real."];
@@ -40,6 +43,9 @@ const shared = productionAnalytics.activityPerformance.find(function (item) { re
 const individual = productionAnalytics.activityPerformance.find(function (item) { return item.activityId === "874894" && item.period === 202606; });
 checkProduction(!productionRows.some(function (row) { return row["ID Actividad"] === "947124"; }) || (Boolean(shared) && shared.totalSales === 541 && shared.objectiveMonthly === 1100 && shared.gap === -559), "Regresion 947124");
 checkProduction(Boolean(individual) && individual.totalSales === 549.252 && individual.objectiveMonthly === 500 && individual.isSharedActivity === false, "Regresión 874894");
+checkProduction(!activity947878 || Math.abs(activity947878.totalClientSalesByMonth[202606] - 223.5) < 0.01, "Venta total 947878 inválida");
+checkProduction(!activity947878 || Math.abs(activity947878.negotiatedPresentationSalesByMonth[202606] - 191) < 0.01, "Venta negociada 947878 inválida");
+checkProduction(!activity947878 || Math.abs(activity947878.monthlyComplianceByMonth[202606] - 223.5 / 134) < 0.0001, "Cumplimiento 947878 inválido");
 const clientRows = productionRows.filter(function (row) { return row["Cliente SAP - Clave"] === "1002559342"; });
 const clientAnalysis = dashboard.buildDashboardAnalyses(clientRows, dashboard.getNoSalesAnalysis(clientRows), { scopeRows: productionRows, filters: { "Cliente SAP - Clave": "1002559342" }, activityAnalytics: productionAnalytics });
 checkProduction(clientAnalysis.timeline.historicalPeriodCount === 2 && clientAnalysis.timeline.activities.length === 2, "Regresión cliente 1002559342");
@@ -55,12 +61,12 @@ checkProduction(dashboardSource.includes('window.addEventListener("scroll", repo
 checkProduction(!dashboardSource.includes('id: "salesTrend"') && !dashboardSource.includes('"chartMes"') && !dashboardSource.includes("Evolución de ventas"), "La gráfica Evolución de ventas no fue eliminada completamente");
 checkProduction(!dashboardSource.includes('id: "noSales"') && !dashboardSource.includes('"chartSinVentasCategoria"') && !dashboardSource.includes("renderNoSalesCategoryChart"), "La gráfica de presentaciones sin ventas no fue eliminada completamente");
 checkProduction(dashboardSource.includes('action: "open-no-sales-explorer"') && dashboardSource.includes("buildNoSalesCategoryExplorerConfig"), "Falta el explorador del KPI de presentaciones sin ventas");
-checkProduction(dashboardSource.includes('title: "Ventas atribuibles comparables"'), "Falta el KPI de ventas atribuibles comparables");
+checkProduction(dashboardSource.includes('title: "Ventas comparables"'), "Falta el KPI de ventas comparables");
 checkProduction(productionRows.length > 0, "Workbook sin filas");
 checkProduction(clientNegotiationModels.clientActivitySummary.length > 0, "Modelo cliente-negociacion vacio");
 checkProduction(clientNegotiationModels.clientSummary.length > 0, "Modelo resumido por cliente vacio");
 checkProduction(clientNegotiationModels.availablePeriods.length > 0, "No se resolvieron periodos dinamicos");
-checkProduction(clientNegotiationModels.summaryTableColumns.length === 17 + clientNegotiationModels.availablePeriods.length * 4, "Contrato de columnas dinamicas invalido");
+checkProduction(clientNegotiationModels.summaryTableColumns.length === 17 + clientNegotiationModels.availablePeriods.length * 8, "Contrato de columnas dinamicas invalido");
 const trackingPeriod = clientNegotiationModels.availablePeriods[clientNegotiationModels.availablePeriods.length - 1];
 const trackingCsv = dashboard.buildClientTrackingSummaryCsv(clientNegotiationModels.clientActivitySummary, clientNegotiationModels.availablePeriods, trackingPeriod);
 checkProduction(productionHtml.includes('id="clientTracking"') && productionHtml.includes("Seguimiento de clientes y negociaciones"), "Vista de seguimiento ausente");
@@ -87,7 +93,18 @@ console.log(JSON.stringify({
   caches: productionSnapshot.caches,
   diagnostics: dashboard.getDashboardDiagnosticsSnapshot(),
   clientNegotiationModels: { relations: clientNegotiationModels.clientActivitySummary.length, clients: clientNegotiationModels.clientSummary.length, periods: clientNegotiationModels.availablePeriods.length, monthlyStates: clientNegotiationModels.diagnostics.monthlyStatusCountsByPeriod, totalStates: clientNegotiationModels.diagnostics.totalObjectiveStatusCounts },
-  regressions: { activity947124: shared ? true : "no presente en el workbook", activity874894: true, client1002559342: true },
+  regressions: {
+    activity947124: shared ? true : "no presente en el workbook",
+    activity947878: activity947878 ? {
+      totalSales: activity947878.totalClientSalesByMonth[202606],
+      negotiatedSales: activity947878.negotiatedPresentationSalesByMonth[202606],
+      nonNegotiatedSales: activity947878.nonNegotiatedPresentationSalesByMonth[202606],
+      compliance: activity947878.monthlyComplianceByMonth[202606],
+      status: activity947878.monthlyStatusByMonth[202606]
+    } : "no presente en el workbook",
+    activity874894: true,
+    client1002559342: true
+  },
   visualInspectionPerformed: false
 }, null, 2));
 `;

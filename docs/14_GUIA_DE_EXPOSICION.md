@@ -1,5 +1,11 @@
 # Guía de exposición
 
+## Mensaje central actualizado
+
+La venta total del cliente dentro de la vigencia se utiliza para comparar contra el objetivo. La venta de presentaciones negociadas y no negociadas se muestra como una composición informativa, pero ambas participan en el cumplimiento.
+
+En actividades compartidas el resultado es conjunto. En multiactividad no se duplica `TotalVentaMes`: se usa una vez en el agregado del cliente y las actividades requieren una regla de distribución antes de mostrar cumplimiento individual.
+
 ## Mensaje central
 
 El dashboard no suma columnas repetidas: respeta la granularidad de venta, objetivo y actividad. Distingue venta general de venta atribuible comparable para que cumplimiento y diferencia sean explicables.

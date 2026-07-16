@@ -7,7 +7,7 @@ const { performance } = require("perf_hooks");
 
 const testPath = path.join(__dirname, "sales-information.test.js");
 let source = fs.readFileSync(testPath, "utf8").replace(/\r\n/g, "\n");
-const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
+const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunTotalSalesComplianceRegressionTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
 
 const audit = String.raw`
 const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");

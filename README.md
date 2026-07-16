@@ -2,6 +2,12 @@
 
 Aplicación web estática para GitHub Pages que permite cargar un Excel, validar su estructura, procesar los datos localmente en el navegador y descargar un `dashboard.html` ejecutivo listo para compartir.
 
+## Regla de cumplimiento
+
+Durante un período válido de la negociación, la venta total del cliente (`TotalVentaMes`) se utiliza para comparar contra el objetivo mensual. La venta de presentaciones negociadas y no negociadas se muestra como composición informativa, pero ambas participan en el cumplimiento.
+
+En actividades compartidas se suma una vez la venta total de cada cliente asociado. Si un cliente tiene varias actividades vigentes en el mismo mes, su venta total se usa una sola vez en el resumen agregado contra la suma de objetivos únicos; no se duplica ni se distribuye entre actividades sin una regla verificable.
+
 ## Cómo usar la herramienta
 
 1. Abre `index.html` localmente o desde GitHub Pages.
@@ -34,7 +40,7 @@ La Fase 10A incorpora dos modelos analíticos, todavía sin añadir la interfaz 
 
 `availablePeriods` se obtiene de los datos y `summaryTableColumns` añade por cada período columnas de venta, descuento, cumplimiento y estado. Cada relación conserva `clientSap` y `activityId` para que la futura acción navegue mediante `updateDashboardFilters()` sin crear otro estado. El modelo se construye durante el procesamiento, se serializa de forma segura en el HTML y se incorpora a `state.analyses`; las interacciones futuras consumirán esa estructura y la caché analítica LRU, no las filas originales.
 
-El estado principal se calcula por mes: venta atribuible comparable del período dividida por objetivo mensual. Produce `CUMPLE_MES`, `NO_CUMPLE_MES` o `NO_EVALUABLE_MES`. Sin filtro de mes se usa el último período disponible; con un mes seleccionado, `state.analyses` proyecta ese período sobre el modelo ya preparado. El avance acumulado contra `Objetivo cajas total` se conserva por separado como `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`.
+El estado principal se calcula por mes: venta total comparable del período dividida por objetivo mensual. Produce `CUMPLE_MES`, `NO_CUMPLE_MES` o `NO_EVALUABLE_MES`. Sin filtro de mes se usa el último período disponible; con un mes seleccionado, `state.analyses` proyecta ese período sobre el modelo ya preparado. El avance acumulado contra `Objetivo cajas total` se conserva por separado como `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`.
 
 Por cada período, `summaryTableColumns` prepara venta, descuento, cumplimiento y estado. Las columnas base incluyen estado y cumplimiento del mes seleccionado, ventas atribuibles acumuladas, objetivo total, avance y estado del objetivo total. La interfaz completa de la tabla permanece fuera del alcance de esta fase.
 
@@ -62,7 +68,7 @@ Los desplegables de Actividad y Cliente SAP se portalan temporalmente al documen
 
 Los KPI se adaptan al contexto. Una actividad compartida presenta ventas conjuntas, objetivo, cumplimiento y contribuciones; una actividad individual omite la contribución de 100 % y la posición 1 de 1. Al filtrar un cliente, el objetivo continúa identificado como objetivo completo de la actividad. Para varias actividades, los objetivos únicos y las ventas comparables se agregan mediante totales, sin promediar porcentajes.
 
-En la vista global, **Ventas del período** representa `TotalVentaMes` resuelto por cliente y período. **Ventas atribuibles comparables** representa únicamente el numerador de cumplimiento y diferencia. El objetivo visible reconciliable usa la misma población comparable; la cobertura `X de Y actividades` aparece como ayuda secundaria.
+En la vista global, **Ventas del período** representa `TotalVentaMes` resuelto por cliente y período. **Ventas comparables** representa esa venta total restringida a vigencias evaluables, sin duplicar cliente-período. El objetivo visible reconciliable usa la misma población comparable; la cobertura `X de Y actividades` aparece como ayuda secundaria.
 
 El explorador de una actividad compartida separa el resumen de la negociación de la tabla de clientes. Presenta ventas, objetivo, cumplimiento, diferencia, vigencia y estado; permite buscar por código o nombre, ordenar, mostrar 25 clientes por lote, abrir el detalle de un cliente y exportar el resultado visible a CSV. Con dos a cuatro clientes usa un modo compacto sin altura vacía; en móvil utiliza tarjetas en lugar de construir simultáneamente una tabla oculta. Si el dashboard está filtrado por cliente, conserva la población completa de la actividad y marca la selección.
 

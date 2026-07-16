@@ -42,6 +42,7 @@ const dashboard = loadDashboardContext();
 
 runSyntheticTests();
 runClientNegotiationModelTests();
+runTotalSalesComplianceRegressionTests();
 runClientTrackingTableTests();
 runTimelineModelTests();
 runLayoutPresentationTests();
@@ -66,8 +67,8 @@ function runDocumentationTests() {
   const contents = expectedDocs.map((name) => ({ name, source: fs.readFileSync(path.join(docsDir, name), "utf8") }));
   const combined = contents.map((item) => item.source).join("\n");
   assert(!combined.includes("C:/Users/User/") && !combined.includes("C:\\Users\\User\\"));
-  assert(combined.includes("Ventas atribuibles comparables"));
-  assert(combined.includes("TotalVentaMes ≠ ventas atribuibles comparables"));
+  assert(combined.includes("venta total comparable") || combined.includes("Venta total comparable"));
+  assert(combined.includes("presentaciones negociadas") && combined.includes("no negociadas"));
   assert(combined.includes("Guion de 3 minutos") && combined.includes("Guion de 15 minutos"));
   assert(combined.includes("LRU") && combined.includes("Lucide") && combined.includes("CDN"));
   assert(combined.includes("947124") && combined.includes("874894") && combined.includes("1002559342"));
@@ -431,7 +432,9 @@ function runSyntheticTests() {
     normalizeKpiRow({ clientId: "C-OBJ-KPI", activityId: "A-2", presentationCode: "P-O2", sales: "120", objectiveMonth: "1500" })
   ]);
   assert.strictEqual(objectiveOncePerActivity.objective, 3000);
-  assert.strictEqual(objectiveOncePerActivity.performanceConsistency.consistent, true);
+  assert.strictEqual(objectiveOncePerActivity.comparableSales, 0);
+  assert.strictEqual(objectiveOncePerActivity.performanceConsistency.consistent, null);
+  assert(objectiveOncePerActivity.activityPerformance.every((item) => item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD"));
   assert.strictEqual(app.computeKpis([
     normalizeKpiRow({ clientId: "C-APP", activityId: "A-APP", sales: "80", objectiveMonth: "100" })
   ]).performanceConsistency.consistent, true);
@@ -510,37 +513,36 @@ function runSyntheticTests() {
   const multiActivityAnalytics = dashboard.buildActivityAnalytics(multiActivityRows);
   const multiPerformance = multiActivityAnalytics.activityPerformance.sort((a, b) => a.activityId.localeCompare(b.activityId));
   assert.strictEqual(multiActivityAnalytics.summary.multipleActivityClientPeriods, 1);
-  assert.deepStrictEqual(plain(multiPerformance.map((item) => item.totalSales)), [60, 40]);
-  assert(multiPerformance.every((item) => item.contributionRows[0].source === "VENTAS_FISICAS_ACTIVIDAD"));
-  assert.strictEqual(multiPerformance.reduce((sum, item) => sum + item.totalSales, 0), 100);
+  assert.deepStrictEqual(plain(multiPerformance.map((item) => item.totalSales)), [null, null]);
+  assert(multiPerformance.every((item) => item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD"));
+  assert(multiPerformance.every((item) => item.contributionRows[0].negotiatedPresentationSales > 0));
   const multiAggregate = dashboard.aggregateActivityPerformance(multiPerformance);
-  assert.strictEqual(multiAggregate.objective, 300);
-  assert.strictEqual(multiAggregate.sales, 100);
-  assert.strictEqual(multiAggregate.achievement, 1 / 3);
-  assert.notStrictEqual(multiAggregate.achievement, (0.6 + 0.2) / 2);
+  assert.strictEqual(multiAggregate.objective, 0);
+  assert.strictEqual(multiAggregate.sales, 0);
+  assert.strictEqual(multiAggregate.achievement, null);
   const multiSelectionAnalysis = dashboard.buildDashboardAnalyses(multiActivityRows, dashboard.getNoSalesAnalysis(multiActivityRows), {
     scopeRows: multiActivityRows,
     filters: { "ID Actividad": ["A-M1", "A-M2"] }
   });
   assert.strictEqual(multiSelectionAnalysis.kpis.mode, "ACTIVITY_AGGREGATE");
-  assert.strictEqual(multiSelectionAnalysis.kpis.compliance, 1 / 3);
+  assert.strictEqual(multiSelectionAnalysis.kpis.compliance, null);
   const multiSelectionModel = dashboard.buildContextualKpiModel(multiSelectionAnalysis, { "ID Actividad": ["A-M1", "A-M2"] });
   assert.strictEqual(multiSelectionModel.contextType, "MULTIPLE_ACTIVITIES");
-  assert.strictEqual(multiSelectionModel.items.find((item) => item.id === "aggregateObjective").value, "300");
-  assert.strictEqual(multiSelectionModel.items.find((item) => item.id === "aggregateDifference").value, "-200");
+  assert.strictEqual(multiSelectionModel.items.find((item) => item.id === "aggregateObjective").value, "No disponible");
+  assert.strictEqual(multiSelectionModel.items.find((item) => item.id === "aggregateDifference").value, "No disponible");
   assert(!multiSelectionModel.items.some((item) => /Contribución|Posición/.test(item.title)));
   assert(!multiSelectionModel.items.some((item) => item.id === "comparableActivities" || item.id === "analyticalCoverage"));
-  assert(multiSelectionModel.items.find((item) => item.id === "comparableSales").description.includes("Cobertura: 2 de 2 actividades"));
+  assert(multiSelectionModel.items.find((item) => item.id === "comparableSales").description.includes("Cobertura: 0 de 2 actividades"));
   const globalMultiAnalysis = dashboard.buildDashboardAnalyses(multiActivityRows, dashboard.getNoSalesAnalysis(multiActivityRows), { scopeRows: multiActivityRows, filters: {} });
   const globalMultiModel = dashboard.buildContextualKpiModel(globalMultiAnalysis, {});
   assert.strictEqual(globalMultiModel.contextType, "GLOBAL");
   assert.deepStrictEqual(plain(globalMultiModel.items.map((item) => item.id)), [
     "periodSales", "latestSales", "comparableSales", "monthlyObjectives", "activityCompliance", "objectiveDifference", "withoutSales", "activeNegotiations"
   ]);
-  assert.strictEqual(globalMultiModel.items.find((item) => item.id === "comparableSales").value, "100");
-  assert.strictEqual(globalMultiModel.items.find((item) => item.id === "monthlyObjectives").value, "300");
+  assert.strictEqual(globalMultiModel.items.find((item) => item.id === "comparableSales").value, "No disponible");
+  assert.strictEqual(globalMultiModel.items.find((item) => item.id === "monthlyObjectives").value, "No disponible");
   assert(globalMultiModel.items.find((item) => item.id === "periodSales").description.toLocaleLowerCase("es-CO").includes("venta general"));
-  assert(globalMultiModel.items.find((item) => item.id === "activityCompliance").description.includes("Cobertura: 2 de 2 actividades"));
+  assert(globalMultiModel.items.find((item) => item.id === "activityCompliance").description.includes("Cobertura: 0 de 2 actividades"));
   assert(!globalMultiModel.items.some((item) => item.id === "comparableActivities"));
   const consistentPerformance = dashboard.reconcileComparablePerformance({ comparableSales: 100, comparableObjective: 300, compliance: 1 / 3, objectiveDifference: -200 });
   assert.strictEqual(consistentPerformance.consistent, true);
@@ -552,7 +554,8 @@ function runSyntheticTests() {
     normalizeActivityRow({ activityId: "A-GC-1", clientId: "C-GC", presentationCode: "P-GC", totalSales: "100", physicalSales: "70", objectiveMonth: "100" }),
     normalizeActivityRow({ activityId: "A-GC-2", clientId: "C-GC", presentationCode: "P-GC-2", totalSales: "100", physicalSales: "40", objectiveMonth: "100" })
   ]);
-  assert(granularConflictAnalytics.activityPerformance.some((item) => item.status === "VENTA_CONFLICTIVA"));
+  assert(granularConflictAnalytics.activityPerformance.every((item) => item.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD"));
+  assert(Array.from(granularConflictAnalytics.granularSalesByActivity.values()).some((item) => item.status === "VENTA_CONFLICTIVA"));
 
   const ambiguousRows = [
     normalizeActivityRow({ activityId: "A-AMB-1", clientId: "C-AMB", presentationCode: "P-AMB-1", totalSales: "100", physicalSales: "60", objectiveMonth: "100" }),
@@ -560,10 +563,10 @@ function runSyntheticTests() {
   ];
   const ambiguousAnalytics = dashboard.buildActivityAnalytics(ambiguousRows);
   const ambiguousPerformance = ambiguousAnalytics.activityPerformance.find((item) => item.activityId === "A-AMB-2");
-  assert.strictEqual(ambiguousPerformance.status, "VENTA_ACTIVIDAD_AMBIGUA");
+  assert.strictEqual(ambiguousPerformance.status, "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
   assert.strictEqual(ambiguousPerformance.totalSales, null);
   assert.strictEqual(ambiguousPerformance.achievement, null);
-  assert.strictEqual(ambiguousAnalytics.summary.ambiguousActivityPeriods, 1);
+  assert.strictEqual(ambiguousAnalytics.summary.ambiguousActivityPeriods, 0);
 
   const objectiveConflictAnalytics = dashboard.buildActivityAnalytics([
     normalizeActivityRow({ activityId: "A-OBJ-CONFLICT", clientId: "C-OC", presentationCode: "P-OC-1", totalSales: "10", objectiveMonth: "100" }),
@@ -1202,7 +1205,7 @@ function runSyntheticTests() {
     dashboard.renderKpis([normalizeKpiRow({ sales: "120", objectiveMonth: "100", yearMonth: "202607" })]);
   });
   assert(kpiElement.innerHTML.includes("Ventas del período"));
-  assert(kpiElement.innerHTML.includes("Diferencia atribuible frente al objetivo"));
+  assert(kpiElement.innerHTML.includes("Diferencia frente al objetivo"));
   assert(kpiElement.innerHTML.includes("Por encima del objetivo"));
   assert(!kpiElement.innerHTML.includes("Cajas faltantes"));
   assert(!kpiElement.innerHTML.includes("Clientes SAP únicos"));
@@ -1515,23 +1518,27 @@ function runClientNegotiationModelTests() {
 
   const model = app.buildClientNegotiationModels(rows);
   assert.deepStrictEqual(plain(model.availablePeriods.map((period) => period.key)), [202605, 202606]);
-  assert(model.summaryTableColumns.some((column) => column.id === "sales_202605" && column.label === "Venta MAY 2026"));
+  assert(model.summaryTableColumns.some((column) => column.id === "sales_202605" && column.label === "Venta total MAY 2026"));
   assert(model.summaryTableColumns.some((column) => column.id === "discount_202606" && column.label === "Dcto. JUN 2026"));
   assert.strictEqual(model.clientActivitySummary.length, 5);
   const individual = model.clientActivitySummary.find((row) => row.clientSap === "C-1" && row.activityId === "A-MODEL");
   assert(individual);
   assert.deepStrictEqual(plain(individual.salesByMonth), { 202605: 100, 202606: 120 });
   assert.deepStrictEqual(plain(individual.attributableSalesByMonth), { 202605: 45, 202606: 60 });
+  assert.deepStrictEqual(plain(individual.negotiatedPresentationSalesByMonth), { 202605: 45, 202606: 60 });
+  assert.deepStrictEqual(plain(individual.nonNegotiatedPresentationSalesByMonth), { 202605: 55, 202606: 60 });
+  assert.strictEqual(individual.negotiatedSalesShareByMonth[202605], 0.45);
+  assert.strictEqual(individual.nonNegotiatedSalesShareByMonth[202605], 0.55);
   assert.strictEqual(individual.accumulatedGeneralSales, 220);
   assert.strictEqual(individual.accumulatedAttributableSales, 105);
-  assert.strictEqual(individual.totalProgress, 1.05);
-  assert.strictEqual(individual.totalDifference, 5);
-  assert.deepStrictEqual(plain(individual.monthlyComplianceByMonth), { 202605: 0.9, 202606: 1.2 });
-  assert.deepStrictEqual(plain(individual.monthlyStatusByMonth), { 202605: "NO_CUMPLE_MES", 202606: "CUMPLE_MES" });
+  assert.strictEqual(individual.totalProgress, null);
+  assert.strictEqual(individual.totalDifference, null);
+  assert.deepStrictEqual(plain(individual.monthlyComplianceByMonth), { 202605: 2, 202606: null });
+  assert.deepStrictEqual(plain(individual.monthlyStatusByMonth), { 202605: "CUMPLE_MES", 202606: "NO_EVALUABLE_MES" });
   assert.strictEqual(individual.selectedStatusPeriod, 202606);
-  assert.strictEqual(individual.selectedMonthlyCompliance, 1.2);
-  assert.strictEqual(individual.selectedMonthlyStatus, "CUMPLE_MES");
-  assert.strictEqual(individual.totalObjectiveStatus, "CUMPLIO_OBJETIVO_TOTAL");
+  assert.strictEqual(individual.selectedMonthlyCompliance, null);
+  assert.strictEqual(individual.selectedMonthlyStatus, "NO_EVALUABLE_MES");
+  assert.strictEqual(individual.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
   assert.strictEqual(individual.negotiationType, "INDIVIDUAL");
   assert.strictEqual(individual.investmentPercentage, 0.15);
   assert.strictEqual(individual.negotiationDiscount.status, "VARIOS");
@@ -1540,12 +1547,12 @@ function runClientNegotiationModelTests() {
   assert.strictEqual(shared.isSharedActivity, true);
   assert.strictEqual(shared.negotiationType, "COMPARTIDA");
   assert.strictEqual(shared.associatedClientCount, 2);
-  assert.strictEqual(shared.jointActivitySalesByMonth[202606], 100);
-  assert.strictEqual(shared.monthlyComplianceByMonth[202606], 1);
-  assert.strictEqual(shared.monthlyStatusByMonth[202606], "CUMPLE_MES");
-  assert.strictEqual(shared.totalProgress, 0.5);
-  assert.strictEqual(shared.totalObjectiveStatus, "EN_PROGRESO_OBJETIVO_TOTAL");
-  assert.notStrictEqual(shared.monthlyComplianceByMonth[202606], shared.attributableSalesByMonth[202606] / shared.monthlyObjective);
+  assert.strictEqual(shared.jointActivitySalesByMonth[202606], undefined);
+  assert.strictEqual(shared.monthlyComplianceByMonth[202606], null);
+  assert.strictEqual(shared.monthlyStatusByMonth[202606], "NO_EVALUABLE_MES");
+  assert.strictEqual(shared.totalProgress, null);
+  assert.strictEqual(shared.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
+  assert(shared.warnings.includes("REQUIERE_DISTRIBUCION_MULTIACTIVIDAD:202606"));
   const noPeriod = model.clientActivitySummary.find((row) => row.activityId === "A-NO-PERIOD");
   assert(noPeriod && noPeriod.selectedMonthlyStatus === "NO_EVALUABLE_MES");
   assert.strictEqual(noPeriod.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
@@ -1553,8 +1560,7 @@ function runClientNegotiationModelTests() {
   const client = model.clientSummary.find((row) => row.clientSap === "C-1");
   assert.strictEqual(client.activityCount, 2);
   assert.strictEqual(client.accumulatedGeneralSales, 220);
-  assert(Math.abs(client.monthlyComplianceByMonth[202606] - 160 / 150) < 1e-12);
-  assert.notStrictEqual(client.monthlyComplianceByMonth[202606], (1.2 + 1) / 2);
+  assert(Math.abs(client.monthlyComplianceByMonth[202606] - 120 / 150) < 1e-12);
   const past = model.clientActivitySummary.find((row) => row.activityId === "A-PAST");
   assert.strictEqual(past.monthlyStatusByMonth[202605], "CUMPLE_MES");
   assert.strictEqual(past.monthlyStatusByMonth[202606], "NO_CUMPLE_MES");
@@ -1562,12 +1568,12 @@ function runClientNegotiationModelTests() {
   const mayModel = app.selectClientNegotiationModelPeriod(model, { filters: { Mes: "MAY", "AÃ±o": "2026" } });
   const mayIndividual = mayModel.clientActivitySummary.find((row) => row.activityId === "A-MODEL");
   assert.strictEqual(mayModel.selectedStatusPeriod, 202605);
-  assert.strictEqual(mayIndividual.selectedMonthlyStatus, "NO_CUMPLE_MES");
+  assert.strictEqual(mayIndividual.selectedMonthlyStatus, "CUMPLE_MES");
   assert(mayModel.summaryTableColumns.find((column) => column.id === "selectedMonthlyStatus").label.includes("MAY 2026"));
   assert.strictEqual(model.diagnostics.rowsWithoutPeriod, 1);
-  assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 3, NO_CUMPLE_MES: 1, NO_EVALUABLE_MES: 1 });
-  assert.deepStrictEqual(plain(model.diagnostics.totalObjectiveStatusCounts), { CUMPLIO_OBJETIVO_TOTAL: 2, EN_PROGRESO_OBJETIVO_TOTAL: 2, NO_EVALUABLE_TOTAL: 1 });
-  assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 4);
+  assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 0, NO_CUMPLE_MES: 1, NO_EVALUABLE_MES: 4 });
+  assert.deepStrictEqual(plain(model.diagnostics.totalObjectiveStatusCounts), { CUMPLIO_OBJETIVO_TOTAL: 1, EN_PROGRESO_OBJETIVO_TOTAL: 0, NO_EVALUABLE_TOTAL: 4 });
+  assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 8);
   assert(model.summaryTableColumns.some((column) => column.id === "compliance_202605"));
   assert(model.summaryTableColumns.some((column) => column.id === "status_202606"));
   const generated = dashboard.generatedHtml({ rows, metadata: { clientNegotiationModels: model } });
@@ -1604,6 +1610,10 @@ function runClientTrackingTableTests() {
     startDate: "2026-05-01", endDate: "2026-06-30", dateStatus: "OK",
     negotiationDiscount: { status: "UNICO", values: [0.1] }, negotiationDiscountStatus: "UNICO",
     salesByMonth: { 202605: 120, 202606: 140 }, attributableSalesByMonth: { 202605: 90, 202606: 110 }, jointActivitySalesByMonth: {},
+    comparableSalesByMonth: { 202605: 120, 202606: 140 },
+    negotiatedPresentationSalesByMonth: { 202605: 90, 202606: 110 }, nonNegotiatedPresentationSalesByMonth: { 202605: 30, 202606: 30 },
+    negotiatedSalesShareByMonth: { 202605: 0.75, 202606: 110 / 140 }, nonNegotiatedSalesShareByMonth: { 202605: 0.25, 202606: 30 / 140 },
+    compositionStatusByMonth: { 202605: "OK", 202606: "OK" }, monthlyDifferenceByMonth: { 202605: 20, 202606: 40 },
     monthlyDiscountByMonth: { 202605: 0.08, 202606: 0.09 }, monthlyDiscountStatusByMonth: { 202605: "OK", 202606: "OK" }, monthlyComplianceByMonth: { 202605: 0.9, 202606: 1.1 },
     monthlyStatusByMonth: { 202605: "NO_CUMPLE_MES", 202606: "CUMPLE_MES" }, selectedMonthlyCompliance: 1.1, selectedMonthlyStatus: "CUMPLE_MES", selectedStatusPeriod: 202606,
     accumulatedGeneralSales: 260, accumulatedAttributableSales: 200, accumulatedComparableSales: 200, totalProgress: 1, totalDifference: 0,
@@ -1612,12 +1622,17 @@ function runClientTrackingTableTests() {
   const shared = Object.assign({}, base, {
     clientSap: "C-002", clientName: "Cliente Dos", activityId: "A-002", isSharedActivity: true, negotiationType: "COMPARTIDA", associatedClientCount: 2,
     attributableSalesByMonth: { 202605: 30, 202606: 40 }, jointActivitySalesByMonth: { 202605: 95, 202606: 120 }, accumulatedAttributableSales: 70,
+    comparableSalesByMonth: { 202605: 95, 202606: 120 }, clientContributionSalesByMonth: { 202605: 35, 202606: 45 },
+    jointNegotiatedPresentationSalesByMonth: { 202605: 70, 202606: 90 }, jointNonNegotiatedPresentationSalesByMonth: { 202605: 25, 202606: 30 },
     accumulatedComparableSales: 215, totalProgress: 1.075, totalDifference: 15
   });
   assert(dashboard.clientTrackingRelationMatchesFilters(base, { "Región SAP": ["CENTRO"], Canal: ["TRADICIONAL"], "Categoría AS400 de la venta": ["GASEOSAS"], Cedi: ["CALI"] }));
   assert(!dashboard.clientTrackingRelationMatchesFilters(base, { "Región SAP": ["NORTE"] }));
-  assert.strictEqual(dashboard.getClientTrackingComparableSales(base, 202606), 110);
+  assert.strictEqual(dashboard.getClientTrackingComparableSales(base, 202606), 140);
   assert.strictEqual(dashboard.getClientTrackingComparableSales(shared, 202606), 120, "La actividad compartida debe usar la venta conjunta");
+  const compositionMarkup = dashboard.buildClientTrackingCompositionMarkup(base, 202606);
+  assert(compositionMarkup.includes("&middot;") && compositionMarkup.includes("composici&oacute;n") && compositionMarkup.includes("cu&aacute;nto"));
+  assert(!compositionMarkup.includes("Â") && !compositionMarkup.includes("Ã"));
   const detailModelCold = dashboard.getClientTrackingDetailModel(shared, periods);
   const detailModelCached = dashboard.getClientTrackingDetailModel(shared, periods);
   assert.strictEqual(detailModelCached, detailModelCold, "La apertura repetida debe reutilizar el modelo de detalle");
@@ -1626,12 +1641,15 @@ function runClientTrackingTableTests() {
   assert.strictEqual(dashboard.buildClientTrackingDetailConfig(detailModelCold).type, "clientTrackingDetail");
   const csv = dashboard.buildClientTrackingSummaryCsv([base, shared], periods, periods[1]);
   assert(csv.startsWith("\uFEFF"));
-  assert(csv.includes("Venta MAY 2026") && csv.includes("Dcto. JUN 2026") && csv.includes("Cumplimiento JUN 2026") && csv.includes("Estado JUN 2026"));
+  assert(csv.includes("Venta total MAY 2026") && csv.includes("Venta negociada MAY 2026") && csv.includes("% negociada MAY 2026"));
+  assert(csv.includes("Venta no negociada JUN 2026") && csv.includes("% no negociada JUN 2026"));
+  assert(csv.includes("Dcto. JUN 2026") && csv.includes("Cumplimiento JUN 2026") && csv.includes("Estado JUN 2026"));
   assert(csv.includes('"9 %"') && !csv.includes('"900 %"'), "El CSV debe formatear el descuento mensual normalizado");
   assert(csv.includes("'=C-001"), "El resumen debe conservar protección contra inyección CSV");
   assert.strictEqual((csv.match(/A-00[12]/g) || []).length, 2, "El CSV debe incluir todas las coincidencias, no una sola página");
   const detailCsv = dashboard.buildClientTrackingDetailCsv(shared, periods);
-  assert(detailCsv.includes("Venta comparable de la negociación") && detailCsv.includes("Aporte atribuible del cliente"));
+  assert(detailCsv.includes("Venta comparable del mes") && detailCsv.includes("Venta de presentaciones negociadas"));
+  assert(detailCsv.includes("Venta total conjunta") && detailCsv.includes("Aporte total del cliente"));
   assert(detailCsv.includes("MAY 2026") && detailCsv.includes("JUN 2026"));
   assert(detailCsv.includes('"9 %"'));
   const source = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
@@ -1642,6 +1660,10 @@ function runClientTrackingTableTests() {
   assert.strictEqual((source.match(/panel\.addEventListener\("click"/g) || []).length, 1, "La tabla debe conservar un único listener delegado de clic");
   assert(source.includes("white-space: nowrap") && source.includes("client-tracking-table-wrap { max-width: 100%; overflow: auto"));
   assert(source.includes('const headers = ["Estado mes", "Estado total", "Cliente / CodSAP"'));
+  assert(!source.includes("Relaciones cliente–negociación para "));
+  assert(source.includes('.detail-explorer-dialog[data-layout="wide"]'));
+  assert(source.includes(".tracking-period-table {") && source.includes("min-width: 1480px"));
+  assert(source.includes(".client-tracking-detail .detail-table-wrap") && source.includes("overflow-y: visible"));
   assert(source.includes("getClientTrackingMonthlyDiscountDisplay(row, period && period.key)"));
   const controlsMarkup = dashboard.buildClientTrackingControlsMarkup();
   assert(!controlsMarkup.includes('type=\\"search\\"') && !controlsMarkup.includes("Buscar cliente"));
@@ -1651,6 +1673,59 @@ function runClientTrackingTableTests() {
   assert(source.includes('@media (max-width: 820px)') && source.includes('client-tracking-cards'));
   assert(!source.includes("DASHBOARD_DATA.filter(function (row) { return getClientTracking"));
   runModalNavigationAndScrollTests(base, periods, source);
+}
+
+function runTotalSalesComplianceRegressionTests() {
+  const rows947878 = [
+    normalizeActivityRow({ activityId: "947878", clientId: "947878", yearMonth: "62026", month: "JUN", presentationCode: "P-947-A", physicalSales: "100", totalSales: "223.5", objectiveMonth: "134", objectiveTotal: "134", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "947878", clientId: "947878", yearMonth: "62026", month: "JUN", presentationCode: "P-947-B", physicalSales: "91", totalSales: "223.5", objectiveMonth: "134", objectiveTotal: "134", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ];
+  const model947878 = app.buildClientNegotiationModels(rows947878);
+  const relation = model947878.clientActivitySummary[0];
+  assert.strictEqual(relation.totalClientSalesByMonth[202606], 223.5);
+  assert.strictEqual(relation.comparableSalesByMonth[202606], 223.5);
+  assert.strictEqual(relation.negotiatedPresentationSalesByMonth[202606], 191);
+  assert.strictEqual(relation.nonNegotiatedPresentationSalesByMonth[202606], 32.5);
+  assert(Math.abs(relation.negotiatedSalesShareByMonth[202606] - 191 / 223.5) < 1e-12);
+  assert(Math.abs(relation.nonNegotiatedSalesShareByMonth[202606] - 32.5 / 223.5) < 1e-12);
+  assert(Math.abs(relation.negotiatedSalesShareByMonth[202606] + relation.nonNegotiatedSalesShareByMonth[202606] - 1) < 1e-12);
+  assert(Math.abs(relation.monthlyComplianceByMonth[202606] - 223.5 / 134) < 1e-12);
+  assert(Math.abs(relation.monthlyComplianceByMonth[202606] - 1.6679104477611941) < 1e-12);
+  assert.strictEqual(relation.monthlyDifferenceByMonth[202606], 89.5);
+  assert.strictEqual(relation.monthlyStatusByMonth[202606], "CUMPLE_MES");
+
+  const zeroModel = app.buildClientNegotiationModels([
+    normalizeActivityRow({ activityId: "A-ZERO", clientId: "C-ZERO", yearMonth: "62026", month: "JUN", presentationCode: "P-ZERO", physicalSales: "0", totalSales: "0", objectiveMonth: "10", objectiveTotal: "10", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ]).clientActivitySummary[0];
+  assert.strictEqual(zeroModel.negotiatedSalesShareByMonth[202606], null);
+  assert.strictEqual(zeroModel.nonNegotiatedSalesShareByMonth[202606], null);
+
+  const mismatchModel = app.buildClientNegotiationModels([
+    normalizeActivityRow({ activityId: "A-MISMATCH", clientId: "C-MISMATCH", yearMonth: "62026", month: "JUN", presentationCode: "P-MISMATCH", physicalSales: "120", totalSales: "100", objectiveMonth: "50", objectiveTotal: "50", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ]).clientActivitySummary[0];
+  assert.strictEqual(mismatchModel.nonNegotiatedPresentationSalesByMonth[202606], -20);
+  assert.strictEqual(mismatchModel.compositionStatusByMonth[202606], "DESCUADRE_COMPOSICION_VENTA");
+
+  const sharedRows = [
+    normalizeActivityRow({ activityId: "A-SHARED-TOTAL", clientId: "C-SH-1", yearMonth: "62026", month: "JUN", presentationCode: "P-SH-1", physicalSales: "70", totalSales: "100", objectiveMonth: "120", objectiveTotal: "120", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-SHARED-TOTAL", clientId: "C-SH-2", yearMonth: "62026", month: "JUN", presentationCode: "P-SH-2", physicalSales: "30", totalSales: "50", objectiveMonth: "120", objectiveTotal: "120", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ];
+  const sharedPerformance = app.buildActivityAnalytics(sharedRows).activityPerformance[0];
+  assert.strictEqual(sharedPerformance.totalSales, 150);
+  assert.strictEqual(sharedPerformance.negotiatedPresentationSales, 100);
+  assert.strictEqual(sharedPerformance.nonNegotiatedPresentationSales, 50);
+  assert.strictEqual(sharedPerformance.achievement, 1.25);
+  assert.deepStrictEqual(plain(sharedPerformance.contributionRows.map((item) => item.sales)), [100, 50]);
+
+  const multiRows = [
+    normalizeActivityRow({ activityId: "A-MULTI-1", clientId: "C-MULTI-TOTAL", yearMonth: "62026", month: "JUN", presentationCode: "P-MULTI-1", physicalSales: "60", totalSales: "100", objectiveMonth: "100", objectiveTotal: "100", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-MULTI-2", clientId: "C-MULTI-TOTAL", yearMonth: "62026", month: "JUN", presentationCode: "P-MULTI-2", physicalSales: "40", totalSales: "100", objectiveMonth: "200", objectiveTotal: "200", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ];
+  const multiModel = app.buildClientNegotiationModels(multiRows);
+  assert(multiModel.clientActivitySummary.every((item) => item.monthlyStatusByMonth[202606] === "NO_EVALUABLE_MES"));
+  assert(multiModel.clientActivitySummary.every((item) => item.warnings.includes("REQUIERE_DISTRIBUCION_MULTIACTIVIDAD:202606")));
+  assert.strictEqual(multiModel.clientSummary[0].salesByMonth[202606], 100);
+  assert.strictEqual(multiModel.clientSummary[0].monthlyComplianceByMonth[202606], 1 / 3);
 }
 
 function runModalNavigationAndScrollTests(base, periods, source) {
@@ -1957,10 +2032,10 @@ function runTimelineModelTests() {
     normalizeActivityRow({ activityId: "TL-AMB-2", clientId: "C-AMB", presentationCode: "P-2", totalSales: "0", physicalSales: "0", year: "", month: "", yearMonth: "" })
   ];
   const ambiguousAnalytics = dashboard.buildActivityAnalytics(ambiguousRows);
-  assert.strictEqual(ambiguousAnalytics.activityPerformance.find((item) => item.activityId === "TL-AMB-2").status, "VENTA_ACTIVIDAD_AMBIGUA");
+  assert.strictEqual(ambiguousAnalytics.activityPerformance.find((item) => item.activityId === "TL-AMB-2").status, "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
   const ambiguousTimeline = dashboard.buildNegotiationTimelineAnalysis({ filters: { "ID Actividad": "TL-AMB-2" }, analyses: { activityAnalytics: ambiguousAnalytics } });
   const ambiguousPeriod = ambiguousTimeline.periods.find((item) => item.periodKey === 202607);
-  assert.strictEqual(ambiguousPeriod.temporalStatus, "VENTA_ACTIVIDAD_AMBIGUA");
+  assert.strictEqual(ambiguousPeriod.temporalStatus, "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
   assert.strictEqual(ambiguousPeriod.comparable, false);
 
   const manyRows = Array.from({ length: 9 }, (_, index) => normalizeActivityRow({ activityId: "TL-M-" + index, clientId: "TL-MC-" + index }));
