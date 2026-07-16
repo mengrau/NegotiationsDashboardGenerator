@@ -1205,7 +1205,7 @@ function runSyntheticTests() {
     dashboard.renderKpis([normalizeKpiRow({ sales: "120", objectiveMonth: "100", yearMonth: "202607" })]);
   });
   assert(kpiElement.innerHTML.includes("Ventas del período"));
-  assert(kpiElement.innerHTML.includes("Diferencia frente al objetivo"));
+  assert(kpiElement.innerHTML.includes("Diferencia atribuible frente al objetivo"));
   assert(kpiElement.innerHTML.includes("Por encima del objetivo"));
   assert(!kpiElement.innerHTML.includes("Cajas faltantes"));
   assert(!kpiElement.innerHTML.includes("Clientes SAP únicos"));
@@ -2063,6 +2063,27 @@ function runLayoutPresentationTests() {
     assert.strictEqual(metadata.tail, count % 4);
     assert.strictEqual(metadata.odd, count % 2 === 1);
   });
+  const comparableCopy = dashboard.normalizeKpiDisplayCopy({
+    id: "comparableSales",
+    title: "Ventas comparables",
+    description: "Ventas totales de clientes asociadas a actividades v\u00e1lidas dentro de su vigencia."
+  });
+  assert.strictEqual(comparableCopy.title, "Ventas atribuibles comparables");
+  assert(comparableCopy.description.includes("Ventas atribuibles asociadas"));
+  const differenceCopy = dashboard.normalizeKpiDisplayCopy({
+    id: "objectiveDifference",
+    title: "Diferencia frente al objetivo",
+    description: "Ventas totales comparables menos objetivos comparables."
+  });
+  assert.strictEqual(differenceCopy.title, "Diferencia atribuible frente al objetivo");
+  assert(differenceCopy.description.includes("Ventas atribuibles comparables"));
+  const mojibakeCopy = dashboard.normalizeKpiDisplayCopy({
+    id: "withoutSales",
+    title: "Presentaciones sin ventas",
+    description: "Haz clic para explorar por categor\u00c3\u00ada. \u00c2\u00b7"
+  });
+  assert(!mojibakeCopy.description.includes("\u00c3") && !mojibakeCopy.description.includes("\u00c2"));
+  assert(mojibakeCopy.description.includes("categor\u00eda") && mojibakeCopy.description.includes("\u00b7"));
   const one = dashboard.assignAdaptiveChartLayout([{ id: "one", layout: "standard" }]);
   assert(one[0].layoutClass.includes("chart-standard"));
   assert(one[0].layoutClass.includes("chart-row-fill"));

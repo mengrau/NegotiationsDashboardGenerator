@@ -2341,6 +2341,7 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
   container.dataset.tail = String(gridLayout.tail);
   container.dataset.odd = String(gridLayout.odd);
   container.innerHTML = model.items.map(function (item) {
+    item = normalizeKpiDisplayCopy(item);
     const secondary = (item.className || "").indexOf("kpi-secondary") !== -1;
     const className = "kpi-card " + (secondary ? "" : "kpi-primary ") + (item.className || "");
     const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
@@ -2349,6 +2350,48 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
     return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
   refreshIcons(container, "data-kpi-icon");
+}
+function normalizeKpiDisplayCopy(item) {
+  const normalized = Object.assign({}, item);
+  const title = normalizeMojibakeText(normalized.title) || "";
+  const description = normalizeMojibakeText(normalized.description) || "";
+  normalized.status = normalizeMojibakeText(normalized.status);
+  normalized.actionLabel = normalizeMojibakeText(normalized.actionLabel);
+  if (normalized.id === "comparableSales" && title === "Ventas comparables") {
+    normalized.title = "Ventas atribuibles comparables";
+    normalized.description = description
+      .replace("Ventas totales de clientes asociadas", "Ventas atribuibles asociadas")
+      .replace("ventas totales comparables", "ventas atribuibles comparables");
+  } else if (normalized.id === "aggregateDifference" || normalized.id === "objectiveDifference") {
+    normalized.title = "Diferencia atribuible frente al objetivo";
+    normalized.description = description.replace("Ventas totales comparables", "Ventas atribuibles comparables");
+  } else if (normalized.id === "aggregateCompliance" || normalized.id === "activityCompliance") {
+    normalized.title = title;
+    normalized.description = description
+      .replace("Ventas totales comparables", "Ventas atribuibles comparables")
+      .replace("Venta total comparable", "Venta atribuible");
+  } else if (normalized.id === "activitySales") {
+    normalized.title = title;
+    normalized.description = description
+      .replace("Ventas totales conjuntas", "Ventas conjuntas atribuibles")
+      .replace("Venta total comparable", "Ventas atribuibles comparables");
+  } else if (normalized.id === "clientSales") {
+    normalized.title = title;
+    normalized.description = description.replace("Venta total comparable", "Venta atribuible");
+  } else {
+    normalized.title = title;
+    normalized.description = description;
+  }
+  if (normalized.title === "Ventas comparables de las actividades") normalized.title = "Ventas atribuibles comparables de las actividades";
+  if (normalized.title === "Venta total comparable del cliente") normalized.title = "Venta atribuible comparable del cliente";
+  return normalized;
+}
+function normalizeMojibakeText(value) {
+  if (value === null || value === undefined) return value;
+  return String(value)
+    .replace(/\u00c3\u00a1/g, "\u00e1").replace(/\u00c3\u00a9/g, "\u00e9").replace(/\u00c3\u00ad/g, "\u00ed").replace(/\u00c3\u00b3/g, "\u00f3").replace(/\u00c3\u00ba/g, "\u00fa")
+    .replace(/\u00c3\u0081/g, "\u00c1").replace(/\u00c3\u0089/g, "\u00c9").replace(/\u00c3\u008d/g, "\u00cd").replace(/\u00c3\u0093/g, "\u00d3").replace(/\u00c3\u009a/g, "\u00da")
+    .replace(/\u00c3\u00b1/g, "\u00f1").replace(/\u00c3\u0091/g, "\u00d1").replace(/\u00c2\u00ba/g, "\u00ba").replace(/\u00c2\u00b7/g, "\u00b7").replace(/\u00e2\u0080\u00a2/g, "\u2022");
 }
 function getKpiGridLayoutMetadata(count) {
   const normalized = Math.max(0, Number(count) || 0);
