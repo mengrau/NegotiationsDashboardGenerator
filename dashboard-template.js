@@ -88,6 +88,23 @@ function generateDashboardHtml(payload) {
           <div id="filtersGrid" class="filters-grid"></div>
         </section>
 
+        <section id="clientTracking" class="client-tracking-panel section-enter" aria-labelledby="clientTrackingTitle">
+          <div class="panel-heading client-tracking-heading">
+            <div>
+              <p class="eyebrow">Seguimiento comercial</p>
+              <h2 id="clientTrackingTitle">Seguimiento de clientes y negociaciones</h2>
+              <p>Listado cliente–negociación con cumplimiento mensual, avance total, ventas, descuentos e inversión.</p>
+            </div>
+            <div class="client-tracking-meta" aria-live="polite">
+              <span id="clientTrackingPeriod" class="badge badge-muted">Período no disponible</span>
+              <strong id="clientTrackingCount">0 relaciones</strong>
+            </div>
+          </div>
+          <div id="clientTrackingControls" class="client-tracking-controls"></div>
+          <div id="clientTrackingBody" aria-live="polite"></div>
+          <div id="clientTrackingPagination" class="client-tracking-pagination"></div>
+        </section>
+
         <section id="charts" class="charts-grid section-enter" aria-label="Análisis adaptativo"></section>
 
         <section id="chartEmptySummary" class="analysis-note" hidden></section>
@@ -101,7 +118,10 @@ function generateDashboardHtml(payload) {
             <p id="detailExplorerSubtitle" class="eyebrow">Exploración</p>
             <h2 id="detailExplorerTitle">Detalle</h2>
           </div>
-          <button id="detailExplorerClose" class="icon-button" type="button" aria-label="Cerrar detalle"><i data-lucide="x"></i></button>
+          <div class="detail-explorer-header-actions">
+            <button id="detailExplorerBack" class="button button-ghost detail-modal-back" type="button" data-detail-action="navigate-back" hidden><span aria-hidden="true">←</span> Volver</button>
+            <button id="detailExplorerClose" class="icon-button" type="button" aria-label="Cerrar detalle"><i data-lucide="x"></i></button>
+          </div>
         </header>
         <div id="detailExplorerSelectionMessage" class="detail-selection-message" hidden></div>
         <div id="detailExplorerSummary" class="detail-summary"></div>
@@ -330,14 +350,53 @@ input:focus-visible {
   background: var(--panel); color: var(--muted); cursor: pointer; transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .icon-button:hover { background: var(--primary-soft); color: var(--primary); transform: translateY(-1px); }
-.filter-panel, .kpi-card, .chart-card, .table-card {
+.filter-panel, .client-tracking-panel, .kpi-card, .chart-card, .table-card {
   border: 1px solid var(--line); border-radius: var(--card-radius); background: var(--panel); box-shadow: var(--shadow);
 }
 label, .kpi-label {
   display: block; color: var(--muted); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
 }
-.filter-panel, .table-card { padding: var(--space-card); margin-bottom: var(--space-section); }
+.filter-panel, .client-tracking-panel, .table-card { padding: var(--space-card); margin-bottom: var(--space-section); }
 .panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+.client-tracking-heading p:not(.eyebrow) { max-width: 760px; margin: 7px 0 0; color: var(--muted); line-height: 1.5; }
+.client-tracking-meta { display: grid; justify-items: end; gap: 8px; color: var(--muted); font-size: 0.82rem; white-space: nowrap; }
+.client-tracking-controls { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; align-items: end; margin-bottom: 14px; }
+.client-tracking-controls > label { grid-column: span 2; }
+.client-tracking-controls .tracking-sort { grid-column: span 3; }
+.client-tracking-controls .tracking-page-size { grid-column: span 1; }
+.client-tracking-actions { grid-column: span 4; display: flex; gap: 8px; justify-content: flex-end; }
+.client-tracking-actions .button { white-space: nowrap; }
+.client-tracking-table-wrap { max-width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.client-tracking-table { width: 100%; min-width: 1320px; border-collapse: separate; border-spacing: 0; table-layout: auto; }
+.client-tracking-table th, .client-tracking-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.client-tracking-table th { position: sticky; top: 0; z-index: 2; min-width: max-content; background: var(--soft-bg); color: var(--muted); font-size: 0.7rem; letter-spacing: 0.04em; line-height: 1.3; overflow-wrap: normal; text-align: left; text-transform: uppercase; white-space: nowrap; word-break: normal; }
+.client-tracking-table tbody tr:hover { background: var(--primary-soft); }
+.client-tracking-table td { font-size: 0.82rem; }
+.client-tracking-table .numeric, .client-tracking-table .tracking-code, .client-tracking-table .tracking-action { text-align: right; white-space: nowrap; word-break: normal; font-variant-numeric: tabular-nums; }
+.client-tracking-table .tracking-code { text-align: left; }
+.client-tracking-table .tracking-action .button { white-space: nowrap; }
+.tracking-client { display: grid; gap: 2px; min-width: 250px; max-width: 360px; }
+.tracking-client small { color: var(--muted); }
+.tracking-status { display: inline-flex; align-items: center; min-height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.72rem; font-weight: 900; white-space: nowrap; }
+.tracking-status.is-positive { border-color: rgba(16,185,129,.34); background: var(--emerald-soft); color: var(--emerald); }
+.tracking-status.is-negative { border-color: rgba(239,68,68,.34); background: var(--red-soft); color: var(--red); }
+.tracking-status.is-progress { border-color: rgba(13,148,136,.3); background: var(--primary-soft); color: var(--primary); }
+.tracking-status.is-neutral { background: var(--soft-bg); color: var(--muted); }
+.client-tracking-pagination { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+.client-tracking-pagination-actions { display: flex; gap: 8px; }
+.client-tracking-cards { display: grid; gap: 10px; }
+.client-tracking-card { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft-bg); }
+.client-tracking-card-head, .client-tracking-card-actions { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.client-tracking-card-head > div { min-width: 0; }
+.client-tracking-card-head strong, .client-tracking-card-head span { display: block; overflow-wrap: anywhere; }
+.client-tracking-card-head span { color: var(--muted); font-size: 0.78rem; }
+.client-tracking-card-statuses { display: flex; flex-wrap: wrap; gap: 7px; }
+.client-tracking-card-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.client-tracking-card-metrics span { display: grid; gap: 3px; }
+.client-tracking-card-metrics small { color: var(--muted); font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+.client-tracking-detail-note { margin: 0; padding: 11px 13px; border-left: 4px solid var(--primary); border-radius: 8px; background: var(--primary-soft); color: var(--ink); }
+.tracking-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tracking-period-table { min-width: 980px; }
 .quick-search {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center;
   min-height: 46px; margin-bottom: 14px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--soft-bg); color: var(--muted);
@@ -586,12 +645,12 @@ tbody tr:hover { background: var(--primary-soft); }
 .pagination { display: flex; justify-content: flex-end; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font-weight: 800; }
 .detail-explorer-overlay {
   position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 22px;
-  background: rgba(15, 23, 42, 0.48); backdrop-filter: blur(4px);
+  overflow: hidden; overscroll-behavior: none; background: rgba(15, 23, 42, 0.52);
 }
 .detail-explorer-overlay[hidden] { display: none; }
 .detail-explorer-dialog {
   display: grid; grid-template-rows: auto auto auto auto minmax(0, 1fr); width: min(1060px, 100%); max-height: min(88vh, 860px);
-  overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 28px 70px rgba(15, 23, 42, 0.26);
+  overflow: hidden; isolation: isolate; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 18px 44px rgba(15, 23, 42, 0.22);
   animation: detailDialogIn 0.16s ease-out;
 }
 .detail-explorer-dialog[data-layout="compact"] { width: min(920px, 100%); }
@@ -600,6 +659,8 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-explorer-header h2 { margin: 4px 0 0; font-size: clamp(1.15rem, 2vw, 1.45rem); }
 .detail-explorer-header .eyebrow { max-width: 720px; color: var(--primary); letter-spacing: 0.08em; }
 .detail-explorer-header .icon-button { flex: 0 0 42px; width: 42px; height: 42px; }
+.detail-explorer-header-actions { display: flex; flex: 0 0 auto; gap: 8px; align-items: center; }
+.detail-modal-back { min-height: 40px; white-space: nowrap; }
 .detail-selection-message { margin: 14px 20px 0; padding: 12px 14px; border: 1px solid rgba(245, 158, 11, 0.32); border-radius: 12px; background: var(--amber-soft); color: var(--amber); font-weight: 800; }
 .detail-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; padding: 14px 20px 4px; color: var(--muted); }
 .detail-metric { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
@@ -610,8 +671,8 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-toolbar { display: grid; grid-template-columns: minmax(280px, 1fr) 170px auto auto auto; gap: 8px; align-items: end; padding: 12px 20px; }
 .detail-toolbar .quick-search { margin: 0; min-height: 40px; }
 .detail-toolbar label { min-width: 0; }
-.detail-body { min-height: 0; padding: 2px 20px 20px; overflow: auto; }
-.detail-table-wrap { overflow: auto; max-height: min(52vh, 500px); border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.detail-body { min-height: 0; padding: 2px 20px 20px; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.detail-table-wrap { overflow: auto; max-height: min(52vh, 500px); overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .detail-table-wrap.is-short { max-height: none; overflow: visible; }
 .detail-table { width: 100%; min-width: 720px; table-layout: auto; }
 .detail-table th, .detail-table td { padding: 11px 12px; line-height: 1.35; }
@@ -635,7 +696,7 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-row-link:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: 3px; border-radius: 4px; }
 .detail-footer { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 12px; color: var(--muted); font-weight: 800; }
 .detail-card-list { display: none; gap: 10px; }
-.detail-card { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
+.detail-card { display: grid; gap: 8px; contain: layout paint; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
 .detail-card.is-selected-client { border-color: rgba(13, 148, 136, 0.45); box-shadow: inset 3px 0 0 var(--primary); }
 .detail-card:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: 3px; }
 .detail-card strong { color: var(--ink); }
@@ -647,7 +708,7 @@ tbody tr:hover { background: var(--primary-soft); }
 .contribution-card-metrics small { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; }
 .presentation-detail { display: grid; gap: 14px; }
 .detail-back-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.detail-section { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
+.detail-section { display: grid; gap: 10px; contain: layout paint; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft-bg); }
 .detail-section h3 { margin: 0; font-size: 0.92rem; }
 .detail-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 16px; }
 .detail-field { min-width: 0; }
@@ -679,6 +740,8 @@ tbody tr:hover { background: var(--primary-soft); }
   .kpi-grid[data-odd="true"] .kpi-card:last-child { grid-column: 1 / -1; }
   .region-map-layout { grid-template-columns: 1fr; }
   .region-map-canvas { min-height: 300px; }
+  .client-tracking-controls > label, .client-tracking-controls .tracking-sort { grid-column: span 4; }
+  .client-tracking-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 @media (max-width: 820px) {
   .main { padding: 20px 12px 34px; }
@@ -695,7 +758,7 @@ tbody tr:hover { background: var(--primary-soft); }
   .multi-combobox-list { max-height: min(44vh, 340px); }
   .detail-explorer-overlay { padding: 8px; place-items: stretch; }
   .detail-explorer-dialog { width: 100%; max-height: calc(100vh - 16px); border-radius: 16px; }
-  .detail-explorer-header { position: sticky; top: 0; z-index: 3; }
+  .detail-explorer-header { position: static; }
   .detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .detail-toolbar { grid-template-columns: minmax(0, 1fr) minmax(140px, 0.45fr); }
   .detail-toolbar .quick-search { grid-column: 1 / -1; }
@@ -704,6 +767,12 @@ tbody tr:hover { background: var(--primary-soft); }
   .timeline-heading { display: grid; }
   .timeline-action { width: 100%; }
   .timeline-summary-state > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .client-tracking-meta { justify-items: start; white-space: normal; }
+  .client-tracking-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .client-tracking-controls > label, .client-tracking-controls .tracking-sort { grid-column: auto; }
+  .client-tracking-actions { grid-column: 1 / -1; }
+  .client-tracking-table-wrap { display: none; }
+  .client-tracking-detail .detail-table-wrap { display: block; max-width: 100%; overflow-x: auto; }
 }
 @media (max-width: 560px) {
   .sidebar-note { display: none; }
@@ -732,6 +801,17 @@ tbody tr:hover { background: var(--primary-soft); }
   .detail-toolbar { grid-template-columns: 1fr; }
   .detail-toolbar .quick-search { grid-column: auto; }
   .detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .client-tracking-panel { padding: 14px; }
+  .client-tracking-controls { grid-template-columns: 1fr; }
+  .client-tracking-controls > label, .client-tracking-controls .tracking-sort, .client-tracking-actions { grid-column: auto; }
+  .client-tracking-actions { display: grid; }
+  .client-tracking-pagination { display: grid; }
+  .client-tracking-pagination-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .detail-explorer-header { align-items: flex-start; }
+  .detail-explorer-header-actions { flex-direction: column-reverse; align-items: flex-end; }
+  .detail-modal-back { min-height: 38px; padding-inline: 10px; }
 }
 @media (max-width: 390px) {
   .kpi-grid { grid-template-columns: 1fr; }
@@ -875,6 +955,9 @@ let colombiaGeoJsonCache = null;
 let regionMapRenderToken = 0;
 let detailExplorerEventsBound = false;
 let detailSearchDebounced = null;
+const pageScrollLock = {
+  count: 0, scrollX: 0, scrollY: 0, touchY: null, bodyStyle: null
+};
 let filterPanelEventsBound = false;
 let filterSearchDebounced = null;
 let comboboxViewportEventsBound = false;
@@ -882,13 +965,16 @@ let dashboardInitialized = false;
 const debouncedResizeCharts = debounce(resizeCharts, 160);
 const state = {
   filters: {}, scopeRows: [], filteredRows: [], analyses: null, indexes: null, datasetVersion: 0,
-  filterCache: createLruCache(12), analysisCache: createLruCache(8), noSalesCache: createLruCache(8), contributionModelCache: createLruCache(8), facetedOptionsCache: createLruCache(12), timelineCache: createLruCache(8),
+  filterCache: createLruCache(12), analysisCache: createLruCache(8), noSalesCache: createLruCache(8), contributionModelCache: createLruCache(8), facetedOptionsCache: createLruCache(12), timelineCache: createLruCache(8), clientTrackingCache: createLruCache(8), clientTrackingDetailCache: createLruCache(16),
+  clientTrackingRelationIndex: new Map(), clientTrackingRelationIndexSource: null,
   activityAnalyticsCache: { key: "", value: null }, chartSignatures: new Map(), chartLayoutSignature: "",
   pendingRenderFrame: null, renderVersion: 0, syncingControls: false,
   filterUi: { openComboboxId: null, queries: { activity: "", client: "" }, highlighted: { activity: -1, client: -1 } },
   facetedOptions: null,
   performance: createPerformanceState(),
   runtimeDiagnostics: { errors: [], warnings: [] },
+  clientTrackingTable: getEmptyClientTrackingTableState(),
+  modalNavigation: { stack: [] },
   noSalesAnalysis: getEmptyNoSalesAnalysis(), detailExplorer: getEmptyDetailExplorerState(), search: "",
   page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc"
 };
@@ -1029,6 +1115,7 @@ function bindEvents() {
   const themeToggle = document.getElementById("themeToggle");
   if (themeToggle) themeToggle.addEventListener("click", toggleTheme);
   bindDetailExplorerEvents();
+  bindClientTrackingEvents();
   const clearButton = document.getElementById("clearFiltersButton");
   if (clearButton) clearButton.addEventListener("click", clearFilters);
   const searchInput = document.getElementById("globalSearchInput");
@@ -1226,6 +1313,7 @@ function updateDashboardFilters(patch, options) {
   }
   state.filters = nextFilters;
   state.page = 1;
+  state.clientTrackingTable.page = 1;
   if (!options.preserveOpenDropdown) state.filterUi.openComboboxId = null;
   syncFilterControlsFromState({ refreshOptions: false });
   scheduleDashboardRender(options.reason || "filter-change");
@@ -1540,7 +1628,7 @@ function handleActiveFilterClick(event) {
   updateDashboardFilters({ [target.dataset.filterChipField]: [] }, { reason: "remove-filter-chip" });
 }
 function createPerformanceState() {
-  return { stages: {}, counters: { indexesBuilt: 0, analysesExecuted: 0, rendersScheduled: 0, rendersCompleted: 0, rendersCancelled: 0, chartUpdates: 0, chartInitializations: 0, chartDisposals: 0, timelineModelsBuilt: 0, timelineCacheHits: 0, timelineUpdates: 0, timelineInitializations: 0, modalRowsRendered: 0, modalModelsBuilt: 0 } };
+  return { stages: {}, counters: { indexesBuilt: 0, analysesExecuted: 0, rendersScheduled: 0, rendersCompleted: 0, rendersCancelled: 0, chartUpdates: 0, chartInitializations: 0, chartDisposals: 0, timelineModelsBuilt: 0, timelineCacheHits: 0, timelineUpdates: 0, timelineInitializations: 0, modalRowsRendered: 0, modalModelsBuilt: 0, clientTrackingProjectionsBuilt: 0, clientTrackingCacheHits: 0, clientTrackingRowsRendered: 0, clientTrackingDetailModelsBuilt: 0, clientTrackingDetailCacheHits: 0 } };
 }
 function performanceNow() {
   return window.performance && typeof window.performance.now === "function" ? window.performance.now() : Date.now();
@@ -1563,7 +1651,7 @@ function getDashboardPerformanceSnapshot() {
     indexes: state.indexes ? state.indexes.stats : null,
     stages: JSON.parse(JSON.stringify(state.performance.stages)),
     counters: Object.assign({}, state.performance.counters),
-    caches: { filters: state.filterCache.size(), analyses: state.analysisCache.size(), noSales: state.noSalesCache.size(), contributions: state.contributionModelCache.size(), facets: state.facetedOptionsCache.size(), timelines: state.timelineCache.size(), charts: state.chartSignatures.size },
+    caches: { filters: state.filterCache.size(), analyses: state.analysisCache.size(), noSales: state.noSalesCache.size(), contributions: state.contributionModelCache.size(), facets: state.facetedOptionsCache.size(), timelines: state.timelineCache.size(), clientTracking: state.clientTrackingCache.size(), clientTrackingDetails: state.clientTrackingDetailCache.size(), charts: state.chartSignatures.size },
     diagnostics: { errors: state.runtimeDiagnostics.errors.length, warnings: state.runtimeDiagnostics.warnings.length, limit: RUNTIME_DIAGNOSTIC_LIMIT }
   };
 }
@@ -1578,14 +1666,19 @@ function createLruCache(limit) {
 }
 function initializeDashboardDataset(rows) {
   state.runtimeDiagnostics = { errors: [], warnings: [] };
+  if (state.detailExplorer && state.detailExplorer.isOpen) closeDetailExplorer({ restoreFocus: false });
+  else if (pageScrollLock.count) unlockPageScroll(true);
+  state.modalNavigation.stack = [];
   cancelPendingDashboardRender();
   disposeCharts();
   if (detailSearchDebounced && detailSearchDebounced.cancel) detailSearchDebounced.cancel();
   state.datasetVersion += 1;
-  state.filterCache.clear(); state.analysisCache.clear(); state.noSalesCache.clear(); state.contributionModelCache.clear(); state.facetedOptionsCache.clear(); state.timelineCache.clear(); state.chartSignatures.clear();
+  state.filterCache.clear(); state.analysisCache.clear(); state.noSalesCache.clear(); state.contributionModelCache.clear(); state.facetedOptionsCache.clear(); state.timelineCache.clear(); state.clientTrackingCache.clear(); state.clientTrackingDetailCache.clear(); state.chartSignatures.clear();
+  state.clientTrackingRelationIndex = new Map(); state.clientTrackingRelationIndexSource = null;
   state.filters = {};
   state.scopeRows = []; state.filteredRows = []; state.analyses = null; state.search = "";
   state.noSalesAnalysis = getEmptyNoSalesAnalysis(); state.detailExplorer = getEmptyDetailExplorerState(); state.facetedOptions = null;
+  state.clientTrackingTable = getEmptyClientTrackingTableState();
   state.chartLayoutSignature = ""; state.renderVersion += 1; state.pendingRenderFrame = null;
   state.performance = createPerformanceState();
   state.filterUi = { openComboboxId: null, queries: { activity: "", client: "" }, highlighted: { activity: -1, client: -1 } };
@@ -1727,6 +1820,7 @@ function renderAll(reason) {
   safelyRenderComponent("data-health", renderDataHealth);
   safelyRenderComponent("active-filters", renderActiveFilters);
   measurePerformance("kpiRender", function () { safelyRenderComponent("kpis", function () { renderKpis(state.filteredRows, state.noSalesAnalysis, state.analyses); }, renderKpiFailureState); });
+  measurePerformance("clientTrackingRender", function () { safelyRenderComponent("client-tracking", renderClientTrackingTable, renderClientTrackingFailureState); });
   measurePerformance("chartRender", function () { safelyRenderComponent("charts", function () { renderAdaptiveCharts(state.analyses); }, renderChartFailureState); });
   safelyRenderComponent("detail-explorer", syncOpenDetailExplorer, renderDetailExplorerFailureState);
   safelyRenderComponent("icons", function () { refreshIcons(document.getElementById("dashboardApp")); });
@@ -1747,6 +1841,229 @@ function renderChartFailureState() {
 function renderDetailExplorerFailureState() {
   const body = document.getElementById("detailExplorerBody");
   if (body) body.innerHTML = '<div class="empty-state empty-state-error" role="alert"><strong>Detalle no disponible</strong><span>El explorador puede cerrarse con el botón o la tecla Escape.</span></div>';
+}
+function getEmptyClientTrackingTableState() {
+  return { monthlyStatus: "ALL", totalStatus: "ALL", sortField: "selectedMonthlyStatus", sortDirection: "asc", page: 1, pageSize: 25, selectedRowKey: "", compactLayout: null };
+}
+function getClientTrackingTableState() {
+  return state.clientTrackingTable;
+}
+function getClientTrackingRowKey(row) {
+  return normalizeText(row && row.clientSap) + "||" + normalizeText(row && row.activityId);
+}
+function getClientTrackingPeriod() {
+  const models = state.analyses || {};
+  const periods = models.availablePeriods || [];
+  const selectedKey = models.clientNegotiationModels && models.clientNegotiationModels.selectedStatusPeriod
+    || (periods.length ? periods[periods.length - 1].key : null);
+  return periods.find(function (period) { return period.key === selectedKey; }) || null;
+}
+function bindClientTrackingEvents() {
+  const panel = document.getElementById("clientTracking");
+  if (!panel || panel.dataset.eventsBound === "true") return;
+  panel.dataset.eventsBound = "true";
+  panel.addEventListener("change", function (event) {
+    const target = event.target;
+    if (!target) return;
+    if (target.id === "clientTrackingMonthlyStatus") state.clientTrackingTable.monthlyStatus = target.value;
+    else if (target.id === "clientTrackingTotalStatus") state.clientTrackingTable.totalStatus = target.value;
+    else if (target.id === "clientTrackingSort") state.clientTrackingTable.sortField = target.value;
+    else if (target.id === "clientTrackingPageSize") state.clientTrackingTable.pageSize = [25, 50, 100].indexOf(Number(target.value)) !== -1 ? Number(target.value) : 25;
+    else return;
+    state.clientTrackingTable.page = 1;
+    renderClientTrackingTable();
+  });
+  panel.addEventListener("click", function (event) {
+    const target = event.target && event.target.closest ? event.target.closest("[data-tracking-action]") : null;
+    if (!target) return;
+    const action = target.dataset.trackingAction;
+    if (action === "sort-direction") state.clientTrackingTable.sortDirection = state.clientTrackingTable.sortDirection === "asc" ? "desc" : "asc";
+    else if (action === "page-prev") state.clientTrackingTable.page -= 1;
+    else if (action === "page-next") state.clientTrackingTable.page += 1;
+    else if (action === "clear-local") state.clientTrackingTable = Object.assign(getEmptyClientTrackingTableState(), { compactLayout: state.clientTrackingTable.compactLayout });
+    else if (action === "export-summary") { exportClientTrackingSummaryCsv(); return; }
+    else if (action === "open-detail") { openClientTrackingDetail(target.dataset.trackingRowKey, target); return; }
+    else return;
+    renderClientTrackingTable();
+  });
+}
+function clientTrackingRelationMatchesFilters(row, filters) {
+  const mappings = {
+    "ID Actividad": [row.activityId],
+    "Cliente SAP - Clave": [row.clientSap],
+    "Región SAP": row.regions || [row.region],
+    "Canal": row.channels || [row.channel],
+    "Categoría AS400 de la venta": row.categories || [row.category],
+    "Cedi": row.cedis || [row.cedi]
+  };
+  return Object.keys(mappings).every(function (field) {
+    const selected = (filters && filters[field] || []).map(normalizeText).filter(Boolean);
+    if (!selected.length) return true;
+    const available = new Set((mappings[field] || []).map(normalizeText).filter(Boolean));
+    return selected.some(function (value) { return available.has(value); });
+  });
+}
+function getClientTrackingProjection() {
+  const tableState = state.clientTrackingTable;
+  const period = getClientTrackingPeriod();
+  const key = [state.datasetVersion, getFilterSignature(state.filters), period ? period.key : "", tableState.monthlyStatus, tableState.totalStatus, tableState.sortField, tableState.sortDirection].join("|");
+  const cached = state.clientTrackingCache.get(key);
+  if (cached) {
+    state.performance.counters.clientTrackingCacheHits += 1;
+    return cached;
+  }
+  const source = state.analyses && Array.isArray(state.analyses.clientActivitySummary) ? state.analyses.clientActivitySummary : [];
+  const globalRows = source.filter(function (row) { return clientTrackingRelationMatchesFilters(row, state.filters); });
+  const rows = globalRows.filter(function (row) {
+    if (tableState.monthlyStatus !== "ALL" && row.selectedMonthlyStatus !== tableState.monthlyStatus) return false;
+    if (tableState.totalStatus !== "ALL" && row.totalObjectiveStatus !== tableState.totalStatus) return false;
+    return true;
+  }).slice();
+  rows.sort(function (left, right) {
+    const a = getClientTrackingSortValue(left, tableState.sortField, period);
+    const b = getClientTrackingSortValue(right, tableState.sortField, period);
+    const direction = tableState.sortDirection === "desc" ? -1 : 1;
+    if (a < b) return -1 * direction;
+    if (a > b) return direction;
+    return getClientTrackingRowKey(left).localeCompare(getClientTrackingRowKey(right), "es");
+  });
+  state.performance.counters.clientTrackingProjectionsBuilt += 1;
+  return state.clientTrackingCache.set(key, { rows: rows, globalCount: globalRows.length, sourceCount: source.length, period: period });
+}
+function getClientTrackingSortValue(row, field, period) {
+  const periodKey = period && period.key;
+  const values = {
+    selectedMonthlyStatus: { CUMPLE_MES: 1, NO_CUMPLE_MES: 2, NO_EVALUABLE_MES: 3 }[row.selectedMonthlyStatus] || 9,
+    totalObjectiveStatus: { CUMPLIO_OBJETIVO_TOTAL: 1, EN_PROGRESO_OBJETIVO_TOTAL: 2, NO_EVALUABLE_TOTAL: 3 }[row.totalObjectiveStatus] || 9,
+    clientName: normalizeSearchText(row.clientName || row.clientSap), activityId: normalizeSearchText(row.activityId),
+    monthlyObjective: row.monthlyObjective, monthlySales: getClientTrackingComparableSales(row, periodKey), selectedMonthlyCompliance: row.selectedMonthlyCompliance,
+    accumulatedComparableSales: row.accumulatedComparableSales, totalObjective: row.totalObjective, totalProgress: row.totalProgress,
+    investmentPercentage: row.investmentPercentage, region: normalizeSearchText(row.region), cedi: normalizeSearchText(row.cedi)
+  };
+  const value = values[field];
+  return isFiniteNumber(value) ? value : typeof value === "string" ? value : -Number.MAX_VALUE;
+}
+function getClientTrackingComparableSales(row, periodKey) {
+  if (!periodKey) return null;
+  const source = row.isSharedActivity ? row.jointActivitySalesByMonth : row.attributableSalesByMonth;
+  return source && isFiniteNumber(source[periodKey]) ? source[periodKey] : null;
+}
+function getClientTrackingMonthlyDiscountDisplay(row, periodKey) {
+  if (!periodKey || !row) return "No disponible";
+  const status = row.monthlyDiscountStatusByMonth && row.monthlyDiscountStatusByMonth[periodKey];
+  if (status === "DESCUENTO_MENSUAL_CONFLICTIVO") return "Revisar";
+  const value = row.monthlyDiscountByMonth && row.monthlyDiscountByMonth[periodKey];
+  return isFiniteNumber(value) ? formatRatioPercent(value) : "No disponible";
+}
+function ensureClientTrackingRelationIndex(rows) {
+  if (state.clientTrackingRelationIndexSource === rows) return state.clientTrackingRelationIndex;
+  state.clientTrackingRelationIndex = new Map();
+  (rows || []).forEach(function (row) { state.clientTrackingRelationIndex.set(getClientTrackingRowKey(row), row); });
+  state.clientTrackingRelationIndexSource = rows;
+  return state.clientTrackingRelationIndex;
+}
+function getClientTrackingDetailModel(row, periods) {
+  if (!row) return null;
+  const availablePeriods = periods || state.analyses && state.analyses.availablePeriods || [];
+  const periodSignature = availablePeriods.map(function (period) { return period.key; }).join(",") + "|selected:" + (row.selectedStatusPeriod || "");
+  const key = state.datasetVersion + "|" + getClientTrackingRowKey(row) + "|" + periodSignature;
+  const cached = state.clientTrackingDetailCache.get(key);
+  if (cached) {
+    state.performance.counters.clientTrackingDetailCacheHits += 1;
+    return cached;
+  }
+  const model = {
+    key: getClientTrackingRowKey(row),
+    row: row,
+    periods: availablePeriods.map(function (period) {
+      return {
+        key: period.key, label: period.label,
+        generalSales: row.salesByMonth && row.salesByMonth[period.key],
+        attributableSales: row.attributableSalesByMonth && row.attributableSalesByMonth[period.key],
+        comparableSales: getClientTrackingComparableSales(row, period.key),
+        monthlyDiscount: row.monthlyDiscountByMonth && row.monthlyDiscountByMonth[period.key],
+        monthlyDiscountStatus: row.monthlyDiscountStatusByMonth && row.monthlyDiscountStatusByMonth[period.key] || "SIN_DATO",
+        compliance: row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key],
+        status: row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key] || "NO_EVALUABLE_MES"
+      };
+    })
+  };
+  state.performance.counters.clientTrackingDetailModelsBuilt += 1;
+  return state.clientTrackingDetailCache.set(key, model);
+}
+function renderClientTrackingTable() {
+  const projection = getClientTrackingProjection();
+  const tableState = state.clientTrackingTable;
+  const controls = document.getElementById("clientTrackingControls");
+  const body = document.getElementById("clientTrackingBody");
+  const pagination = document.getElementById("clientTrackingPagination");
+  const count = document.getElementById("clientTrackingCount");
+  const periodBadge = document.getElementById("clientTrackingPeriod");
+  if (!controls || !body || !pagination) return;
+  ensureClientTrackingRelationIndex(state.analyses && state.analyses.clientActivitySummary || []);
+  if (count) count.textContent = formatInteger(projection.rows.length) + " de " + formatInteger(projection.globalCount) + " relaciones";
+  if (periodBadge) periodBadge.textContent = projection.period ? "Estado mensual — " + projection.period.label : "Período no disponible";
+  controls.innerHTML = buildClientTrackingControlsMarkup();
+  const pageCount = Math.max(1, Math.ceil(projection.rows.length / tableState.pageSize));
+  tableState.page = Math.max(1, Math.min(pageCount, tableState.page));
+  const start = (tableState.page - 1) * tableState.pageSize;
+  const visibleRows = projection.rows.slice(start, start + tableState.pageSize);
+  const compact = Boolean(window.matchMedia && window.matchMedia("(max-width: 820px)").matches);
+  tableState.compactLayout = compact;
+  if (!projection.rows.length) body.innerHTML = buildClientTrackingEmptyState(projection);
+  else body.innerHTML = compact ? buildClientTrackingCards(visibleRows, projection.period) : buildClientTrackingDesktopTable(visibleRows, projection.period);
+  pagination.innerHTML = buildClientTrackingPagination(projection.rows.length, start, visibleRows.length, pageCount);
+  state.performance.counters.clientTrackingRowsRendered += visibleRows.length;
+  refreshIcons(document.getElementById("clientTracking"));
+}
+function buildClientTrackingControlsMarkup() {
+  const value = state.clientTrackingTable;
+  const monthly = [["ALL", "Todos"], ["CUMPLE_MES", "Cumple mes"], ["NO_CUMPLE_MES", "No cumple mes"], ["NO_EVALUABLE_MES", "No evaluable"]];
+  const totals = [["ALL", "Todos"], ["CUMPLIO_OBJETIVO_TOTAL", "Objetivo total cumplido"], ["EN_PROGRESO_OBJETIVO_TOTAL", "En progreso"], ["NO_EVALUABLE_TOTAL", "No evaluable"]];
+  const sorts = [["selectedMonthlyStatus", "Estado mensual"], ["totalObjectiveStatus", "Estado total"], ["clientName", "Cliente"], ["activityId", "Actividad"], ["monthlyObjective", "Objetivo mensual"], ["monthlySales", "Venta del mes"], ["selectedMonthlyCompliance", "Cumplimiento mensual"], ["accumulatedComparableSales", "Ventas acumuladas"], ["totalObjective", "Objetivo total"], ["totalProgress", "Avance total"], ["investmentPercentage", "% inversión"], ["region", "Región"], ["cedi", "CEDI"]];
+  const optionMarkup = function (options, selected) { return options.map(function (item) { return "<option value=\\"" + item[0] + "\\"" + (item[0] === selected ? " selected" : "") + ">" + escapeHtml(item[1]) + "</option>"; }).join(""); };
+  return "<label>Estado mensual<select id=\\"clientTrackingMonthlyStatus\\">" + optionMarkup(monthly, value.monthlyStatus) + "</select></label>" +
+    "<label>Estado objetivo total<select id=\\"clientTrackingTotalStatus\\">" + optionMarkup(totals, value.totalStatus) + "</select></label>" +
+    "<label class=\\"tracking-sort\\">Ordenar por<select id=\\"clientTrackingSort\\">" + optionMarkup(sorts, value.sortField) + "</select></label>" +
+    "<label class=\\"tracking-page-size\\">Filas<select id=\\"clientTrackingPageSize\\">" + [25, 50, 100].map(function (size) { return "<option value=\\"" + size + "\\"" + (size === value.pageSize ? " selected" : "") + ">" + size + "</option>"; }).join("") + "</select></label>" +
+    "<div class=\\"client-tracking-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"sort-direction\\"><i data-lucide=\\"" + (value.sortDirection === "asc" ? "arrow-up" : "arrow-down") + "\\"></i> " + (value.sortDirection === "asc" ? "Ascendente" : "Descendente") + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"export-summary\\"><i data-lucide=\\"download\\"></i> Descargar CSV</button></div>";
+}
+function buildClientTrackingDesktopTable(rows, period) {
+  const headers = ["Estado mes", "Estado total", "Cliente / CodSAP", "ID Actividad", "Objetivo mes", "Venta atribuible del mes", "Dcto. mes", "Cumplimiento mes", "Avance total", "% inversión", "Acción"];
+  return "<div class=\\"client-tracking-table-wrap\\"><table class=\\"client-tracking-table\\"><caption class=\\"sr-only\\">Relaciones cliente–negociación para " + escapeHtml(period ? period.label : "el período disponible") + "</caption><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (row) {
+    const key = getClientTrackingRowKey(row);
+    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>CodSAP: " + escapeHtml(row.clientSap) + (row.clientNit ? " · NIT: " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></td></tr>";
+  }).join("") + "</tbody></table></div>";
+}
+function buildClientTrackingCards(rows, period) {
+  return "<div class=\\"client-tracking-cards\\">" + rows.map(function (row) {
+    const key = getClientTrackingRowKey(row);
+    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Actividad " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta " + escapeHtml(period ? period.label : "del mes") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || "Ubicación no disponible") + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">Ver detalle</button></div></article>";
+  }).join("") + "</div>";
+}
+function buildClientTrackingPagination(total, start, visibleCount, pageCount) {
+  const from = total ? start + 1 : 0, to = start + visibleCount;
+  return "<span>Mostrando " + formatInteger(from) + "–" + formatInteger(to) + " de " + formatInteger(total) + " relaciones cliente–negociación</span><div class=\\"client-tracking-pagination-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"page-prev\\"" + (state.clientTrackingTable.page <= 1 ? " disabled" : "") + "><i data-lucide=\\"chevron-left\\"></i> Anterior</button><span class=\\"badge badge-muted\\">Página " + formatInteger(state.clientTrackingTable.page) + " de " + formatInteger(pageCount) + "</span><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"page-next\\"" + (state.clientTrackingTable.page >= pageCount ? " disabled" : "") + ">Siguiente <i data-lucide=\\"chevron-right\\"></i></button></div>";
+}
+function buildClientTrackingEmptyState(projection) {
+  let title = "No hay relaciones cliente–negociación para los filtros actuales.";
+  if (state.clientTrackingTable.monthlyStatus === "CUMPLE_MES") title = "No hay clientes que cumplan el objetivo mensual en el período seleccionado.";
+  else if (projection.globalCount && (state.clientTrackingTable.monthlyStatus !== "ALL" || state.clientTrackingTable.totalStatus !== "ALL")) title = "No hay relaciones con los estados locales seleccionados.";
+  return "<div class=\\"empty-state empty-state-info\\" role=\\"status\\"><i data-lucide=\\"info\\"></i><strong>" + escapeHtml(title) + "</strong><span>Los estados no evaluables no se sustituyen por cero.</span><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"clear-local\\">Limpiar filtros de la tabla</button></div>";
+}
+function clientTrackingMonthlyBadge(status) {
+  const map = { CUMPLE_MES: ["Cumple mes", "is-positive", "check-circle-2"], NO_CUMPLE_MES: ["No cumple mes", "is-negative", "x-circle"], NO_EVALUABLE_MES: ["No evaluable", "is-neutral", "circle-help"] };
+  const item = map[status] || map.NO_EVALUABLE_MES;
+  return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+}
+function clientTrackingTotalBadge(status) {
+  const map = { CUMPLIO_OBJETIVO_TOTAL: ["Objetivo total cumplido", "is-positive", "badge-check"], EN_PROGRESO_OBJETIVO_TOTAL: ["Objetivo total en progreso", "is-progress", "clock-3"], NO_EVALUABLE_TOTAL: ["Objetivo total no evaluable", "is-neutral", "circle-help"] };
+  const item = map[status] || map.NO_EVALUABLE_TOTAL;
+  return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+}
+function renderClientTrackingFailureState() {
+  const body = document.getElementById("clientTrackingBody");
+  if (body) body.innerHTML = '<div class="empty-state empty-state-error" role="alert"><strong>Seguimiento no disponible</strong><span>Los modelos analíticos no fueron sustituidos ni recalculados.</span></div>';
 }
 function getCachedActivityAnalytics(scopeRows, filters) {
   const scopeFilters = getScopeFilters(filters);
@@ -2197,6 +2514,41 @@ function getComplianceState(value, status) {
   if (value >= 0.9) return { label: "Atención · entre 90 % y 99,99 %", className: "kpi-attention" };
   return { label: "Desfavorable · menos de 90 %", className: "kpi-negative" };
 }
+function resolveClientModelSelectedPeriod(model, filters) {
+  const periods = model && model.availablePeriods ? model.availablePeriods : [];
+  if (!periods.length) return null;
+  const first = function (value) { return Array.isArray(value) ? value[0] : value; };
+  const yearText = normalizeText(first(filters && filters["AÃ±o"]));
+  const yearValue = yearText ? Number(yearText) : null;
+  const monthText = normalizeText(first(filters && filters.Mes)).toLocaleUpperCase("es-CO").replace(/\\./g, "");
+  const monthNames = { ENE: 1, ENERO: 1, FEB: 2, FEBRERO: 2, MAR: 3, MARZO: 3, ABR: 4, ABRIL: 4, MAY: 5, MAYO: 5, JUN: 6, JUNIO: 6, JUL: 7, JULIO: 7, AGO: 8, AGOSTO: 8, SEP: 9, SEPT: 9, SEPTIEMBRE: 9, OCT: 10, OCTUBRE: 10, NOV: 11, NOVIEMBRE: 11, DIC: 12, DICIEMBRE: 12 };
+  const monthValue = monthNames[monthText] || Number(monthText) || null;
+  const candidates = periods.filter(function (period) {
+    return (!yearValue || Math.floor(period.key / 100) === yearValue) && (!monthValue || period.key % 100 === monthValue);
+  });
+  return candidates.length ? candidates[candidates.length - 1] : periods[periods.length - 1];
+}
+function projectClientNegotiationModelPeriod(model, filters) {
+  const selected = resolveClientModelSelectedPeriod(model, filters || {});
+  const project = function (row) {
+    const status = selected && row.monthlyStatusByMonth ? row.monthlyStatusByMonth[selected.key] : "NO_EVALUABLE_MES";
+    return Object.assign({}, row, {
+      selectedMonthlyCompliance: selected && row.monthlyComplianceByMonth ? row.monthlyComplianceByMonth[selected.key] : null,
+      selectedMonthlyStatus: status || "NO_EVALUABLE_MES",
+      selectedStatusPeriod: selected ? selected.key : null
+    });
+  };
+  const columns = (model.summaryTableColumns || []).map(function (column) {
+    return column.id === "selectedMonthlyStatus" ? Object.assign({}, column, { label: "Estado mensual" + (selected ? " â€” " + selected.label : "") }) : column;
+  });
+  return Object.assign({}, model, {
+    selectedStatusPeriod: selected ? selected.key : null,
+    selectedStatusPeriodLabel: selected ? selected.label : "",
+    clientActivitySummary: (model.clientActivitySummary || []).map(project),
+    clientSummary: (model.clientSummary || []).map(project),
+    summaryTableColumns: columns
+  });
+}
 function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
   options = options || {};
   const sourceRows = rows || [];
@@ -2211,6 +2563,12 @@ function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
   const periods = salesByCanonicalPeriod(sourceRows);
   const presentationStatus = buildPresentationStatusAnalysis(sourceRows);
   const activityAnalytics = options.activityAnalytics || buildActivityAnalytics(scopeRows);
+  // La tabla de la siguiente fase consumirá este modelo ya construido por el
+  // generador; los renders, búsquedas y páginas no vuelven a recorrer el Excel.
+  const rawClientNegotiationModels = options.clientNegotiationModels
+    || (DASHBOARD_META && DASHBOARD_META.clientNegotiationModels)
+    || { availablePeriods: [], clientActivitySummary: [], clientSummary: [], summaryTableColumns: [], diagnostics: {} };
+  const clientNegotiationModels = projectClientNegotiationModelPeriod(rawClientNegotiationModels, options.filters || {});
   const kpis = computeKpis(sourceRows, noSales, { scopeRows: scopeRows, filters: options.filters || {}, activityAnalytics: activityAnalytics });
   const chartData = {
     regions: groupUniqueTotalSalesByField(sourceRows, "Región SAP", 12),
@@ -2230,6 +2588,11 @@ function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
     categorySales: groupBySum(sourceRows, "Categoría AS400 de la venta", "Ventas cajas físicas (sin rep)", 12),
     kpis: kpis,
     activityAnalytics: activityAnalytics,
+    clientNegotiationModels: clientNegotiationModels,
+    clientActivitySummary: clientNegotiationModels.clientActivitySummary || [],
+    clientSummary: clientNegotiationModels.clientSummary || [],
+    availablePeriods: clientNegotiationModels.availablePeriods || [],
+    summaryTableColumns: clientNegotiationModels.summaryTableColumns || [],
     activityPerformance: kpis.activityPerformance,
     chartData: chartData
   };
@@ -3439,8 +3802,129 @@ function getEmptyDetailExplorerState() {
     viewCache: null
   };
 }
+function getWindowScrollPosition() {
+  return {
+    x: typeof window !== "undefined" ? Number(window.scrollX || window.pageXOffset || 0) : 0,
+    y: typeof window !== "undefined" ? Number(window.scrollY || window.pageYOffset || 0) : 0
+  };
+}
+function lockPageScroll() {
+  pageScrollLock.count += 1;
+  if (pageScrollLock.count > 1) return;
+  const body = document && document.body;
+  const root = document && document.documentElement;
+  if (!body || !body.style) return;
+  const position = getWindowScrollPosition();
+  pageScrollLock.scrollX = position.x;
+  pageScrollLock.scrollY = position.y;
+  pageScrollLock.bodyStyle = {
+    position: body.style.position, top: body.style.top, left: body.style.left,
+    right: body.style.right, width: body.style.width, overflow: body.style.overflow,
+    paddingRight: body.style.paddingRight
+  };
+  const scrollbarWidth = root && typeof window !== "undefined" ? Math.max(0, window.innerWidth - root.clientWidth) : 0;
+  const computedPadding = typeof window !== "undefined" && window.getComputedStyle
+    ? parseFloat(window.getComputedStyle(body).paddingRight) || 0
+    : parseFloat(body.style.paddingRight) || 0;
+  body.style.position = "fixed";
+  body.style.top = "-" + pageScrollLock.scrollY + "px";
+  body.style.left = "-" + pageScrollLock.scrollX + "px";
+  body.style.right = "0";
+  body.style.width = "100%";
+  body.style.overflow = "hidden";
+  if (scrollbarWidth) body.style.paddingRight = (computedPadding + scrollbarWidth) + "px";
+  if (root && root.classList) root.classList.add("modal-scroll-locked");
+}
+function unlockPageScroll(force) {
+  if (force) pageScrollLock.count = Math.min(pageScrollLock.count, 1);
+  if (pageScrollLock.count <= 0) return;
+  pageScrollLock.count -= 1;
+  if (pageScrollLock.count > 0) return;
+  const body = document && document.body;
+  const root = document && document.documentElement;
+  const saved = pageScrollLock.bodyStyle;
+  if (body && body.style && saved) Object.keys(saved).forEach(function (property) { body.style[property] = saved[property]; });
+  if (root && root.classList) root.classList.remove("modal-scroll-locked");
+  if (typeof window !== "undefined" && window.scrollTo) window.scrollTo(pageScrollLock.scrollX, pageScrollLock.scrollY);
+  pageScrollLock.bodyStyle = null;
+  pageScrollLock.touchY = null;
+}
+function isNavigableModalType(type) {
+  return type === "clientTrackingDetail" || type === "activityContribution" || type === "activityDetail";
+}
+function cloneDetailExplorerForNavigation(explorer) {
+  return Object.assign({}, explorer, {
+    allRows: explorer.allRows,
+    selectedClientIds: (explorer.selectedClientIds || []).slice(),
+    searchTexts: explorer.searchTexts,
+    viewCache: explorer.viewCache
+  });
+}
+function captureModalScrollState() {
+  const body = document.getElementById("detailExplorerBody");
+  const tableWrap = body && body.querySelector ? body.querySelector(".detail-table-wrap") : null;
+  return { bodyTop: body ? Number(body.scrollTop || 0) : 0, bodyLeft: body ? Number(body.scrollLeft || 0) : 0, tableTop: tableWrap ? Number(tableWrap.scrollTop || 0) : 0, tableLeft: tableWrap ? Number(tableWrap.scrollLeft || 0) : 0 };
+}
+function restoreModalScrollState(scrollState) {
+  const body = document.getElementById("detailExplorerBody");
+  const tableWrap = body && body.querySelector ? body.querySelector(".detail-table-wrap") : null;
+  if (body) { body.scrollTop = scrollState.bodyTop || 0; body.scrollLeft = scrollState.bodyLeft || 0; }
+  if (tableWrap) { tableWrap.scrollTop = scrollState.tableTop || 0; tableWrap.scrollLeft = scrollState.tableLeft || 0; }
+}
+function captureClientTrackingTableView() {
+  const wrap = document.querySelector ? document.querySelector(".client-tracking-table-wrap") : null;
+  return {
+    tableState: Object.assign({}, state.clientTrackingTable),
+    tableScrollLeft: wrap ? Number(wrap.scrollLeft || 0) : 0,
+    windowScroll: getWindowScrollPosition()
+  };
+}
+function pushModalNavigationSnapshot() {
+  const stack = state.modalNavigation.stack;
+  if (state.detailExplorer.isOpen) {
+    stack.push({ kind: "modal", explorer: cloneDetailExplorerForNavigation(state.detailExplorer), scroll: captureModalScrollState() });
+  } else {
+    const tableView = captureClientTrackingTableView();
+    stack.push({ kind: "dashboard", tableState: tableView.tableState, tableScrollLeft: tableView.tableScrollLeft, windowScroll: tableView.windowScroll });
+  }
+  if (stack.length > 12) stack.shift();
+}
+function syncModalBackButton() {
+  const button = document.getElementById("detailExplorerBack");
+  if (button) button.hidden = !state.modalNavigation.stack.length;
+}
+function navigateModalBack() {
+  const snapshot = state.modalNavigation.stack.pop();
+  if (!snapshot) {
+    closeDetailExplorer();
+    return;
+  }
+  if (snapshot.kind === "dashboard") {
+    state.clientTrackingTable = Object.assign(getEmptyClientTrackingTableState(), snapshot.tableState || {});
+    closeDetailExplorer({ preserveNavigation: true, restoreFocus: false });
+    renderClientTrackingTable();
+    const restoreDashboardView = function () {
+      const wrap = document.querySelector ? document.querySelector(".client-tracking-table-wrap") : null;
+      if (wrap) wrap.scrollLeft = snapshot.tableScrollLeft || 0;
+      if (typeof window !== "undefined" && window.scrollTo) window.scrollTo(snapshot.windowScroll && snapshot.windowScroll.x || 0, snapshot.windowScroll && snapshot.windowScroll.y || 0);
+    };
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(restoreDashboardView); else restoreDashboardView();
+    return;
+  }
+  state.detailExplorer = cloneDetailExplorerForNavigation(snapshot.explorer);
+  renderDetailExplorer();
+  const overlay = document.getElementById("detailExplorerOverlay");
+  const dialog = document.getElementById("detailExplorerDialog");
+  if (overlay) overlay.hidden = false;
+  if (dialog && dialog.dataset) dialog.dataset.layout = state.detailExplorer.config && state.detailExplorer.config.compact ? "compact" : "standard";
+  const restoreModalView = function () { restoreModalScrollState(snapshot.scroll || {}); if (dialog && dialog.focus) dialog.focus(); };
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(restoreModalView); else restoreModalView();
+}
 function getDetailExplorerState() {
   return state.detailExplorer;
+}
+function getModalNavigationSnapshot() {
+  return { depth: state.modalNavigation.stack.length, scrollLockCount: pageScrollLock.count, savedScrollX: pageScrollLock.scrollX, savedScrollY: pageScrollLock.scrollY };
 }
 function setDetailExplorerQuery(query) {
   if (!state.detailExplorer.isOpen) return;
@@ -3497,12 +3981,48 @@ function bindDetailExplorerEvents() {
   });
   overlay.addEventListener("click", handleDetailExplorerClick);
   overlay.addEventListener("keydown", handleDetailExplorerKeydown);
+  overlay.addEventListener("wheel", handleDetailExplorerWheel, { passive: false });
+  overlay.addEventListener("touchstart", handleDetailExplorerTouchStart, { passive: true });
+  overlay.addEventListener("touchmove", handleDetailExplorerTouchMove, { passive: false });
   document.addEventListener("keydown", handleDetailExplorerDocumentKeydown);
+}
+function findModalScroller(target, deltaY) {
+  const dialog = document.getElementById("detailExplorerDialog");
+  let node = target;
+  while (node && node !== dialog) {
+    if (node.scrollHeight > node.clientHeight) {
+      const canMoveUp = deltaY < 0 && node.scrollTop > 0;
+      const canMoveDown = deltaY > 0 && node.scrollTop + node.clientHeight < node.scrollHeight - 1;
+      if (canMoveUp || canMoveDown || deltaY === 0) return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+function handleDetailExplorerWheel(event) {
+  if (!state.detailExplorer.isOpen || event.deltaY === 0) return;
+  if (!findModalScroller(event.target, event.deltaY)) event.preventDefault();
+}
+function handleDetailExplorerTouchStart(event) {
+  const touch = event.touches && event.touches[0];
+  pageScrollLock.touchY = touch ? touch.clientY : null;
+}
+function handleDetailExplorerTouchMove(event) {
+  if (!state.detailExplorer.isOpen) return;
+  const touch = event.touches && event.touches[0];
+  if (!touch || pageScrollLock.touchY === null) return;
+  const deltaY = pageScrollLock.touchY - touch.clientY;
+  pageScrollLock.touchY = touch.clientY;
+  if (!findModalScroller(event.target, deltaY)) event.preventDefault();
 }
 function handleDetailExplorerClick(event) {
   const target = event.target && event.target.closest ? event.target.closest("[data-detail-action], [data-detail-row-key]") : null;
   if (!target) return;
   const action = target.dataset.detailAction;
+  if (action === "navigate-back") {
+    navigateModalBack();
+    return;
+  }
   if (action === "clear-search") {
     state.detailExplorer.query = "";
     state.detailExplorer.visibleCount = DETAIL_EXPLORER_VISIBLE_STEP;
@@ -3532,6 +4052,10 @@ function handleDetailExplorerClick(event) {
     return;
   }
   if (action === "back-list") {
+    if (state.modalNavigation.stack.length && isNavigableModalType(state.detailExplorer.type)) {
+      navigateModalBack();
+      return;
+    }
     state.detailExplorer.selectedKey = "";
     state.detailExplorer.selectedRow = null;
     renderDetailExplorer();
@@ -3545,6 +4069,18 @@ function handleDetailExplorerClick(event) {
   }
   if (action === "export-csv") {
     exportDetailExplorerCsv();
+    return;
+  }
+  if (action === "tracking-detail-csv") {
+    exportClientTrackingDetailCsv(state.detailExplorer.config && state.detailExplorer.config.trackingRow);
+    return;
+  }
+  if (action === "tracking-view-client" || action === "tracking-view-activity") {
+    navigateFromClientTrackingDetail(action);
+    return;
+  }
+  if (action === "tracking-open-contribution") {
+    openClientTrackingContribution(target);
     return;
   }
   const rowKey = target.dataset.detailRowKey;
@@ -3564,6 +4100,20 @@ function handleDetailExplorerDocumentKeydown(event) {
     closeDetailExplorer();
     return;
   }
+  const target = event.target;
+  const interactive = target && (["INPUT", "TEXTAREA", "SELECT", "BUTTON", "A"].indexOf(target.tagName) !== -1 || target.isContentEditable);
+  if (!interactive && ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].indexOf(event.key) !== -1) {
+    const body = document.getElementById("detailExplorerBody");
+    if (body) {
+      const amount = event.key === "ArrowUp" ? -48 : event.key === "ArrowDown" ? 48 : event.key === "PageUp" ? -Math.max(120, body.clientHeight * 0.8) : event.key === "PageDown" || event.key === " " ? Math.max(120, body.clientHeight * 0.8) : 0;
+      if (event.key === "Home") body.scrollTop = 0;
+      else if (event.key === "End") body.scrollTop = body.scrollHeight;
+      else if (body.scrollBy) body.scrollBy({ top: amount, behavior: "auto" });
+      else body.scrollTop += amount;
+      event.preventDefault();
+      return;
+    }
+  }
   if (event.key === "Tab") trapDetailExplorerFocus(event);
 }
 function openNoSalesCategoryDetail(category, noSalesAnalysis, opener, options) {
@@ -3575,6 +4125,14 @@ function openNoSalesCategoryExplorer(opener, options, noSalesAnalysis) {
 }
 function syncOpenDetailExplorer() {
   if (!state.detailExplorer.isOpen) return;
+  if (state.detailExplorer.type === "clientTrackingDetail") {
+    const key = state.detailExplorer.category;
+    const rows = state.analyses && state.analyses.clientActivitySummary || [];
+    const row = ensureClientTrackingRelationIndex(rows).get(key);
+    if (row) openDetailExplorer(buildClientTrackingDetailConfig(getClientTrackingDetailModel(row)), state.detailExplorer.opener, { preserveState: true, skipFocus: true });
+    else closeDetailExplorer();
+    return;
+  }
   if (state.detailExplorer.type === "activityContribution" || state.detailExplorer.type === "activityDetail") {
     const activity = state.analyses && state.analyses.activityPerformance.find(function (item) {
       return item.activityId === state.detailExplorer.category;
@@ -3593,6 +4151,8 @@ function syncOpenDetailExplorer() {
 function openDetailExplorer(config, opener, options) {
   options = options || {};
   const previous = state.detailExplorer;
+  const wasOpen = previous.isOpen;
+  if (!options.preserveState && !options.skipNavigation && isNavigableModalType(config && config.type)) pushModalNavigationSnapshot();
   const preserve = options.preserveState && previous.isOpen && previous.type === config.type && previous.category === config.category;
   const allRows = (config.rows || []).slice();
   state.detailExplorer = {
@@ -3629,19 +4189,25 @@ function openDetailExplorer(config, opener, options) {
   const dialog = document.getElementById("detailExplorerDialog");
   if (overlay) overlay.hidden = false;
   if (dialog && dialog.dataset) dialog.dataset.layout = config.compact ? "compact" : "standard";
+  if (!wasOpen) lockPageScroll();
   if (!options.skipFocus && dialog && dialog.focus) dialog.focus();
 }
-function closeDetailExplorer() {
+function closeDetailExplorer(options) {
+  options = options || {};
+  const wasOpen = state.detailExplorer.isOpen;
   const opener = state.detailExplorer.opener;
   if (detailSearchDebounced && detailSearchDebounced.cancel) detailSearchDebounced.cancel();
   state.detailExplorer = getEmptyDetailExplorerState();
+  if (!options.preserveNavigation) state.modalNavigation.stack = [];
   const overlay = document.getElementById("detailExplorerOverlay");
   if (overlay) overlay.hidden = true;
   ["detailExplorerSummary", "detailExplorerToolbar", "detailExplorerBody", "detailExplorerSelectionMessage"].forEach(function (id) {
     const element = document.getElementById(id);
     if (element) element.innerHTML = "";
   });
-  if (opener && opener.focus) opener.focus();
+  syncModalBackButton();
+  if (wasOpen) unlockPageScroll();
+  if (options.restoreFocus !== false && opener && opener.focus) opener.focus();
 }
 function renderDetailExplorer() {
   return safelyRenderComponent("detail-explorer-render", renderDetailExplorerUnsafe, renderDetailExplorerFailureState);
@@ -3649,6 +4215,7 @@ function renderDetailExplorer() {
 function renderDetailExplorerUnsafe() {
   const explorer = state.detailExplorer;
   if (!explorer.isOpen || !explorer.config) return;
+  syncModalBackButton();
   const title = document.getElementById("detailExplorerTitle");
   const subtitle = document.getElementById("detailExplorerSubtitle");
   const message = document.getElementById("detailExplorerSelectionMessage");
@@ -3660,7 +4227,8 @@ function renderDetailExplorerUnsafe() {
   }
   renderDetailExplorerSummary();
   renderDetailExplorerToolbar();
-  if (configIsStandaloneDetail(explorer.config)) renderStandaloneActivityDetail();
+  if (explorer.config.type === "clientTrackingDetail") renderClientTrackingDetail();
+  else if (configIsStandaloneDetail(explorer.config)) renderStandaloneActivityDetail();
   else if (explorer.selectedRow) renderDetailExplorerPresentationDetail();
   else renderDetailExplorerList();
   refreshIcons();
@@ -3826,6 +4394,128 @@ function renderStandaloneActivityDetail() {
     }).join("") + "</div></section>";
   }).join("") + "</div>";
 }
+function openClientTrackingDetail(rowKey, opener) {
+  const rows = state.analyses && state.analyses.clientActivitySummary || [];
+  const row = ensureClientTrackingRelationIndex(rows).get(rowKey);
+  if (!row) {
+    showDashboardRuntimeMessage("La relación cliente–negociación ya no está disponible con los filtros actuales.", "warning");
+    return;
+  }
+  state.clientTrackingTable.selectedRowKey = rowKey;
+  openDetailExplorer(buildClientTrackingDetailConfig(getClientTrackingDetailModel(row)), opener || document.activeElement);
+}
+function buildClientTrackingDetailConfig(detailModelOrRow) {
+  const detailModel = detailModelOrRow && detailModelOrRow.row ? detailModelOrRow : getClientTrackingDetailModel(detailModelOrRow, state.analyses && state.analyses.availablePeriods || []);
+  const row = detailModel && detailModel.row;
+  if (!row) return null;
+  return {
+    type: "clientTrackingDetail",
+    category: getClientTrackingRowKey(row),
+    trackingRow: row,
+    trackingDetailModel: detailModel,
+    compact: false,
+    standaloneDetail: true,
+    title: "Cliente " + row.clientSap + " · Actividad " + row.activityId,
+    subtitle: "DETALLE CLIENTE–NEGOCIACIÓN",
+    rows: [], defaultSortField: "client", defaultSortDir: "asc", searchFields: [],
+    summary: [
+      { label: "Estado mensual", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus), primary: true, note: row.selectedStatusPeriod ? formatCanonicalPeriod(row.selectedStatusPeriod) : "Período no disponible" },
+      { label: "Cumplimiento del mes", value: formatAvailablePercent(row.selectedMonthlyCompliance), primary: true },
+      { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress), primary: true },
+      { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus), primary: true }
+    ]
+  };
+}
+function renderClientTrackingDetail() {
+  const body = document.getElementById("detailExplorerBody");
+  const detailModel = state.detailExplorer.config && state.detailExplorer.config.trackingDetailModel;
+  const row = detailModel && detailModel.row;
+  if (!body || !row) return;
+  const contribution = row.accumulatedAttributableSales;
+  const joint = row.accumulatedComparableSales;
+  const participation = row.isSharedActivity && isFiniteNumber(contribution) && isFiniteNumber(joint) && joint !== 0 ? contribution / joint : null;
+  const monthlyRows = detailModel.periods.map(function (period) {
+    const discountDisplay = period.monthlyDiscountStatus === "DESCUENTO_MENSUAL_CONFLICTIVO" ? "Revisar" : isFiniteNumber(period.monthlyDiscount) ? formatRatioPercent(period.monthlyDiscount) : "No disponible";
+    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.attributableSales)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
+  }).join("");
+  const warnings = (row.warnings || []).length ? "<section class=\\"detail-section\\"><h3>Advertencias analíticas</h3><div class=\\"extra-columns\\">" + row.warnings.map(function (warning) { return "<span class=\\"extra-chip\\">" + escapeHtml(formatClientTrackingWarning(warning)) + "</span>"; }).join("") + "</div></section>" : "";
+  const sharedFields = row.isSharedActivity ? [
+    { label: "Aporte atribuible del cliente", value: formatAvailableMetric(contribution) },
+    { label: "Venta conjunta comparable", value: formatAvailableMetric(joint) },
+    { label: "Participación del cliente", value: formatAvailablePercent(participation) },
+    { label: "Estado conjunto", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus) }
+  ] : [];
+  const sections = [
+    { title: "Identificación", fields: [
+      { label: "Cliente SAP", value: row.clientSap }, { label: "Nombre", value: row.clientName || "No disponible" }, { label: "NIT", value: row.clientNit || "No disponible" },
+      { label: "ID Actividad", value: row.activityId }, { label: "Tipo", value: row.isSharedActivity ? "Actividad compartida" : "Actividad individual" }, { label: "Clientes asociados", value: formatInteger(row.associatedClientCount) },
+      { label: "Región", value: row.region || "Sin información" }, { label: "CEDI", value: row.cedi || "Sin información" }, { label: "Canal", value: row.channel || "Sin información" }, { label: "Tipología", value: row.typology || "Sin información" },
+      { label: "Fecha inicio", value: formatClientTrackingDate(row.startDate) }, { label: "Fecha fin", value: formatClientTrackingDate(row.endDate) }, { label: "Estado de fechas", value: formatClientTrackingWarning(row.dateStatus) }
+    ] },
+    { title: "Objetivos, inversión y contrato", fields: [
+      { label: "Objetivo mensual", value: formatAvailableMetric(row.monthlyObjective) }, { label: "Objetivo total", value: formatAvailableMetric(row.totalObjective) },
+      { label: "Período de negociación", value: isFiniteNumber(row.negotiationPeriod) ? formatInteger(row.negotiationPeriod) + " meses" : "No disponible" },
+      { label: "% de inversión", value: formatAvailablePercent(row.investmentPercentage) }, { label: "% descuento negociación", value: formatNegotiationDiscountSummary(row.negotiationDiscount) },
+      { label: "Estado descuento", value: formatClientTrackingWarning(row.negotiationDiscountStatus) }
+    ] },
+    { title: row.isSharedActivity ? "Acumulado conjunto y aporte del cliente" : "Acumulado", fields: sharedFields.concat([
+      { label: "Ventas generales acumuladas", value: formatAvailableMetric(row.accumulatedGeneralSales) },
+      { label: "Ventas atribuibles acumuladas", value: formatAvailableMetric(row.accumulatedAttributableSales) },
+      { label: "Numerador comparable acumulado", value: formatAvailableMetric(row.accumulatedComparableSales) },
+      { label: "Objetivo total", value: formatAvailableMetric(row.totalObjective) }, { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress) },
+      { label: "Diferencia frente al objetivo total", value: isFiniteNumber(row.totalDifference) ? formatSignedNumber(row.totalDifference) : "No disponible" },
+      { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus) }
+    ]) }
+  ];
+  const renderSection = function (section) { return "<section class=\\"detail-section\\"><h3>" + escapeHtml(section.title) + "</h3><div class=\\"detail-fields\\">" + section.fields.map(function (field) { return "<article class=\\"detail-field\\"><span>" + escapeHtml(field.label) + "</span><strong>" + escapeHtml(field.value) + "</strong></article>"; }).join("") + "</div></section>"; };
+  const identificationMarkup = sections.slice(0, 2).map(renderSection).join("");
+  const accumulatedMarkup = renderSection(sections[2]);
+  const sharedAction = row.isSharedActivity ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-open-contribution\\"><i data-lucide=\\"users\\"></i> Ver contribución</button>" : "";
+  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\"><strong>Venta general del cliente ≠ venta atribuible de la negociación.</strong> El cumplimiento usa la venta atribuible comparable; en actividades compartidas usa la venta conjunta.</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> Ver cliente</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> Ver negociación</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> Descargar detalle CSV</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>Información mensual</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr><th scope=\\"col\\">Período</th><th scope=\\"col\\">Venta general cliente</th><th scope=\\"col\\">Venta atribuible</th>" + (row.isSharedActivity ? "<th scope=\\"col\\">Venta conjunta negociación</th>" : "") + "<th scope=\\"col\\">% descuento mes</th><th scope=\\"col\\">Cumplimiento mes</th><th scope=\\"col\\">Estado mes</th></tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
+}
+function navigateFromClientTrackingDetail(action) {
+  const row = state.detailExplorer.config && state.detailExplorer.config.trackingRow;
+  if (!row) return;
+  const patch = action === "tracking-view-client"
+    ? { "Cliente SAP - Clave": [row.clientSap], "ID Actividad": [] }
+    : { "ID Actividad": [row.activityId], "Cliente SAP - Clave": [] };
+  closeDetailExplorer();
+  updateDashboardFilters(patch, { reason: action });
+  const section = document.getElementById("kpis");
+  if (section && section.scrollIntoView) section.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function openClientTrackingContribution(opener) {
+  const row = state.detailExplorer.config && state.detailExplorer.config.trackingRow;
+  if (!row || !row.isSharedActivity) return;
+  const activities = state.analyses && state.analyses.activityPerformance || [];
+  const activity = activities.find(function (item) { return item.activityId === row.activityId && item.period === row.selectedStatusPeriod; }) || activities.find(function (item) { return item.activityId === row.activityId; });
+  if (!activity) {
+    state.detailExplorer.message = "La contribución no está disponible para el período y los filtros actuales.";
+    renderDetailExplorer();
+    return;
+  }
+  openActivityContributionDetail(activity, opener || document.activeElement, { selectedClientIds: [row.clientSap] });
+}
+function formatClientTrackingMonthlyStatus(status) {
+  return status === "CUMPLE_MES" ? "Cumple mes" : status === "NO_CUMPLE_MES" ? "No cumple mes" : "No evaluable";
+}
+function formatClientTrackingTotalStatus(status) {
+  return status === "CUMPLIO_OBJETIVO_TOTAL" ? "Objetivo total cumplido" : status === "EN_PROGRESO_OBJETIVO_TOTAL" ? "Objetivo total en progreso" : "Objetivo total no evaluable";
+}
+function formatClientTrackingWarning(value) {
+  const text = normalizeText(value);
+  if (!text) return "Sin información";
+  return text.replace(/_/g, " ").replace(/:(\d{6})$/, function (_, period) { return " · " + formatCanonicalPeriod(Number(period)); }).toLocaleLowerCase("es-CO").replace(/^./, function (letter) { return letter.toLocaleUpperCase("es-CO"); });
+}
+function formatClientTrackingDate(value) {
+  const date = dateOnly(value);
+  return date ? new Intl.DateTimeFormat("es-CO", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date) : "No disponible";
+}
+function formatNegotiationDiscountSummary(summary) {
+  if (!summary || summary.status === "SIN_DATO") return "No disponible";
+  if (summary.status === "VARIOS") return "Varios (" + (summary.values || []).map(formatRatioPercent).join(", ") + ")";
+  return isFiniteNumber(summary.values && summary.values[0]) ? formatRatioPercent(summary.values[0]) : isFiniteNumber(summary.value) ? formatRatioPercent(summary.value) : "No disponible";
+}
 function renderDetailExplorerPresentationDetail() {
   const body = document.getElementById("detailExplorerBody");
   if (!body) return;
@@ -3845,6 +4535,7 @@ function selectDetailExplorerRow(rowKey) {
     return config.rowKey(candidate, index) === rowKey;
   });
   if (!row) return;
+  if (isNavigableModalType(state.detailExplorer.type)) pushModalNavigationSnapshot();
   state.detailExplorer.selectedKey = rowKey;
   state.detailExplorer.selectedRow = row;
   renderDetailExplorer();
@@ -4177,6 +4868,8 @@ function buildNoSalesCategoryExplorerRows(analysis) {
       clientCount: item.clientIds.size
     };
   });
+  const compact = Boolean(window.matchMedia && window.matchMedia("(max-width: 820px)").matches);
+  if (state.analyses && state.clientTrackingTable.compactLayout !== compact) renderClientTrackingTable();
 }
 function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
   const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
@@ -4460,6 +5153,8 @@ function groupUniqueTotalSalesByField(rows, groupField, limit) {
 function destroyDashboard() {
   cancelPendingDashboardRender();
   disposeCharts();
+  if (state.detailExplorer && state.detailExplorer.isOpen) closeDetailExplorer({ restoreFocus: false });
+  else if (pageScrollLock.count) unlockPageScroll(true);
   window.removeEventListener("resize", debouncedResizeCharts);
   window.removeEventListener("resize", repositionOpenComboboxPanel);
   window.removeEventListener("scroll", repositionOpenComboboxPanel, true);
@@ -4731,6 +5426,75 @@ function activityDimensionIsExclusive(rows, field) {
     valuesByActivity.get(activityId).add(value);
   });
   return Array.from(valuesByActivity.values()).every(function (values) { return values.size <= 1; });
+}
+function exportClientTrackingSummaryCsv() {
+  const projection = getClientTrackingProjection();
+  const periods = state.analyses && state.analyses.availablePeriods || [];
+  if (!projection.rows.length) {
+    showDashboardRuntimeMessage("No hay relaciones para exportar con los filtros actuales.", "warning");
+    return false;
+  }
+  const periodPart = projection.period ? projection.period.label : "sin_periodo";
+  return downloadCsv(buildClientTrackingSummaryCsv(projection.rows, periods, projection.period), "seguimiento_clientes_negociaciones_" + normalizeFilenamePart(periodPart) + ".csv");
+}
+function buildClientTrackingSummaryCsv(rows, periods, selectedPeriod) {
+  const baseColumns = [
+    ["Estado del mes", function (row) { return formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus); }],
+    ["Período evaluado", function () { return selectedPeriod ? selectedPeriod.label : "No disponible"; }],
+    ["Estado objetivo total", function (row) { return formatClientTrackingTotalStatus(row.totalObjectiveStatus); }],
+    ["Región", function (row) { return row.region; }], ["CEDI", function (row) { return row.cedi; }], ["CodSAP", function (row) { return row.clientSap; }],
+    ["Nombre", function (row) { return row.clientName; }], ["NIT", function (row) { return row.clientNit; }], ["ID Actividad", function (row) { return row.activityId; }],
+    ["Tipo de negociación", function (row) { return row.isSharedActivity ? "Compartida" : "Individual"; }],
+    ["Objetivo mes", function (row) { return row.monthlyObjective; }], ["Venta atribuible del mes", function (row) { return getClientTrackingComparableSales(row, selectedPeriod && selectedPeriod.key); }],
+    ["Cumplimiento del mes", function (row) { return formatAvailablePercent(row.selectedMonthlyCompliance); }], ["Ventas generales acumuladas", function (row) { return row.accumulatedGeneralSales; }],
+    ["Ventas atribuibles acumuladas", function (row) { return row.accumulatedComparableSales; }], ["Objetivo total", function (row) { return row.totalObjective; }],
+    ["Avance objetivo total", function (row) { return formatAvailablePercent(row.totalProgress); }], ["Diferencia objetivo total", function (row) { return row.totalDifference; }],
+    ["% inversión", function (row) { return formatAvailablePercent(row.investmentPercentage); }], ["% descuento negociación", function (row) { return formatNegotiationDiscountSummary(row.negotiationDiscount); }]
+  ];
+  const dynamicColumns = [];
+  (periods || []).forEach(function (period) {
+    dynamicColumns.push(["Venta " + period.label, function (row) { return getClientTrackingComparableSales(row, period.key); }]);
+    dynamicColumns.push(["Dcto. " + period.label, function (row) { return getClientTrackingMonthlyDiscountDisplay(row, period.key); }]);
+    dynamicColumns.push(["Cumplimiento " + period.label, function (row) { return formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]); }]);
+    dynamicColumns.push(["Estado " + period.label, function (row) { return formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key]); }]);
+  });
+  const columns = baseColumns.concat(dynamicColumns);
+  return ["\uFEFF" + columns.map(function (column) { return serializeCsvCell(column[0], column[0]); }).join(",")].concat((rows || []).map(function (row) {
+    return columns.map(function (column) {
+      const value = column[1](row);
+      const safeValue = value === null || value === undefined || value === "" ? "No disponible" : value;
+      return serializeCsvCell(safeValue, safeValue);
+    }).join(",");
+  })).join("\\n");
+}
+function exportClientTrackingDetailCsv(row) {
+  if (!row) return false;
+  const periods = state.analyses && state.analyses.availablePeriods || [];
+  const csv = buildClientTrackingDetailCsv(row, periods);
+  return downloadCsv(csv, "detalle_" + normalizeFilenamePart(row.clientSap) + "_" + normalizeFilenamePart(row.activityId) + ".csv");
+}
+function buildClientTrackingDetailCsv(row, periods) {
+  const metadata = [
+    ["Cliente SAP", row.clientSap], ["Nombre", row.clientName], ["NIT", row.clientNit], ["ID Actividad", row.activityId],
+    ["Tipo de negociación", row.isSharedActivity ? "Compartida" : "Individual"], ["Clientes asociados", row.associatedClientCount],
+    ["Región", row.region], ["CEDI", row.cedi], ["Canal", row.channel], ["Tipología", row.typology],
+    ["Fecha inicio", formatClientTrackingDate(row.startDate)], ["Fecha fin", formatClientTrackingDate(row.endDate)], ["Estado fechas", formatClientTrackingWarning(row.dateStatus)],
+    ["Objetivo mensual", row.monthlyObjective], ["Objetivo total", row.totalObjective], ["Período negociación", row.negotiationPeriod],
+    ["% inversión", formatAvailablePercent(row.investmentPercentage)], ["% descuento negociación", formatNegotiationDiscountSummary(row.negotiationDiscount)],
+    ["Ventas generales acumuladas", row.accumulatedGeneralSales], ["Aporte atribuible acumulado del cliente", row.accumulatedAttributableSales],
+    ["Venta comparable acumulada de la negociación", row.accumulatedComparableSales], ["Avance objetivo total", formatAvailablePercent(row.totalProgress)], ["Diferencia objetivo total", row.totalDifference],
+    ["Estado objetivo total", formatClientTrackingTotalStatus(row.totalObjectiveStatus)], ["Advertencias", (row.warnings || []).map(formatClientTrackingWarning).join(" | ") || "Ninguna"]
+  ];
+  const lines = ["\uFEFF" + ["Campo", "Valor"].map(function (value) { return serializeCsvCell(value, value); }).join(",")]
+    .concat(metadata.map(function (item) { return serializeCsvCell(item[0], item[0]) + "," + serializeCsvCell(item[1] === null || item[1] === undefined || item[1] === "" ? "No disponible" : item[1], item[1]); }));
+  lines.push("");
+  const headers = ["Período", "Venta general del cliente", "Aporte atribuible del cliente", "Venta comparable de la negociación", "% descuento mes", "Cumplimiento mes", "Estado mes"];
+  lines.push(headers.map(function (value) { return serializeCsvCell(value, value); }).join(","));
+  (periods || []).forEach(function (period) {
+    const values = [period.label, row.salesByMonth && row.salesByMonth[period.key], row.attributableSalesByMonth && row.attributableSalesByMonth[period.key], getClientTrackingComparableSales(row, period.key), getClientTrackingMonthlyDiscountDisplay(row, period.key), formatAvailablePercent(row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key]), formatClientTrackingMonthlyStatus(row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key])];
+    lines.push(values.map(function (value) { const safe = value === null || value === undefined || value === "" ? "No disponible" : value; return serializeCsvCell(safe, safe); }).join(","));
+  });
+  return lines.join("\\n");
 }
 function exportFilteredCsv(rows) {
   return ["\\uFEFF" + TABLE_COLUMNS.map(function (column) { return serializeCsvCell(column, column); }).join(",")].concat(rows.map(function (row) {
@@ -5210,11 +5974,11 @@ function formatSignedNumber(value) {
 function formatPercent(value) {
   if (!isFiniteNumber(value)) return "N/A";
   const displayValue = Math.abs(value) > 1 ? value / 100 : value;
-  return new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(displayValue);
+  return formatRatioPercent(displayValue);
 }
 function formatRatioPercent(value) {
   if (!isFiniteNumber(value)) return "N/A";
-  return new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 2 }).format(value * 100) + " %";
 }
 function formatDateTime(value) {
   if (!value) return "—";

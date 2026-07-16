@@ -18,12 +18,15 @@ const REQUIRED_COLUMNS = [
   "Ventas cajas físicas (sin rep)",
   "TotalVentaMes",
   "Objetivo mes ",
+  "% De inversión",
   "ID Actividad",
   "Fecha inicio",
   "Fecha fin",
   "Objetivo cajas total",
   "Tipo descuento",
-  "Porcentaje descuento",
+  "Porcentaje descuento negociación",
+  "Porcentaje descuento venta",
+  "Porcentaje descuento mes",
   "Periodo negociacion",
   "Cedi"
 ];
@@ -35,11 +38,26 @@ const NUMERIC_COLUMNS = new Set([
   "TotalVentaMes",
   "Objetivo mes ",
   "Objetivo cajas total",
-  "Porcentaje descuento"
+  "% De inversión",
+  "Porcentaje descuento negociación",
+  "Porcentaje descuento venta",
+  "Porcentaje descuento mes"
 ]);
 
 const ZERO_WHEN_EMPTY_NUMERIC_COLUMNS = new Set(["Ventas cajas físicas (sin rep)"]);
-const FLEXIBLE_DECIMAL_NUMERIC_COLUMNS = new Set(["TotalVentaMes"]);
+const PERCENTAGE_COLUMNS = new Set([
+  "% De inversión",
+  "Porcentaje descuento negociación",
+  "Porcentaje descuento venta",
+  "Porcentaje descuento mes"
+]);
+const FLEXIBLE_DECIMAL_NUMERIC_COLUMNS = new Set([
+  "TotalVentaMes",
+  "% De inversión",
+  "Porcentaje descuento negociación",
+  "Porcentaje descuento venta",
+  "Porcentaje descuento mes"
+]);
 const MONTH_INDEX = new Map([
   ["ENE", 1], ["ENERO", 1], ["FEB", 2], ["FEBRERO", 2], ["MAR", 3], ["MARZO", 3],
   ["ABR", 4], ["ABRIL", 4], ["MAY", 5], ["MAYO", 5], ["JUN", 6], ["JUNIO", 6],
@@ -109,6 +127,10 @@ const HEADER_ALIASES = new Map([
   ["Categoría AS400 de la venta", ["Categoria AS400 de la venta", "Categoría AS400 de venta", "Categoria AS400 de venta", "Categoría AS400", "Categoria AS400", "Categoría", "Categoria"]],
   ["Ventas cajas físicas (sin rep)", ["Ventas cajas físicas mes (sin rep)"]],
   ["Objetivo mes ", ["Objetivo mes"]],
+  ["% De inversión", ["% De inversion", "Porcentaje de inversión", "Porcentaje de inversion"]],
+  ["Porcentaje descuento negociación", ["Porcentaje descuento", "Porcentaje descuento negociacion"]],
+  ["Porcentaje descuento venta", ["Porcentaje de descuento venta"]],
+  ["Porcentaje descuento mes", ["Porcentaje de descuento mes"]],
   ["TotalVentaMes", ["Total venta mes", "Total Venta Mes", "Total ventas mes", "Total Ventas Mes"]]
 ]);
 const THEME_KEY = "dashboardTheme";
@@ -123,6 +145,7 @@ const state = {
   ignoredEmptyRows: 0,
   validation: null,
   processedRows: [],
+  clientNegotiationModels: null,
   indexes: null,
   quality: null,
   generatedHtml: "",
@@ -504,6 +527,7 @@ function processCurrentSheet() {
         return normalizeRow(rowObject);
       });
       initializeProcessedDataIndexes(state.processedRows);
+      state.clientNegotiationModels = buildClientNegotiationModels(state.processedRows);
 
       state.quality = buildDataQualityReport(state.processedRows, {
         ignoredEmptyRows: state.ignoredEmptyRows,
@@ -668,6 +692,31 @@ function normalizeFlexibleDecimalNumberText(text) {
   return text;
 }
 
+function normalizePercentage(value) {
+  if (value === null || value === undefined || isEmptyCell(value)) return null;
+  const containsPercent = typeof value === "string" && value.includes("%");
+  let numericValue;
+  if (typeof value === "number") {
+    numericValue = Number.isFinite(value) ? value : null;
+  } else {
+    let text = normalizeCellText(value).replace(/%/g, "").replace(/\s/g, "");
+    let negative = false;
+    if (/^\(.+\)$/.test(text)) {
+      negative = true;
+      text = text.slice(1, -1);
+    }
+    text = text.replace(/[^0-9,\.\-+]/g, "");
+    if (!text || text === "-" || text === "+") return null;
+    if (text.includes(",") && text.includes(".")) return null;
+    const separator = text.includes(",") ? "," : ".";
+    if (text.split(separator).length - 1 > 1) return null;
+    numericValue = Number(text.replace(",", "."));
+    if (negative) numericValue = -numericValue;
+  }
+  if (!Number.isFinite(numericValue)) return null;
+  return containsPercent || Math.abs(numericValue) > 1 ? numericValue / 100 : numericValue;
+}
+
 function parseDate(value) {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : toIsoDate(value);
@@ -711,9 +760,11 @@ function normalizeRow(row) {
   };
 
   REQUIRED_COLUMNS.forEach((column) => {
-    const value = row[column];
+    const value = getWorkbookColumnValue(row, column);
     if (NUMERIC_COLUMNS.has(column)) {
-      normalized[column] = ZERO_WHEN_EMPTY_NUMERIC_COLUMNS.has(column) && isEmptyCell(value) ? 0 : parseNumber(value, column);
+      normalized[column] = PERCENTAGE_COLUMNS.has(column)
+        ? normalizePercentage(value)
+        : ZERO_WHEN_EMPTY_NUMERIC_COLUMNS.has(column) && isEmptyCell(value) ? 0 : parseNumber(value, column);
     } else if (DATE_COLUMNS.has(column)) {
       const parsedDate = parseDate(value);
       normalized[column] = parsedDate;
@@ -731,7 +782,14 @@ function normalizeRow(row) {
   normalized.__periodKey = period.key;
   normalized.__periodLabel = period.label;
   normalized.__periodSource = period.source;
+  normalized.__periodOrder = period.key;
+  normalized.__periodDate = period.key ? `${Math.floor(period.key / 100)}-${pad2(period.key % 100)}-01` : null;
   normalized.estadoInformacionVenta = classifySalesInformation(normalized);
+
+  // Contrato interno estable. Las claves originales se conservan para no alterar
+  // las vistas existentes mientras el adaptador desacopla el análisis del Excel.
+  defineInternalWorkbookFields(normalized, buildInternalWorkbookRow(normalized, period));
+  normalized["Porcentaje descuento"] = normalized["Porcentaje descuento negociación"];
 
   const withoutSalesInformation = isWithoutSalesInformation(normalized);
   if (!withoutSalesInformation && !normalized["Nit cliente - Clave"]) {
@@ -758,6 +816,86 @@ function normalizeRow(row) {
 
   normalized["Estado de vigencia"] = getVigenciaStatus(normalized["Fecha inicio"], normalized["Fecha fin"]);
   return normalized;
+}
+
+function normalizeWorkbookRow(row) {
+  return normalizeRow(row);
+}
+
+function defineInternalWorkbookFields(target, fields) {
+  Object.keys(fields).forEach((field) => {
+    Object.defineProperty(target, field, {
+      value: fields[field],
+      writable: true,
+      configurable: true,
+      enumerable: false
+    });
+  });
+  return target;
+}
+
+function getWorkbookColumnValue(row, column) {
+  if (row && Object.prototype.hasOwnProperty.call(row, column)) {
+    return row[column];
+  }
+  const aliases = HEADER_ALIASES.get(column) || [];
+  for (const alias of aliases) {
+    if (row && Object.prototype.hasOwnProperty.call(row, alias)) {
+      return row[alias];
+    }
+  }
+  return undefined;
+}
+
+function buildInternalWorkbookRow(row, period) {
+  const clientName = normalizeCellText(row["Cliente AS400 - Nombre negocio (Texto)"])
+    || normalizeCellText(row["Cliente AS400 - Texto"])
+    || normalizeCellText(row["Cliente SAP - Clave"]);
+  const hasNegotiation = Boolean(normalizeCellText(row["Cliente SAP - Clave"]) && normalizeCellText(row["ID Actividad"]));
+  const withoutPeriod = hasNegotiation && !period.key;
+  return {
+    year: parseCanonicalYear(row["Año"]),
+    month: parseCanonicalMonth(row["Mes"]),
+    periodKey: period.key,
+    periodLabel: period.key ? formatBusinessPeriodLabel(period.key) : "",
+    periodDate: period.key ? `${Math.floor(period.key / 100)}-${pad2(period.key % 100)}-01` : null,
+    periodOrder: period.key,
+    periodStatus: withoutPeriod ? "SIN_PERIODO_DE_VENTA" : period.key ? "CON_PERIODO" : "SIN_PERIODO",
+    evaluationStatus: withoutPeriod ? "NO_EVALUABLE" : null,
+    centerCode: normalizeCellText(row["Centro - Clave"]),
+    channel: normalizeCellText(row["Canal"]),
+    category: normalizeCellText(row["Categoría AS400 de la venta"]),
+    clientNit: normalizeCellText(row["Nit cliente - Clave"]),
+    presentationName: normalizeCellText(row["Presentación AS400 de la venta - Texto"]),
+    presentationCode: normalizeCellText(row["Presentación AS400 de la venta - Clave"]),
+    region: normalizeCellText(row["Región SAP"]),
+    typology: normalizeCellText(row["Tipología"]),
+    clientAs400: normalizeCellText(row["Cliente AS400 - Texto"]),
+    clientSap: normalizeCellText(row["Cliente SAP - Clave"]),
+    clientName,
+    physicalSales: row["Ventas cajas físicas (sin rep)"],
+    monthlyObjective: row["Objetivo mes "],
+    investmentPercentage: row["% De inversión"],
+    activityId: normalizeCellText(row["ID Actividad"]),
+    startDate: row["Fecha inicio"],
+    endDate: row["Fecha fin"],
+    totalObjective: row["Objetivo cajas total"],
+    discountType: normalizeCellText(row["Tipo descuento"]),
+    negotiationDiscountPercentage: row["Porcentaje descuento negociación"],
+    saleDiscountPercentage: row["Porcentaje descuento venta"],
+    monthlyDiscountPercentage: row["Porcentaje descuento mes"],
+    negotiationPeriod: parseNumber(row["Periodo negociacion"], "Periodo negociacion"),
+    cedi: normalizeCellText(row.Cedi),
+    totalMonthlySales: row.TotalVentaMes
+  };
+}
+
+function formatBusinessPeriodLabel(periodKey) {
+  if (!Number.isInteger(periodKey)) return "";
+  const year = Math.floor(periodKey / 100);
+  const month = periodKey % 100;
+  const monthNames = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+  return month >= 1 && month <= 12 ? `${monthNames[month - 1]} ${year}` : "";
 }
 
 function getCanonicalPeriod(row) {
@@ -1331,6 +1469,428 @@ function summarizeActivityAnalytics(objectives, relations, performance) {
   };
 }
 
+function buildClientNegotiationModels(rows, options = {}) {
+  const sourceRows = rows || [];
+  const startedAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
+  const availablePeriods = Array.from(new Set(sourceRows.map((row) => row.periodKey || getYearMonthSortValue(row)).filter(Number.isInteger)))
+    .sort((a, b) => a - b)
+    .map((key) => ({ key, label: formatBusinessPeriodLabel(key), date: `${Math.floor(key / 100)}-${pad2(key % 100)}-01`, order: key }));
+  const selectedStatusPeriod = resolveSelectedModelPeriod(availablePeriods, options);
+  const activityAnalytics = buildActivityAnalytics(sourceRows);
+  const activityRows = groupRowsByInternalKey(sourceRows, (row) => row.activityId || normalizeCellText(row["ID Actividad"]));
+  const relationRows = groupRowsByInternalKey(sourceRows, (row) => {
+    const clientSap = row.clientSap || normalizeCellText(row["Cliente SAP - Clave"]);
+    const activityId = row.activityId || normalizeCellText(row["ID Actividad"]);
+    return clientSap && activityId ? `${clientSap}||${activityId}` : "";
+  });
+  const objectiveLookup = new Map(activityAnalytics.objectivesByActivity.map((item) => [item.activityId, item]));
+  const generalSalesLookup = new Map(activityAnalytics.salesByClientPeriod.map((item) => [item.key, item]));
+  const activitySettings = new Map();
+  activityRows.forEach((rowsForActivity, activityId) => {
+    const investment = resolveDistinctNumeric(rowsForActivity, "investmentPercentage", "% De inversión", "SIN_INVERSION", "INVERSION_CONFLICTIVA");
+    const negotiationPeriod = resolveDistinctNumeric(rowsForActivity, "negotiationPeriod", "Periodo negociacion", "SIN_PERIODO_NEGOCIACION", "PERIODO_NEGOCIACION_CONFLICTIVO");
+    const objective = objectiveLookup.get(activityId);
+    const formulaWarning = objective && objective.objectiveStatus === "OK" && objective.objectiveTotalStatus === "OK" && negotiationPeriod.status === "OK"
+      && Math.abs(objective.objectiveMonthly * negotiationPeriod.value - objective.objectiveTotal) > 1e-7;
+    activitySettings.set(activityId, {
+      investment,
+      negotiationPeriod,
+      negotiationDiscount: buildNegotiationDiscountSummary(rowsForActivity),
+      totalObjectiveFormulaWarning: formulaWarning
+    });
+  });
+  const monthlyDiscounts = buildResolvedMonthlyDiscounts(sourceRows);
+  const jointSalesLookup = buildJointActivitySalesLookup(activityAnalytics.granularSalesByActivity);
+  const clientActivitySummary = [];
+
+  relationRows.forEach((rowsForRelation, relationKey) => {
+    const splitIndex = relationKey.indexOf("||");
+    const clientSap = relationKey.slice(0, splitIndex);
+    const activityId = relationKey.slice(splitIndex + 2);
+    const objective = objectiveLookup.get(activityId) || {};
+    const settings = activitySettings.get(activityId) || {};
+    const clients = activityAnalytics.activityClientRelations.activityClients.get(activityId) || new Set();
+    const isSharedActivity = clients.size > 1;
+    const salesByMonth = {};
+    const attributableSalesByMonth = {};
+    const jointActivitySalesByMonth = {};
+    const monthlyDiscountByMonth = {};
+    const monthlyDiscountStatusByMonth = {};
+    const monthlyComplianceByMonth = {};
+    const monthlyStatusByMonth = {};
+    const comparableSales = [];
+    const warnings = [];
+    let hasUnreliableActivePeriod = false;
+
+    availablePeriods.forEach((period) => {
+      const general = generalSalesLookup.get(`${clientSap}||${period.key}`);
+      if (general && isFiniteMetric(general.value)) salesByMonth[period.key] = general.value;
+      else if (general && general.status === "CONFLICTO") warnings.push(`VENTA_MENSUAL_CONFLICTIVA:${period.key}`);
+      const granular = activityAnalytics.granularSalesByActivity.get(`${clientSap}||${period.key}||${activityId}`);
+      if (granular && granular.status === "OK") attributableSalesByMonth[period.key] = granular.value;
+      else if (granular && granular.status !== "OK") {
+        warnings.push(`VENTA_ACTIVIDAD_AMBIGUA:${period.key}`);
+      }
+      const joint = jointSalesLookup.get(`${activityId}||${period.key}`);
+      if (joint && joint.status === "OK") jointActivitySalesByMonth[period.key] = joint.value;
+      else if (joint && joint.status !== "OK") warnings.push(`VENTA_CONJUNTA_CONFLICTIVA:${period.key}`);
+      const discount = monthlyDiscounts.get(`${clientSap}||${activityId}||${period.key}`);
+      monthlyDiscountStatusByMonth[period.key] = discount ? discount.status : "SIN_DATO";
+      if (discount && isFiniteMetric(discount.value)) monthlyDiscountByMonth[period.key] = discount.value;
+      else if (discount && discount.status === "DESCUENTO_MENSUAL_CONFLICTIVO") warnings.push(`${discount.status}:${period.key}`);
+
+      const active = isActivityActiveInPeriod(objective, period.key);
+      const numerator = isSharedActivity ? jointActivitySalesByMonth[period.key] : attributableSalesByMonth[period.key];
+      const periodAttributionReliable = isSharedActivity
+        ? Boolean(joint && joint.status === "OK" && isFiniteMetric(joint.value))
+        : Boolean(granular && granular.status === "OK" && isFiniteMetric(granular.value));
+      const comparable = active && objective.dateStatus === "OK" && objective.objectiveStatus === "OK" && objective.objectiveMonthly > 0 && isFiniteMetric(numerator) && periodAttributionReliable;
+      const compliance = comparable ? numerator / objective.objectiveMonthly : null;
+      monthlyComplianceByMonth[period.key] = compliance;
+      monthlyStatusByMonth[period.key] = !comparable ? "NO_EVALUABLE_MES" : compliance >= 1 ? "CUMPLE_MES" : "NO_CUMPLE_MES";
+      if (comparable) comparableSales.push(numerator);
+      if (active && !comparable) hasUnreliableActivePeriod = true;
+    });
+
+    const accumulatedGeneralSales = sumFiniteObjectValues(salesByMonth);
+    const accumulatedAttributableSales = sumFiniteObjectValues(attributableSalesByMonth);
+    const accumulatedComparableAttributableSales = comparableSales.length ? comparableSales.reduce((sum, value) => sum + value, 0) : null;
+    const totalComparable = isFiniteMetric(accumulatedComparableAttributableSales) && objective.objectiveTotalStatus === "OK" && objective.objectiveTotal > 0 && objective.dateStatus === "OK" && !hasUnreliableActivePeriod;
+    const totalProgress = totalComparable ? accumulatedComparableAttributableSales / objective.objectiveTotal : null;
+    const totalDifference = totalComparable ? accumulatedComparableAttributableSales - objective.objectiveTotal : null;
+    const totalObjectiveStatus = !totalComparable ? "NO_EVALUABLE_TOTAL" : totalProgress >= 1 ? "CUMPLIO_OBJETIVO_TOTAL" : "EN_PROGRESO_OBJETIVO_TOTAL";
+    const selectedMonthlyCompliance = selectedStatusPeriod ? monthlyComplianceByMonth[selectedStatusPeriod.key] : null;
+    const selectedMonthlyStatus = selectedStatusPeriod ? monthlyStatusByMonth[selectedStatusPeriod.key] : "NO_EVALUABLE_MES";
+    if (settings.totalObjectiveFormulaWarning) warnings.push("OBJETIVO_TOTAL_NO_COINCIDE_CON_FORMULA");
+    if (!rowsForRelation.some((row) => Number.isInteger(row.periodKey || getYearMonthSortValue(row)))) warnings.push("SIN_PERIODO_DE_VENTA");
+    if (objective.objectiveStatus && objective.objectiveStatus !== "OK") warnings.push(objective.objectiveStatus);
+    if (objective.objectiveTotalStatus && objective.objectiveTotalStatus !== "OK") warnings.push(objective.objectiveTotalStatus);
+    if (objective.dateStatus && objective.dateStatus !== "OK") warnings.push(objective.dateStatus);
+    if (settings.investment && settings.investment.status !== "OK") warnings.push(settings.investment.status);
+
+    const regionSummary = resolveDescriptiveValue(rowsForRelation, "region", "Región SAP");
+    const cediSummary = resolveDescriptiveValue(rowsForRelation, "cedi", "Cedi");
+    const channelSummary = resolveDescriptiveValue(rowsForRelation, "channel", "Canal");
+    const categorySummary = resolveDescriptiveValue(rowsForRelation, "category", "Categoría AS400 de la venta");
+    const typologySummary = resolveDescriptiveValue(rowsForRelation, "typology", "Tipología");
+    const clientName = resolveClientName(rowsForRelation);
+    const clientNit = resolveDescriptiveValue(rowsForRelation, "clientNit", "Nit cliente - Clave").value;
+
+    clientActivitySummary.push({
+      clientSap,
+      clientName,
+      clientNit,
+      activityId,
+      region: regionSummary.value,
+      regions: regionSummary.values,
+      cedi: cediSummary.value,
+      cedis: cediSummary.values,
+      channel: channelSummary.value,
+      channels: channelSummary.values,
+      category: categorySummary.value,
+      categories: categorySummary.values,
+      typology: typologySummary.value,
+      typologies: typologySummary.values,
+      isSharedActivity,
+      negotiationType: isSharedActivity ? "COMPARTIDA" : "INDIVIDUAL",
+      associatedClientCount: clients.size,
+      monthlyObjective: objective.objectiveMonthly,
+      monthlyObjectiveStatus: objective.objectiveStatus || "SIN_OBJETIVO",
+      totalObjective: objective.objectiveTotal,
+      totalObjectiveValueStatus: objective.objectiveTotalStatus || "SIN_OBJETIVO",
+      investmentPercentage: settings.investment && settings.investment.value,
+      investmentStatus: settings.investment && settings.investment.status,
+      negotiationPeriod: settings.negotiationPeriod && settings.negotiationPeriod.value,
+      startDate: objective.startDate || null,
+      endDate: objective.endDate || null,
+      dateStatus: objective.dateStatus || "FECHAS_CONFLICTIVAS",
+      negotiationDiscount: settings.negotiationDiscount || buildNegotiationDiscountSummary([]),
+      negotiationDiscountStatus: settings.negotiationDiscount ? settings.negotiationDiscount.status : "SIN_DATO",
+      salesByMonth,
+      attributableSalesByMonth,
+      jointActivitySalesByMonth,
+      monthlyDiscountByMonth,
+      monthlyDiscountStatusByMonth,
+      accumulatedGeneralSales,
+      accumulatedAttributableSales,
+      accumulatedComparableAttributableSales,
+      accumulatedComparableSales: accumulatedComparableAttributableSales,
+      progressAgainstTotalObjective: totalProgress,
+      totalProgress,
+      totalDifference,
+      monthlyCompliance: monthlyComplianceByMonth,
+      monthlyComplianceByMonth,
+      monthlyStatusByMonth,
+      selectedMonthlyCompliance,
+      selectedMonthlyStatus,
+      selectedStatusPeriod: selectedStatusPeriod ? selectedStatusPeriod.key : null,
+      totalCompliance: totalProgress,
+      totalObjectiveStatus,
+      warnings: Array.from(new Set(warnings)),
+      navigation: { clientSap, activityId }
+    });
+  });
+
+  clientActivitySummary.sort((a, b) => a.clientSap.localeCompare(b.clientSap, "es") || a.activityId.localeCompare(b.activityId, "es"));
+  const clientSummary = buildClientSummaryFromRelations(clientActivitySummary, availablePeriods, selectedStatusPeriod);
+  const summaryTableColumns = buildSummaryTableColumns(availablePeriods, selectedStatusPeriod);
+  const elapsed = (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) - startedAt;
+  return {
+    availablePeriods,
+    salesByClientPeriod: activityAnalytics.salesByClientPeriod,
+    clientActivitySummary,
+    clientSummary,
+    summaryTableColumns,
+    selectedStatusPeriod: selectedStatusPeriod ? selectedStatusPeriod.key : null,
+    selectedStatusPeriodLabel: selectedStatusPeriod ? selectedStatusPeriod.label : "",
+    diagnostics: summarizeClientNegotiationModels(sourceRows, clientActivitySummary, clientSummary, activitySettings, monthlyDiscounts, activityAnalytics),
+    performance: { coldBuildMs: elapsed }
+  };
+}
+
+function groupRowsByInternalKey(rows, keyGetter) {
+  const grouped = new Map();
+  rows.forEach((row, index) => {
+    const key = keyGetter(row, index);
+    if (!key) return;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+  return grouped;
+}
+
+function resolveDistinctNumeric(rows, internalField, legacyField, missingStatus, conflictStatus, preferNonZero) {
+  const values = [];
+  rows.forEach((row) => {
+    const value = isFiniteMetric(row[internalField]) ? row[internalField] : row[legacyField];
+    if (isFiniteMetric(value) && values.indexOf(value) === -1) values.push(value);
+  });
+  const candidates = preferNonZero && values.some((value) => value > 0) ? values.filter((value) => value > 0) : values;
+  if (!candidates.length) return { value: null, status: missingStatus, sourceValues: values };
+  if (candidates.length > 1) return { value: null, status: conflictStatus, sourceValues: values };
+  return { value: candidates[0], status: "OK", sourceValues: values };
+}
+
+function resolveDescriptiveValue(rows, internalField, legacyField) {
+  const values = Array.from(new Set(rows.map((row) => normalizeCellText(row[internalField] || row[legacyField])).filter(Boolean)));
+  return { value: !values.length ? "Sin información" : values.length === 1 ? values[0] : "VARIOS", values, status: !values.length ? "SIN_INFORMACION" : values.length === 1 ? "UNICO" : "VARIOS" };
+}
+
+function resolveClientName(rows) {
+  const preferred = rows.map((row) => normalizeCellText(row.clientName || row["Cliente AS400 - Nombre negocio (Texto)"])).filter(Boolean);
+  if (preferred.length) return preferred[0];
+  const secondary = rows.map((row) => normalizeCellText(row.clientAs400 || row["Cliente AS400 - Texto"])).filter(Boolean);
+  return secondary[0] || normalizeCellText(rows[0] && (rows[0].clientSap || rows[0]["Cliente SAP - Clave"]));
+}
+
+function buildResolvedMonthlyDiscounts(rows) {
+  const grouped = groupRowsByInternalKey(rows, (row) => {
+    const client = row.clientSap || normalizeCellText(row["Cliente SAP - Clave"]);
+    const activity = row.activityId || normalizeCellText(row["ID Actividad"]);
+    const period = row.periodKey || getYearMonthSortValue(row);
+    return client && activity && period ? `${client}||${activity}||${period}` : "";
+  });
+  const result = new Map();
+  grouped.forEach((groupRows, key) => {
+    result.set(key, resolveDistinctNumeric(groupRows, "monthlyDiscountPercentage", "Porcentaje descuento mes", "SIN_DATO", "DESCUENTO_MENSUAL_CONFLICTIVO", true));
+  });
+  return result;
+}
+
+function buildNegotiationDiscountSummary(rows) {
+  const counts = new Map();
+  rows.forEach((row) => {
+    const value = isFiniteMetric(row.negotiationDiscountPercentage) ? row.negotiationDiscountPercentage : row["Porcentaje descuento negociación"];
+    if (isFiniteMetric(value)) counts.set(value, (counts.get(value) || 0) + 1);
+  });
+  const values = Array.from(counts.keys()).sort((a, b) => a - b);
+  const predominant = values.length ? values.slice().sort((a, b) => counts.get(b) - counts.get(a) || a - b)[0] : null;
+  return { status: !values.length ? "SIN_DATO" : values.length === 1 ? "UNICO" : "VARIOS", values, min: values.length ? values[0] : null, max: values.length ? values[values.length - 1] : null, predominant };
+}
+
+function buildJointActivitySalesLookup(granularSales) {
+  const result = new Map();
+  granularSales.forEach((item, key) => {
+    const parts = key.split("||");
+    const aggregateKey = `${parts[2]}||${parts[1]}`;
+    if (!result.has(aggregateKey)) result.set(aggregateKey, { value: 0, status: "OK" });
+    const aggregate = result.get(aggregateKey);
+    if (item.status !== "OK" || !isFiniteMetric(item.value)) {
+      aggregate.value = null;
+      aggregate.status = "VENTA_ACTIVIDAD_AMBIGUA";
+    } else if (aggregate.status === "OK") aggregate.value += item.value;
+  });
+  return result;
+}
+
+function sumFiniteObjectValues(values) {
+  return Object.values(values).reduce((sum, value) => sum + (isFiniteMetric(value) ? value : 0), 0);
+}
+
+function resolveSelectedModelPeriod(availablePeriods, options = {}) {
+  if (!availablePeriods.length) return null;
+  const filters = options.filters || options;
+  const explicit = options.selectedPeriod !== undefined ? options.selectedPeriod : filters.selectedPeriod;
+  const explicitPeriod = getCanonicalPeriod({ "Año": "", "Mes": "", "Año Mes": explicit }).key;
+  if (explicitPeriod) {
+    const match = availablePeriods.find((period) => period.key === explicitPeriod);
+    if (match) return match;
+  }
+  const periodFilter = firstFilterValue(filters["Año Mes"]);
+  const filteredPeriod = getCanonicalPeriod({ "Año": "", "Mes": "", "Año Mes": periodFilter }).key;
+  if (filteredPeriod) {
+    const match = availablePeriods.find((period) => period.key === filteredPeriod);
+    if (match) return match;
+  }
+  const selectedMonth = parseCanonicalMonth(firstFilterValue(filters.Mes));
+  const selectedYear = parseCanonicalYear(firstFilterValue(filters["Año"]));
+  const candidates = availablePeriods.filter((period) => {
+    return (!selectedMonth || period.key % 100 === selectedMonth) && (!selectedYear || Math.floor(period.key / 100) === selectedYear);
+  });
+  return candidates.length ? candidates[candidates.length - 1] : availablePeriods[availablePeriods.length - 1];
+}
+
+function firstFilterValue(value) {
+  if (Array.isArray(value)) return value.length ? value[0] : "";
+  return value === null || value === undefined ? "" : value;
+}
+
+function selectClientNegotiationModelPeriod(model, selection = {}) {
+  const availablePeriods = model && model.availablePeriods ? model.availablePeriods : [];
+  const selected = resolveSelectedModelPeriod(availablePeriods, selection);
+  const applySelection = (row) => ({
+    ...row,
+    selectedMonthlyCompliance: selected ? row.monthlyComplianceByMonth[selected.key] : null,
+    selectedMonthlyStatus: selected ? row.monthlyStatusByMonth[selected.key] : "NO_EVALUABLE_MES",
+    selectedStatusPeriod: selected ? selected.key : null
+  });
+  return {
+    ...model,
+    selectedStatusPeriod: selected ? selected.key : null,
+    selectedStatusPeriodLabel: selected ? selected.label : "",
+    clientActivitySummary: (model.clientActivitySummary || []).map(applySelection),
+    clientSummary: (model.clientSummary || []).map(applySelection),
+    summaryTableColumns: buildSummaryTableColumns(availablePeriods, selected)
+  };
+}
+
+function buildClientSummaryFromRelations(relations, availablePeriods, selectedStatusPeriod) {
+  const grouped = groupRowsByInternalKey(relations, (row) => row.clientSap);
+  return Array.from(grouped, ([clientSap, clientRelations]) => {
+    const first = clientRelations[0];
+    const activityIds = clientRelations.map((row) => row.activityId);
+    const salesByMonth = {};
+    const monthlyDiscountByMonth = {};
+    const monthlyComplianceByMonth = {};
+    const monthlyStatusByMonth = {};
+    availablePeriods.forEach((period) => {
+      const sales = clientRelations.map((row) => row.salesByMonth[period.key]).filter(isFiniteMetric);
+      if (sales.length) salesByMonth[period.key] = sales[0];
+      const discounts = Array.from(new Set(clientRelations.map((row) => row.monthlyDiscountByMonth[period.key]).filter(isFiniteMetric)));
+      monthlyDiscountByMonth[period.key] = !discounts.length ? null : discounts.length === 1 ? discounts[0] : "VARIOS";
+      const allEvaluable = clientRelations.length > 0 && clientRelations.every((row) => row.monthlyStatusByMonth[period.key] !== "NO_EVALUABLE_MES");
+      const comparableSales = clientRelations.reduce((sum, row) => {
+        const value = row.isSharedActivity ? row.jointActivitySalesByMonth[period.key] : row.attributableSalesByMonth[period.key];
+        return sum + (isFiniteMetric(value) ? value : 0);
+      }, 0);
+      const comparableObjective = clientRelations.reduce((sum, row) => sum + (isFiniteMetric(row.monthlyObjective) ? row.monthlyObjective : 0), 0);
+      const compliance = allEvaluable && comparableObjective > 0 ? comparableSales / comparableObjective : null;
+      monthlyComplianceByMonth[period.key] = compliance;
+      monthlyStatusByMonth[period.key] = !isFiniteMetric(compliance) ? "NO_EVALUABLE_MES" : compliance >= 1 ? "CUMPLE_MES" : "NO_CUMPLE_MES";
+    });
+    const totalEvaluable = clientRelations.length > 0 && clientRelations.every((row) => row.totalObjectiveStatus !== "NO_EVALUABLE_TOTAL");
+    const comparable = totalEvaluable ? clientRelations : [];
+    const accumulatedComparableSales = comparable.reduce((sum, row) => sum + row.accumulatedComparableAttributableSales, 0);
+    const accumulatedObjective = comparable.reduce((sum, row) => sum + row.totalObjective, 0);
+    const totalProgress = accumulatedObjective > 0 ? accumulatedComparableSales / accumulatedObjective : null;
+    const totalObjectiveStatus = totalProgress === null ? "NO_EVALUABLE_TOTAL" : totalProgress >= 1 ? "CUMPLIO_OBJETIVO_TOTAL" : "EN_PROGRESO_OBJETIVO_TOTAL";
+    const selectedMonthlyCompliance = selectedStatusPeriod ? monthlyComplianceByMonth[selectedStatusPeriod.key] : null;
+    const selectedMonthlyStatus = selectedStatusPeriod ? monthlyStatusByMonth[selectedStatusPeriod.key] : "NO_EVALUABLE_MES";
+    return {
+      clientSap,
+      clientName: first.clientName,
+      clientNit: first.clientNit,
+      regions: Array.from(new Set(clientRelations.map((row) => row.region).filter((value) => value && value !== "Sin información"))),
+      cedis: Array.from(new Set(clientRelations.map((row) => row.cedi).filter((value) => value && value !== "Sin información"))),
+      activityIds,
+      activityCount: activityIds.length,
+      sharedActivityCount: clientRelations.filter((row) => row.isSharedActivity).length,
+      individualActivityCount: clientRelations.filter((row) => !row.isSharedActivity).length,
+      monthlyObjectivesUnique: Object.fromEntries(clientRelations.map((row) => [row.activityId, row.monthlyObjective])),
+      totalObjectivesUnique: Object.fromEntries(clientRelations.map((row) => [row.activityId, row.totalObjective])),
+      salesByMonth,
+      monthlyDiscountByMonth,
+      monthlyComplianceByMonth,
+      monthlyStatusByMonth,
+      selectedMonthlyCompliance,
+      selectedMonthlyStatus,
+      selectedStatusPeriod: selectedStatusPeriod ? selectedStatusPeriod.key : null,
+      accumulatedGeneralSales: sumFiniteObjectValues(salesByMonth),
+      accumulatedComparableSales: accumulatedObjective > 0 ? accumulatedComparableSales : null,
+      accumulatedObjective: accumulatedObjective > 0 ? accumulatedObjective : null,
+      totalObjective: accumulatedObjective > 0 ? accumulatedObjective : null,
+      totalProgress,
+      totalDifference: totalProgress === null ? null : accumulatedComparableSales - accumulatedObjective,
+      totalObjectiveStatus,
+      investmentSummary: buildValueSummary(clientRelations.map((row) => row.investmentPercentage).filter(isFiniteMetric)),
+      warnings: Array.from(new Set(clientRelations.flatMap((row) => row.warnings))),
+      relations: clientRelations.map((row) => ({ clientSap: row.clientSap, activityId: row.activityId }))
+    };
+  }).sort((a, b) => a.clientSap.localeCompare(b.clientSap, "es"));
+}
+
+function buildValueSummary(values) {
+  const unique = Array.from(new Set(values)).sort((a, b) => a - b);
+  return { status: !unique.length ? "SIN_DATO" : unique.length === 1 ? "UNICO" : "VARIOS", values: unique, value: unique.length === 1 ? unique[0] : null };
+}
+
+function buildSummaryTableColumns(availablePeriods, selectedStatusPeriod) {
+  const base = [
+    ["selectedMonthlyStatus", `Estado mensual${selectedStatusPeriod ? ` — ${selectedStatusPeriod.label}` : ""}`],
+    ["selectedMonthlyCompliance", "Cumplimiento del mes"], ["region", "Región"], ["cedi", "CEDI"], ["clientSap", "CodSAP"],
+    ["clientName", "Nombre del cliente"], ["activityId", "ID Actividad"], ["negotiationType", "Tipo de negociación"],
+    ["monthlyObjective", "Objetivo mes"], ["totalObjective", "Objetivo total"], ["investmentPercentage", "% de inversión"],
+    ["negotiationDiscount", "% descuento negociación"], ["accumulatedGeneralSales", "Ventas acumuladas"],
+    ["accumulatedComparableSales", "Ventas acumuladas atribuibles"], ["totalProgress", "Avance objetivo total"],
+    ["totalObjectiveStatus", "Estado objetivo total"], ["totalDifference", "Diferencia frente al objetivo total"]
+  ].map(([id, label]) => ({ id, label, kind: "base" }));
+  availablePeriods.forEach((period) => {
+    base.push({ id: `sales_${period.key}`, label: `Venta ${period.label}`, kind: "periodSales", periodKey: period.key });
+    base.push({ id: `discount_${period.key}`, label: `Dcto. ${period.label}`, kind: "periodDiscount", periodKey: period.key });
+    base.push({ id: `compliance_${period.key}`, label: `Cumplimiento ${period.label}`, kind: "periodCompliance", periodKey: period.key });
+    base.push({ id: `status_${period.key}`, label: `Estado ${period.label}`, kind: "periodStatus", periodKey: period.key });
+  });
+  return base;
+}
+
+function summarizeClientNegotiationModels(rows, relations, clients, activitySettings, monthlyDiscounts, activityAnalytics) {
+  const periodKeys = Array.from(new Set(rows.map((row) => row.periodKey).filter(Number.isInteger))).sort((a, b) => a - b);
+  const monthlyStatusCountsByPeriod = {};
+  periodKeys.forEach((periodKey) => {
+    const counts = { CUMPLE_MES: 0, NO_CUMPLE_MES: 0, NO_EVALUABLE_MES: 0 };
+    relations.forEach((row) => { counts[row.monthlyStatusByMonth[periodKey] || "NO_EVALUABLE_MES"] += 1; });
+    monthlyStatusCountsByPeriod[periodKey] = { label: formatBusinessPeriodLabel(periodKey), ...counts };
+  });
+  const totalObjectiveStatusCounts = { CUMPLIO_OBJETIVO_TOTAL: 0, EN_PROGRESO_OBJETIVO_TOTAL: 0, NO_EVALUABLE_TOTAL: 0 };
+  relations.forEach((row) => { totalObjectiveStatusCounts[row.totalObjectiveStatus] += 1; });
+  return {
+    workbookRows: rows.length,
+    clients: clients.length,
+    activities: activitySettings.size,
+    availablePeriods: Array.from(new Set(rows.map((row) => row.periodKey).filter(Number.isInteger))).length,
+    clientActivityRelations: relations.length,
+    sharedActivities: new Set(relations.filter((row) => row.isSharedActivity).map((row) => row.activityId)).size,
+    multiActivityClients: clients.filter((row) => row.activityCount > 1).length,
+    rowsWithoutPeriod: rows.filter((row) => row.periodStatus === "SIN_PERIODO_DE_VENTA").length,
+    monthlySalesConflicts: (activityAnalytics.salesByClientPeriod || []).filter((item) => item.status === "CONFLICTO").length,
+    objectiveConflicts: relations.filter((row) => row.monthlyObjectiveStatus === "OBJETIVO_CONFLICTIVO" || row.totalObjectiveValueStatus === "OBJETIVO_CONFLICTIVO").length,
+    investmentConflicts: Array.from(activitySettings.values()).filter((item) => item.investment.status === "INVERSION_CONFLICTIVA").length,
+    monthlyDiscountConflicts: Array.from(monthlyDiscounts.values()).filter((item) => item.status === "DESCUENTO_MENSUAL_CONFLICTIVO").length,
+    monthlyStatusCountsByPeriod,
+    totalObjectiveStatusCounts
+  };
+}
+
 function aggregateActivityPerformance(performance) {
   const eligible = performance.filter((item) => item.objectiveStatus === "OK" && item.dateStatus === "OK");
   const comparable = eligible.filter((item) => item.comparable);
@@ -1533,7 +2093,8 @@ function buildMetadata() {
     extraColumns: state.validation ? state.validation.extras : [],
     optionalMissingColumns: state.validation ? state.validation.optionalMissing : [],
     informationalMissingColumns: state.validation ? state.validation.informationalMissing : [],
-    qualityWarnings: state.quality || null
+    qualityWarnings: state.quality || null,
+    clientNegotiationModels: state.clientNegotiationModels || null
   };
 }
 
@@ -1609,6 +2170,7 @@ function resetProcessedOutput() {
   state.processing = false;
   state.runtimeDiagnostics = { errors: [], warnings: [] };
   state.processedRows = [];
+  state.clientNegotiationModels = null;
   clearProcessedDataIndexes();
   state.quality = null;
   state.generatedHtml = "";

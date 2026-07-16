@@ -24,12 +24,15 @@ const REQUIRED_COLUMNS = [
   "Ventas cajas físicas (sin rep)",
   "TotalVentaMes",
   "Objetivo mes ",
+  "% De inversión",
   "ID Actividad",
   "Fecha inicio",
   "Fecha fin",
   "Objetivo cajas total",
   "Tipo descuento",
-  "Porcentaje descuento",
+  "Porcentaje descuento negociación",
+  "Porcentaje descuento venta",
+  "Porcentaje descuento mes",
   "Periodo negociacion",
   "Cedi"
 ];
@@ -38,6 +41,8 @@ const app = loadAppContext();
 const dashboard = loadDashboardContext();
 
 runSyntheticTests();
+runClientNegotiationModelTests();
+runClientTrackingTableTests();
 runTimelineModelTests();
 runLayoutPresentationTests();
 runProductionHardeningTests();
@@ -642,7 +647,7 @@ function runSyntheticTests() {
   const multiClientModel = dashboard.buildContextualKpiModel(multiClientAnalysis, { "Cliente SAP - Clave": "C-MULTI" });
   assert.strictEqual(multiClientModel.contextType, "CLIENT_MULTIPLE_ACTIVITIES");
   assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateObjective").value, "300");
-  assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateCompliance").value, new Intl.NumberFormat("es-CO", { style: "percent", maximumFractionDigits: 2 }).format(1 / 3));
+  assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateCompliance").value, dashboard.formatRatioPercent(1 / 3));
   assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateDifference").value, "-200");
   assert(!multiClientModel.items.some((item) => /Contribución|Posición/.test(item.title)));
 
@@ -1142,9 +1147,19 @@ function runSyntheticTests() {
     dashboard.bindDetailExplorerEvents();
     const clickListeners = delegatedExplorerElements.detailExplorerOverlay.listenerCount("click");
     const inputListeners = delegatedExplorerElements.detailExplorerOverlay.listenerCount("input");
+    const wheelListeners = delegatedExplorerElements.detailExplorerOverlay.listenerCount("wheel");
+    const touchStartListeners = delegatedExplorerElements.detailExplorerOverlay.listenerCount("touchstart");
+    const touchMoveListeners = delegatedExplorerElements.detailExplorerOverlay.listenerCount("touchmove");
+    assert.strictEqual(clickListeners, 1);
+    assert.strictEqual(wheelListeners, 1);
+    assert.strictEqual(touchStartListeners, 1);
+    assert.strictEqual(touchMoveListeners, 1);
     dashboard.bindDetailExplorerEvents();
     assert.strictEqual(delegatedExplorerElements.detailExplorerOverlay.listenerCount("click"), clickListeners);
     assert.strictEqual(delegatedExplorerElements.detailExplorerOverlay.listenerCount("input"), inputListeners);
+    assert.strictEqual(delegatedExplorerElements.detailExplorerOverlay.listenerCount("wheel"), wheelListeners);
+    assert.strictEqual(delegatedExplorerElements.detailExplorerOverlay.listenerCount("touchstart"), touchStartListeners);
+    assert.strictEqual(delegatedExplorerElements.detailExplorerOverlay.listenerCount("touchmove"), touchMoveListeners);
   });
   const firstFocusable = makeElement();
   const lastFocusable = makeElement();
@@ -1473,6 +1488,270 @@ function runSyntheticTests() {
   assert(!templateSource.includes("body { overflow-x: hidden"));
   assert(!templateSource.includes("dashboard-shell"));
   assert(!templateSource.includes("kpiGrid"));
+}
+
+function runClientNegotiationModelTests() {
+  const rows = [
+    normalizeActivityRow({ activityId: "A-MODEL", clientId: "C-1", yearMonth: "52026", month: "MAY", presentationCode: "P-1", physicalSales: "40", totalSales: "100", objectiveMonth: "50", objectiveTotal: "100", startDate: "2026-05-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-MODEL", clientId: "C-1", yearMonth: "52026", month: "MAY", presentationCode: "P-2", physicalSales: "5", totalSales: "100", objectiveMonth: "50", objectiveTotal: "100", startDate: "2026-05-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-MODEL", clientId: "C-1", yearMonth: "62026", month: "JUN", presentationCode: "P-1", physicalSales: "30", totalSales: "120", objectiveMonth: "50", objectiveTotal: "100", startDate: "2026-05-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-MODEL", clientId: "C-1", yearMonth: "62026", month: "JUN", presentationCode: "P-2", physicalSales: "30", totalSales: "120", objectiveMonth: "50", objectiveTotal: "100", startDate: "2026-05-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-SHARED", clientId: "C-1", yearMonth: "62026", month: "JUN", presentationCode: "P-S1", physicalSales: "25", totalSales: "120", objectiveMonth: "100", objectiveTotal: "200", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-SHARED", clientId: "C-2", yearMonth: "62026", month: "JUN", presentationCode: "P-S2", physicalSales: "75", totalSales: "75", objectiveMonth: "100", objectiveTotal: "200", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-NO-PERIOD", clientId: "C-3", year: "", month: "", yearMonth: "", presentationCode: "P-NP", physicalSales: "0", totalSales: "", objectiveMonth: "20", objectiveTotal: "40", startDate: "2026-07-01", endDate: "2026-08-31" }),
+    normalizeActivityRow({ activityId: "A-PAST", clientId: "C-4", yearMonth: "52026", month: "MAY", presentationCode: "P-PAST-1", physicalSales: "120", totalSales: "120", objectiveMonth: "100", objectiveTotal: "150", startDate: "2026-05-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-PAST", clientId: "C-4", yearMonth: "62026", month: "JUN", presentationCode: "P-PAST-2", physicalSales: "80", totalSales: "80", objectiveMonth: "100", objectiveTotal: "150", startDate: "2026-05-01", endDate: "2026-06-30" })
+  ];
+  rows.slice(0, 4).forEach((row) => {
+    row.investmentPercentage = row["% De inversión"] = 0.15;
+    row.monthlyDiscountPercentage = row["Porcentaje descuento mes"] = row.periodKey === 202605 ? 0.1 : 0.2;
+    row.negotiationDiscountPercentage = row["Porcentaje descuento negociación"] = row.presentationCode === "P-1" ? 0.08 : 0.1;
+    row.negotiationPeriod = row["Periodo negociacion"] = 2;
+  });
+  assert.strictEqual(rows[0].periodKey, 202605);
+  assert.strictEqual(rows[0].periodLabel, "MAY 2026");
+  assert.strictEqual(rows[2].periodKey, 202606);
+  assert.strictEqual(rows[6].periodStatus, "SIN_PERIODO_DE_VENTA");
+
+  const model = app.buildClientNegotiationModels(rows);
+  assert.deepStrictEqual(plain(model.availablePeriods.map((period) => period.key)), [202605, 202606]);
+  assert(model.summaryTableColumns.some((column) => column.id === "sales_202605" && column.label === "Venta MAY 2026"));
+  assert(model.summaryTableColumns.some((column) => column.id === "discount_202606" && column.label === "Dcto. JUN 2026"));
+  assert.strictEqual(model.clientActivitySummary.length, 5);
+  const individual = model.clientActivitySummary.find((row) => row.clientSap === "C-1" && row.activityId === "A-MODEL");
+  assert(individual);
+  assert.deepStrictEqual(plain(individual.salesByMonth), { 202605: 100, 202606: 120 });
+  assert.deepStrictEqual(plain(individual.attributableSalesByMonth), { 202605: 45, 202606: 60 });
+  assert.strictEqual(individual.accumulatedGeneralSales, 220);
+  assert.strictEqual(individual.accumulatedAttributableSales, 105);
+  assert.strictEqual(individual.totalProgress, 1.05);
+  assert.strictEqual(individual.totalDifference, 5);
+  assert.deepStrictEqual(plain(individual.monthlyComplianceByMonth), { 202605: 0.9, 202606: 1.2 });
+  assert.deepStrictEqual(plain(individual.monthlyStatusByMonth), { 202605: "NO_CUMPLE_MES", 202606: "CUMPLE_MES" });
+  assert.strictEqual(individual.selectedStatusPeriod, 202606);
+  assert.strictEqual(individual.selectedMonthlyCompliance, 1.2);
+  assert.strictEqual(individual.selectedMonthlyStatus, "CUMPLE_MES");
+  assert.strictEqual(individual.totalObjectiveStatus, "CUMPLIO_OBJETIVO_TOTAL");
+  assert.strictEqual(individual.negotiationType, "INDIVIDUAL");
+  assert.strictEqual(individual.investmentPercentage, 0.15);
+  assert.strictEqual(individual.negotiationDiscount.status, "VARIOS");
+  assert.deepStrictEqual(plain(individual.monthlyDiscountByMonth), { 202605: 0.1, 202606: 0.2 });
+  const shared = model.clientActivitySummary.find((row) => row.clientSap === "C-1" && row.activityId === "A-SHARED");
+  assert.strictEqual(shared.isSharedActivity, true);
+  assert.strictEqual(shared.negotiationType, "COMPARTIDA");
+  assert.strictEqual(shared.associatedClientCount, 2);
+  assert.strictEqual(shared.jointActivitySalesByMonth[202606], 100);
+  assert.strictEqual(shared.monthlyComplianceByMonth[202606], 1);
+  assert.strictEqual(shared.monthlyStatusByMonth[202606], "CUMPLE_MES");
+  assert.strictEqual(shared.totalProgress, 0.5);
+  assert.strictEqual(shared.totalObjectiveStatus, "EN_PROGRESO_OBJETIVO_TOTAL");
+  assert.notStrictEqual(shared.monthlyComplianceByMonth[202606], shared.attributableSalesByMonth[202606] / shared.monthlyObjective);
+  const noPeriod = model.clientActivitySummary.find((row) => row.activityId === "A-NO-PERIOD");
+  assert(noPeriod && noPeriod.selectedMonthlyStatus === "NO_EVALUABLE_MES");
+  assert.strictEqual(noPeriod.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
+  assert(noPeriod.warnings.includes("SIN_PERIODO_DE_VENTA"));
+  const client = model.clientSummary.find((row) => row.clientSap === "C-1");
+  assert.strictEqual(client.activityCount, 2);
+  assert.strictEqual(client.accumulatedGeneralSales, 220);
+  assert(Math.abs(client.monthlyComplianceByMonth[202606] - 160 / 150) < 1e-12);
+  assert.notStrictEqual(client.monthlyComplianceByMonth[202606], (1.2 + 1) / 2);
+  const past = model.clientActivitySummary.find((row) => row.activityId === "A-PAST");
+  assert.strictEqual(past.monthlyStatusByMonth[202605], "CUMPLE_MES");
+  assert.strictEqual(past.monthlyStatusByMonth[202606], "NO_CUMPLE_MES");
+  assert.strictEqual(past.totalObjectiveStatus, "CUMPLIO_OBJETIVO_TOTAL");
+  const mayModel = app.selectClientNegotiationModelPeriod(model, { filters: { Mes: "MAY", "AÃ±o": "2026" } });
+  const mayIndividual = mayModel.clientActivitySummary.find((row) => row.activityId === "A-MODEL");
+  assert.strictEqual(mayModel.selectedStatusPeriod, 202605);
+  assert.strictEqual(mayIndividual.selectedMonthlyStatus, "NO_CUMPLE_MES");
+  assert(mayModel.summaryTableColumns.find((column) => column.id === "selectedMonthlyStatus").label.includes("MAY 2026"));
+  assert.strictEqual(model.diagnostics.rowsWithoutPeriod, 1);
+  assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 3, NO_CUMPLE_MES: 1, NO_EVALUABLE_MES: 1 });
+  assert.deepStrictEqual(plain(model.diagnostics.totalObjectiveStatusCounts), { CUMPLIO_OBJETIVO_TOTAL: 2, EN_PROGRESO_OBJETIVO_TOTAL: 2, NO_EVALUABLE_TOTAL: 1 });
+  assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 4);
+  assert(model.summaryTableColumns.some((column) => column.id === "compliance_202605"));
+  assert(model.summaryTableColumns.some((column) => column.id === "status_202606"));
+  const generated = dashboard.generatedHtml({ rows, metadata: { clientNegotiationModels: model } });
+  assert(generated.includes("clientNegotiationModels"));
+  assert(!/>\s*(?:NaN|-?Infinity|undefined|\[object Object\])\s*</.test(generated));
+  const analyses = dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: {}, clientNegotiationModels: model });
+  assert.strictEqual(analyses.clientActivitySummary.length, model.clientActivitySummary.length);
+  assert.strictEqual(analyses.clientSummary.length, model.clientSummary.length);
+  assert.strictEqual(analyses.summaryTableColumns.length, model.summaryTableColumns.length);
+  assert.strictEqual(dashboard.resolveClientModelSelectedPeriod(model, { Mes: "MAY" }).key, 202605);
+  const mayAnalyses = dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: { Mes: "MAY" }, clientNegotiationModels: model });
+  assert.strictEqual(mayAnalyses.clientNegotiationModels.selectedStatusPeriod, 202605);
+}
+
+function runClientTrackingTableTests() {
+  const percentageCases = [["10", 0.1], ["10.00", 0.1], ["10,00", 0.1], ["10%", 0.1], ["10,50%", 0.105], ["0.10", 0.1], [0.10, 0.1], [10, 0.1]];
+  percentageCases.forEach(([input, expected]) => assert(Math.abs(app.normalizePercentage(input) - expected) < 1e-12, "Porcentaje inválido: " + input));
+  assert.strictEqual(app.normalizePercentage(""), null);
+  assert.strictEqual(dashboard.normalizeText(dashboard.formatRatioPercent(app.normalizePercentage("10"))), "10 %");
+  assert.strictEqual(dashboard.normalizeText(dashboard.formatRatioPercent(app.normalizePercentage("10.00"))), "10 %");
+  assert.strictEqual(dashboard.normalizeText(dashboard.formatRatioPercent(app.normalizePercentage("10,50%"))), "10,5 %");
+  assert.strictEqual(dashboard.normalizeText(dashboard.formatRatioPercent(app.normalizePercentage(0.10))), "10 %");
+  assert.strictEqual(dashboard.normalizeText(dashboard.formatRatioPercent(app.normalizePercentage(10))), "10 %");
+  assert.strictEqual(app.normalizePercentage(app.normalizePercentage("10")), 0.1, "No debe multiplicarse dos veces por 100");
+  const variedDiscount = app.buildNegotiationDiscountSummary([{ negotiationDiscountPercentage: 0.1 }, { negotiationDiscountPercentage: 0.125 }]);
+  assert.strictEqual(variedDiscount.status, "VARIOS");
+  const periods = [{ key: 202605, label: "MAY 2026" }, { key: 202606, label: "JUN 2026" }];
+  const base = {
+    clientSap: "=C-001", clientName: "Cliente, Uno", clientNit: "900\n123", activityId: "A-001",
+    region: "CENTRO", regions: ["CENTRO"], cedi: "CALI", cedis: ["CALI"], channel: "TRADICIONAL", channels: ["TRADICIONAL"],
+    category: "GASEOSAS", categories: ["GASEOSAS"], typology: "TIPO A", typologies: ["TIPO A"],
+    isSharedActivity: false, negotiationType: "INDIVIDUAL", associatedClientCount: 1,
+    monthlyObjective: 100, totalObjective: 200, investmentPercentage: 0.15, negotiationPeriod: 2,
+    startDate: "2026-05-01", endDate: "2026-06-30", dateStatus: "OK",
+    negotiationDiscount: { status: "UNICO", values: [0.1] }, negotiationDiscountStatus: "UNICO",
+    salesByMonth: { 202605: 120, 202606: 140 }, attributableSalesByMonth: { 202605: 90, 202606: 110 }, jointActivitySalesByMonth: {},
+    monthlyDiscountByMonth: { 202605: 0.08, 202606: 0.09 }, monthlyDiscountStatusByMonth: { 202605: "OK", 202606: "OK" }, monthlyComplianceByMonth: { 202605: 0.9, 202606: 1.1 },
+    monthlyStatusByMonth: { 202605: "NO_CUMPLE_MES", 202606: "CUMPLE_MES" }, selectedMonthlyCompliance: 1.1, selectedMonthlyStatus: "CUMPLE_MES", selectedStatusPeriod: 202606,
+    accumulatedGeneralSales: 260, accumulatedAttributableSales: 200, accumulatedComparableSales: 200, totalProgress: 1, totalDifference: 0,
+    totalObjectiveStatus: "CUMPLIO_OBJETIVO_TOTAL", warnings: []
+  };
+  const shared = Object.assign({}, base, {
+    clientSap: "C-002", clientName: "Cliente Dos", activityId: "A-002", isSharedActivity: true, negotiationType: "COMPARTIDA", associatedClientCount: 2,
+    attributableSalesByMonth: { 202605: 30, 202606: 40 }, jointActivitySalesByMonth: { 202605: 95, 202606: 120 }, accumulatedAttributableSales: 70,
+    accumulatedComparableSales: 215, totalProgress: 1.075, totalDifference: 15
+  });
+  assert(dashboard.clientTrackingRelationMatchesFilters(base, { "Región SAP": ["CENTRO"], Canal: ["TRADICIONAL"], "Categoría AS400 de la venta": ["GASEOSAS"], Cedi: ["CALI"] }));
+  assert(!dashboard.clientTrackingRelationMatchesFilters(base, { "Región SAP": ["NORTE"] }));
+  assert.strictEqual(dashboard.getClientTrackingComparableSales(base, 202606), 110);
+  assert.strictEqual(dashboard.getClientTrackingComparableSales(shared, 202606), 120, "La actividad compartida debe usar la venta conjunta");
+  const detailModelCold = dashboard.getClientTrackingDetailModel(shared, periods);
+  const detailModelCached = dashboard.getClientTrackingDetailModel(shared, periods);
+  assert.strictEqual(detailModelCached, detailModelCold, "La apertura repetida debe reutilizar el modelo de detalle");
+  assert.strictEqual(detailModelCold.periods.length, 2);
+  assert.strictEqual(detailModelCold.periods[1].monthlyDiscount, 0.09);
+  assert.strictEqual(dashboard.buildClientTrackingDetailConfig(detailModelCold).type, "clientTrackingDetail");
+  const csv = dashboard.buildClientTrackingSummaryCsv([base, shared], periods, periods[1]);
+  assert(csv.startsWith("\uFEFF"));
+  assert(csv.includes("Venta MAY 2026") && csv.includes("Dcto. JUN 2026") && csv.includes("Cumplimiento JUN 2026") && csv.includes("Estado JUN 2026"));
+  assert(csv.includes('"9 %"') && !csv.includes('"900 %"'), "El CSV debe formatear el descuento mensual normalizado");
+  assert(csv.includes("'=C-001"), "El resumen debe conservar protección contra inyección CSV");
+  assert.strictEqual((csv.match(/A-00[12]/g) || []).length, 2, "El CSV debe incluir todas las coincidencias, no una sola página");
+  const detailCsv = dashboard.buildClientTrackingDetailCsv(shared, periods);
+  assert(detailCsv.includes("Venta comparable de la negociación") && detailCsv.includes("Aporte atribuible del cliente"));
+  assert(detailCsv.includes("MAY 2026") && detailCsv.includes("JUN 2026"));
+  assert(detailCsv.includes('"9 %"'));
+  const source = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
+  assert(source.includes('id="clientTracking"') && source.includes('data-tracking-action=\\\\"open-detail\\\\"'));
+  assert(source.includes("clientTrackingCache: createLruCache(8)") && source.includes("rows.slice(start, start + tableState.pageSize)"));
+  assert(source.includes("clientTrackingDetailCache: createLruCache(16)") && source.includes("clientTrackingRelationIndex: new Map()"));
+  assert(source.includes("ensureClientTrackingRelationIndex(rows).get(rowKey)") && !source.includes("clientActivitySummary.find(function (item) { return getClientTrackingRowKey(item)"));
+  assert.strictEqual((source.match(/panel\.addEventListener\("click"/g) || []).length, 1, "La tabla debe conservar un único listener delegado de clic");
+  assert(source.includes("white-space: nowrap") && source.includes("client-tracking-table-wrap { max-width: 100%; overflow: auto"));
+  assert(source.includes('const headers = ["Estado mes", "Estado total", "Cliente / CodSAP"'));
+  assert(source.includes("getClientTrackingMonthlyDiscountDisplay(row, period && period.key)"));
+  const controlsMarkup = dashboard.buildClientTrackingControlsMarkup();
+  assert(!controlsMarkup.includes('type=\\"search\\"') && !controlsMarkup.includes("Buscar cliente"));
+  assert(!source.includes("clientTrackingTable.query") && !source.includes("trackingSearchText") && !source.includes("clientTrackingSearchDebounced"));
+  assert.deepStrictEqual(Object.keys(plain(dashboard.getClientTrackingTableState())).sort(), ["compactLayout", "monthlyStatus", "page", "pageSize", "selectedRowKey", "sortDirection", "sortField", "totalStatus"].sort());
+  assert(source.includes('updateDashboardFilters(patch, { reason: action })'));
+  assert(source.includes('@media (max-width: 820px)') && source.includes('client-tracking-cards'));
+  assert(!source.includes("DASHBOARD_DATA.filter(function (row) { return getClientTracking"));
+  runModalNavigationAndScrollTests(base, periods, source);
+}
+
+function runModalNavigationAndScrollTests(base, periods, source) {
+  const elements = makeDetailExplorerElements();
+  const originalScrollTo = dashboard.window.scrollTo;
+  const originalScrollX = dashboard.window.scrollX;
+  const originalScrollY = dashboard.window.scrollY;
+  const scrollCalls = [];
+  dashboard.window.scrollX = 12;
+  dashboard.window.scrollY = 340;
+  dashboard.window.scrollTo = (x, y) => scrollCalls.push([x, y]);
+  withDashboardElements(elements, () => {
+    const tableState = dashboard.getClientTrackingTableState();
+    Object.assign(tableState, { page: 3, sortField: "clientName", sortDirection: "desc", selectedRowKey: dashboard.getClientTrackingRowKey(base) });
+    const trackingConfig = dashboard.buildClientTrackingDetailConfig(dashboard.getClientTrackingDetailModel(base, periods));
+    dashboard.openDetailExplorer(trackingConfig, null);
+    assert.strictEqual(dashboard.getModalNavigationSnapshot().depth, 1);
+    assert.strictEqual(elements.detailExplorerBack.hidden, false);
+    elements.detailExplorerBody.scrollTop = 175;
+
+    const contributionRows = [{ clientId: "C-1", clientName: "Cliente Uno", sales: 70, share: 1, rank: 1, presentationCount: 1 }];
+    const contributionConfig = {
+      type: "activityContribution", category: "A-001", title: "Contribución", subtitle: "ACTIVIDAD COMPARTIDA",
+      rows: contributionRows, rowKey: (row) => row.clientId, searchFields: ["clientId"], columns: [],
+      defaultSortField: "clientId", defaultSortDir: "asc", selectedClientIds: [], paginated: true,
+      sortOptions: [{ field: "clientId", dir: "asc", label: "Cliente" }], summary: []
+    };
+    dashboard.openDetailExplorer(contributionConfig, null);
+    assert.strictEqual(dashboard.getModalNavigationSnapshot().depth, 2);
+    dashboard.selectDetailExplorerRow("C-1");
+    assert.strictEqual(dashboard.getModalNavigationSnapshot().depth, 3);
+    assert(dashboard.getDetailExplorerState().selectedRow);
+    dashboard.navigateModalBack();
+    assert.strictEqual(dashboard.getDetailExplorerState().type, "activityContribution");
+    assert.strictEqual(dashboard.getDetailExplorerState().selectedRow, null);
+    const scrollable = { scrollHeight: 900, clientHeight: 300, scrollTop: 120, parentElement: elements.detailExplorerDialog };
+    const countersBeforeScroll = plain(dashboard.getDashboardPerformanceSnapshot().counters);
+    dashboard.handleDetailExplorerWheel({ target: scrollable, deltaY: 40, preventDefault() { throw new Error("No debe bloquear el scroll interno disponible"); } });
+    assert.deepStrictEqual(plain(dashboard.getDashboardPerformanceSnapshot().counters), countersBeforeScroll, "El scroll no debe recalcular análisis ni renderizar");
+    scrollable.scrollTop = 0;
+    let touchBoundaryPrevented = false;
+    dashboard.handleDetailExplorerTouchStart({ touches: [{ clientY: 100 }] });
+    dashboard.handleDetailExplorerTouchMove({ target: scrollable, touches: [{ clientY: 120 }], preventDefault() { touchBoundaryPrevented = true; } });
+    assert.strictEqual(touchBoundaryPrevented, true, "El gesto en el límite no debe propagarse al documento");
+    elements.detailExplorerBody.clientHeight = 400;
+    elements.detailExplorerBody.scrollHeight = 1200;
+    let keyboardPrevented = false;
+    dashboard.handleDetailExplorerDocumentKeydown({ key: "PageDown", target: elements.detailExplorerDialog, preventDefault() { keyboardPrevented = true; } });
+    assert.strictEqual(keyboardPrevented, true);
+    dashboard.navigateModalBack();
+    assert.strictEqual(dashboard.getDetailExplorerState().type, "clientTrackingDetail");
+    assert.strictEqual(elements.detailExplorerBody.scrollTop, 175);
+    dashboard.navigateModalBack();
+    assert.strictEqual(dashboard.getDetailExplorerState().isOpen, false);
+    assert.strictEqual(dashboard.getClientTrackingTableState().page, 3);
+    assert.strictEqual(dashboard.getClientTrackingTableState().sortField, "clientName");
+    assert.strictEqual(dashboard.getClientTrackingTableState().sortDirection, "desc");
+    assert.strictEqual(dashboard.getClientTrackingTableState().selectedRowKey, dashboard.getClientTrackingRowKey(base));
+    assert(scrollCalls.some((value) => value[0] === 12 && value[1] === 340));
+  });
+
+  const originalBody = dashboard.document.body;
+  const originalRoot = dashboard.document.documentElement;
+  const originalInnerWidth = dashboard.window.innerWidth;
+  const originalComputedStyle = dashboard.window.getComputedStyle;
+  const body = { style: { position: "", top: "", left: "", right: "", width: "", overflow: "", paddingRight: "4px" } };
+  const classes = new Set();
+  dashboard.document.body = body;
+  dashboard.document.documentElement = { clientWidth: 1180, classList: { add(value) { classes.add(value); }, remove(value) { classes.delete(value); } } };
+  dashboard.window.innerWidth = 1200;
+  dashboard.window.scrollX = 7;
+  dashboard.window.scrollY = 260;
+  dashboard.window.getComputedStyle = () => ({ paddingRight: "4px" });
+  dashboard.lockPageScroll();
+  dashboard.lockPageScroll();
+  assert.strictEqual(dashboard.getModalNavigationSnapshot().scrollLockCount, 2);
+  assert.strictEqual(body.style.position, "fixed");
+  assert.strictEqual(body.style.top, "-260px");
+  assert.strictEqual(body.style.paddingRight, "24px");
+  assert(classes.has("modal-scroll-locked"));
+  dashboard.unlockPageScroll();
+  assert.strictEqual(body.style.position, "fixed", "Un modal encadenado no debe desbloquear el fondo");
+  dashboard.unlockPageScroll();
+  assert.strictEqual(body.style.position, "");
+  assert.strictEqual(body.style.paddingRight, "4px");
+  assert(!classes.has("modal-scroll-locked"));
+  assert(scrollCalls.some((value) => value[0] === 7 && value[1] === 260));
+  dashboard.document.body = originalBody;
+  dashboard.document.documentElement = originalRoot;
+  dashboard.window.innerWidth = originalInnerWidth;
+  dashboard.window.getComputedStyle = originalComputedStyle;
+  dashboard.window.scrollTo = originalScrollTo;
+  dashboard.window.scrollX = originalScrollX;
+  dashboard.window.scrollY = originalScrollY;
+
+  assert(source.includes('data-detail-action="navigate-back"'));
+  assert(source.includes('overlay.addEventListener("wheel", handleDetailExplorerWheel, { passive: false })'));
+  assert(source.includes('overlay.addEventListener("touchstart", handleDetailExplorerTouchStart, { passive: true })'));
+  assert(!source.includes('overlay.addEventListener("scroll"'));
+  assert(!source.includes("backdrop-filter: blur"));
+  assert(source.includes("overscroll-behavior: contain"));
 }
 
 function runAttachedWorkbookValidation() {
@@ -1901,13 +2180,42 @@ function runProductionHardeningTests() {
 }
 
 function runSharedWorkbookValidation() {
-  const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (1).xlsx");
+  const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");
   if (!fs.existsSync(workbookPath)) {
-    console.warn("INSUMO DASHBOARD (1).xlsx no encontrado; se omite validación multicliente.");
+    console.warn("INSUMO DASHBOARD (3).xlsx no encontrado; se omite validación multicliente.");
     return;
   }
   const matrix = readXlsxFirstSheet(workbookPath);
   const rows = processWorkbook(workbookPath);
+  if (matrix[0].length === 28) {
+    assert(rows.length > 0);
+    const model = app.buildClientNegotiationModels(rows);
+    assert.strictEqual(model.diagnostics.workbookRows, rows.length);
+    assert.strictEqual(model.diagnostics.clients, new Set(rows.map((row) => row.clientSap).filter(Boolean)).size);
+    assert.strictEqual(model.diagnostics.activities, new Set(rows.map((row) => row.activityId).filter(Boolean)).size);
+    assert(model.availablePeriods.length > 0);
+    assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 4);
+    assert(model.clientActivitySummary.length >= model.clientSummary.length);
+    assert(model.clientActivitySummary.every((row) => row.navigation.clientSap === row.clientSap && row.navigation.activityId === row.activityId));
+    assert(model.clientActivitySummary.every((row) => ["CUMPLE_MES", "NO_CUMPLE_MES", "NO_EVALUABLE_MES"].includes(row.selectedMonthlyStatus)));
+    assert(model.clientActivitySummary.every((row) => ["CUMPLIO_OBJETIVO_TOTAL", "EN_PROGRESO_OBJETIVO_TOTAL", "NO_EVALUABLE_TOTAL"].includes(row.totalObjectiveStatus)));
+    assert(model.clientActivitySummary.every((row) => row.totalProgress === null || Number.isFinite(row.totalProgress)));
+    assert(model.clientActivitySummary.every((row) => row.totalDifference === null || Number.isFinite(row.totalDifference)));
+    const shared = model.clientActivitySummary.find((row) => row.isSharedActivity);
+    assert(shared && shared.associatedClientCount > 1);
+    assert(rows.some((row) => row.periodStatus === "SIN_PERIODO_DE_VENTA"));
+    const activity947124 = model.clientActivitySummary.filter((row) => row.activityId === "947124");
+    if (activity947124.length) assert(activity947124.every((row) => row.isSharedActivity));
+    const activity874894 = model.clientActivitySummary.find((row) => row.activityId === "874894");
+    if (activity874894) assert.strictEqual(activity874894.isSharedActivity, false);
+    const client1002559342 = model.clientSummary.find((row) => row.clientSap === "1002559342");
+    if (client1002559342) assert(client1002559342.activityCount >= 1);
+    const dashboardHtml = dashboard.generatedHtml({ rows, metadata: { clientNegotiationModels: model } });
+    const scripts = Array.from(dashboardHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g));
+    assert.strictEqual(scripts.length, 1);
+    assert.doesNotThrow(() => new vm.Script(scripts[0][1]));
+    return;
+  }
   assert.strictEqual(matrix[0].length, 25);
   assert.strictEqual(rows.length, 18319);
   const analytics = app.buildActivityAnalytics(rows);
@@ -2182,6 +2490,7 @@ function makeDetailExplorerElements() {
     detailExplorerDialog: makeElement(),
     detailExplorerTitle: makeElement(),
     detailExplorerSubtitle: makeElement(),
+    detailExplorerBack: makeElement(),
     detailExplorerClose: makeElement(),
     detailExplorerSelectionMessage: makeElement(),
     detailExplorerSummary: makeElement(),

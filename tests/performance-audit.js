@@ -7,10 +7,10 @@ const { performance } = require("perf_hooks");
 
 const testPath = path.join(__dirname, "sales-information.test.js");
 let source = fs.readFileSync(testPath, "utf8").replace(/\r\n/g, "\n");
-const marker = 'runSyntheticTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
+const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
 
 const audit = String.raw`
-const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (1).xlsx");
+const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");
 const measurements = {};
 function measure(name, callback) {
   const startedAt = performance.now();
@@ -32,14 +32,17 @@ const rows = measure("normalizationMs", function () {
   });
 });
 measure("indexConstructionMs", function () { return dashboard.initializeDashboardDataset(rows); });
+const preferredActivityId = rows.some(function (row) { return row["ID Actividad"] === "947124"; })
+  ? "947124"
+  : rows.map(function (row) { return row["ID Actividad"]; }).find(Boolean);
 const facetedOptions = measure("facetedOptionsColdMs", function () {
-  return dashboard.buildFacetedOptions({ "ID Actividad": ["947124"] }, rows);
+  return dashboard.buildFacetedOptions({ "ID Actividad": [preferredActivityId] }, rows);
 });
 measure("facetedOptionsCacheHitMs", function () {
-  return dashboard.buildFacetedOptions({ "ID Actividad": ["947124"] }, rows);
+  return dashboard.buildFacetedOptions({ "ID Actividad": [preferredActivityId] }, rows);
 });
 measure("activityComboboxSearchMs", function () {
-  const query = dashboard.normalizeSearchText("947124");
+  const query = dashboard.normalizeSearchText(preferredActivityId);
   return facetedOptions.get("ID Actividad").filter(function (item) { return item.searchText.includes(query); });
 });
 measure("clientComboboxSearchMs", function () {
@@ -47,6 +50,23 @@ measure("clientComboboxSearchMs", function () {
   return facetedOptions.get("Cliente SAP - Clave").filter(function (item) { return item.searchText.includes(query); });
 });
 const activityAnalytics = measure("activityAnalyticsMs", function () { return dashboard.buildActivityAnalytics(rows); });
+const clientNegotiationModels = measure("clientNegotiationModelColdMs", function () { return app.buildClientNegotiationModels(rows); });
+measure("clientNegotiationModelReadMs", function () { return clientNegotiationModels.clientActivitySummary.length + clientNegotiationModels.clientSummary.length; });
+const trackingRows = measure("clientTrackingProjectionMs", function () {
+  return clientNegotiationModels.clientActivitySummary.filter(function (row) { return dashboard.clientTrackingRelationMatchesFilters(row, {}); }).slice().sort(function (a, b) { return a.clientName.localeCompare(b.clientName, "es"); });
+});
+measure("clientTrackingPageReadMs", function () { return trackingRows.slice(0, 25); });
+measure("clientTrackingCsvMs", function () { return dashboard.buildClientTrackingSummaryCsv(trackingRows, clientNegotiationModels.availablePeriods, clientNegotiationModels.availablePeriods[clientNegotiationModels.availablePeriods.length - 1]); });
+const trackingDetailRow = clientNegotiationModels.clientActivitySummary[0];
+const trackingDetailCold = measure("clientTrackingDetailColdMs", function () { return dashboard.getClientTrackingDetailModel(trackingDetailRow, clientNegotiationModels.availablePeriods); });
+const trackingDetailCached = measure("clientTrackingDetailCacheHitMs", function () { return dashboard.getClientTrackingDetailModel(trackingDetailRow, clientNegotiationModels.availablePeriods); });
+if (trackingDetailCold !== trackingDetailCached) throw new Error("La caché de detalle no reutilizó el modelo preparado.");
+const scrollCountersBefore = JSON.stringify(dashboard.getDashboardPerformanceSnapshot().counters);
+measure("modalScrollBoundaryChecks1000Ms", function () {
+  const scrollable = { scrollHeight: 1200, clientHeight: 480, scrollTop: 200, parentElement: null };
+  for (let index = 0; index < 1000; index += 1) dashboard.findModalScroller(scrollable, index % 2 ? 1 : -1);
+});
+if (JSON.stringify(dashboard.getDashboardPerformanceSnapshot().counters) !== scrollCountersBefore) throw new Error("El scroll del modal modificó contadores de análisis o render");
 measure("noSalesAnalysisMs", function () { return dashboard.getNoSalesAnalysis(rows); });
 measure("dimensionOptionsMs", function () {
   return ["Región SAP", "Canal", "Categoría AS400 de la venta", "Cliente SAP - Clave", "Cedi"].map(function (field) {
@@ -65,7 +85,7 @@ measure("kpisWithActivityCacheMs", function () {
   return dashboard.computeKpis(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: {}, activityAnalytics: activityAnalytics });
 });
 const fullAnalysis = measure("dashboardAnalysesColdMs", function () {
-  return dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: {} });
+  return dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: {}, clientNegotiationModels: clientNegotiationModels });
 });
 const visibleChartDefinitions = dashboard.getChartRegistry().filter(function (definition) { return definition.shouldRender(fullAnalysis); });
 const adaptiveChartLayout = measure("adaptiveChartLayoutMs", function () {
@@ -101,21 +121,21 @@ measure("dashboardAnalysisCacheHitMs", function () {
   return dashboard.getDashboardAnalysisCached("audit:all", function () { throw new Error("No debe reconstruir el análisis"); });
 });
 const activityRows = measure("filterActivity947124Ms", function () {
-  return dashboard.getFilteredRowsCached(rows, { "ID Actividad": ["947124"] }, "activity-947124");
+  return dashboard.getFilteredRowsCached(rows, { "ID Actividad": [preferredActivityId] }, "activity-audit");
 });
 measure("filterActivity947124CacheHitMs", function () {
-  return dashboard.getFilteredRowsCached(rows, { "ID Actividad": ["947124"] }, "activity-947124");
+  return dashboard.getFilteredRowsCached(rows, { "ID Actividad": [preferredActivityId] }, "activity-audit");
 });
 const activityAnalysis = measure("activity947124AnalysisCachedMs", function () {
   return dashboard.buildDashboardAnalyses(activityRows, dashboard.getNoSalesAnalysis(activityRows), {
     scopeRows: rows,
-    filters: { "ID Actividad": "947124" },
+    filters: { "ID Actividad": preferredActivityId },
     activityAnalytics: activityAnalytics
   });
 });
 const timelineCold = measure("timelineModelColdMs", function () {
   return dashboard.buildNegotiationTimelineAnalysis({
-    filters: { "ID Actividad": "947124" },
+    filters: { "ID Actividad": preferredActivityId },
     analyses: activityAnalysis,
     indexes: dashboard.state && dashboard.state.indexes
   });
@@ -125,12 +145,12 @@ if (timelineVisualOption.series[0].type !== "line" || timelineVisualOption.serie
 if (visualOptions.presentations.series[1].type !== "scatter") throw new Error("El ranking no usa lollipop");
 measure("timelineCachePopulateMs", function () {
   return dashboard.getNegotiationTimelineAnalysisCached({
-    filters: { "ID Actividad": "947124" }, analyses: activityAnalysis, datasetVersion: "audit-timeline"
+    filters: { "ID Actividad": preferredActivityId }, analyses: activityAnalysis, datasetVersion: "audit-timeline"
   });
 });
 const timelineCached = measure("timelineModelCacheHitMs", function () {
   return dashboard.getNegotiationTimelineAnalysisCached({
-    filters: { "ID Actividad": "947124" }, analyses: activityAnalysis, datasetVersion: "audit-timeline"
+    filters: { "ID Actividad": preferredActivityId }, analyses: activityAnalysis, datasetVersion: "audit-timeline"
   });
 });
 const activity = activityAnalysis.kpis.selectedActivity;
@@ -153,7 +173,8 @@ console.log(JSON.stringify({
   environment: "Node.js calculation timings; no browser paint or ECharts timing",
   rows: rows.length,
   measurements: measurements,
-  activity947124: activity ? {
+  activityAudit: activity ? {
+    activityId: preferredActivityId,
     clients: activity.associatedClientCount,
     sales: activity.totalSales,
     objective: activity.objectiveMonthly,
@@ -194,9 +215,16 @@ console.log(JSON.stringify({
     updates: dashboard.getDashboardPerformanceSnapshot().counters.timelineUpdates,
     initializations: dashboard.getDashboardPerformanceSnapshot().counters.timelineInitializations,
     cacheSize: dashboard.getDashboardPerformanceSnapshot().caches.timelines,
-    cacheReturnedSameModel: timelineCached === dashboard.getNegotiationTimelineAnalysisCached({ filters: { "ID Actividad": "947124" }, analyses: activityAnalysis, datasetVersion: "audit-timeline" })
+    cacheReturnedSameModel: timelineCached === dashboard.getNegotiationTimelineAnalysisCached({ filters: { "ID Actividad": preferredActivityId }, analyses: activityAnalysis, datasetVersion: "audit-timeline" })
   },
   analyticalSummary: activityAnalytics.summary,
+  clientNegotiationSummary: {
+    relations: clientNegotiationModels.clientActivitySummary.length,
+    clients: clientNegotiationModels.clientSummary.length,
+    periods: clientNegotiationModels.availablePeriods,
+    columns: clientNegotiationModels.summaryTableColumns.length,
+    diagnostics: clientNegotiationModels.diagnostics
+  },
   instrumentation: dashboard.getDashboardPerformanceSnapshot()
 }, null, 2));
 `;

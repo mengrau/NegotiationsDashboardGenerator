@@ -7,10 +7,10 @@ const path = require("path");
 const testPath = path.join(__dirname, "sales-information.test.js");
 let source = fs.readFileSync(testPath, "utf8");
 source = source.replace(/\r\n/g, "\n");
-const marker = 'runSyntheticTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
+const marker = 'runSyntheticTests();\nrunClientNegotiationModelTests();\nrunClientTrackingTableTests();\nrunTimelineModelTests();\nrunLayoutPresentationTests();\nrunProductionHardeningTests();\nrunDocumentationTests();\nrunAttachedWorkbookValidation();\nrunSharedWorkbookValidation();\n\nconsole.log("sales-information.test.js: OK");';
 
 const audit = String.raw`
-const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || process.env.PRUEBA_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (1).xlsx");
+const workbookPath = process.env.INSUMO_DASHBOARD_XLSX || process.env.PRUEBA_DASHBOARD_XLSX || path.join(os.homedir(), "Downloads", "INSUMO DASHBOARD (3).xlsx");
 const matrix = readXlsxFirstSheet(workbookPath);
 const rows = processWorkbook(workbookPath);
 
@@ -83,6 +83,7 @@ const latestActivityPeriod = activityAnalytics.activityClientRelations.periods[a
 const latestActivityAggregate = app.aggregateActivityPerformance(activityAnalytics.activityPerformance.filter((item) => item.period === latestActivityPeriod));
 const qualityReport = app.buildDataQualityReport(rows, { activityAnalytics: activityAnalytics });
 const generalSales = { period: app.sumUniqueTotalSalesMonth(rows), latestMonth: app.sumUniqueTotalSalesMonth(app.getLatestYearMonthRows(rows)) };
+const clientNegotiationModels = app.buildClientNegotiationModels(rows);
 
 console.log(JSON.stringify({
   rows: rows.length,
@@ -144,7 +145,13 @@ console.log(JSON.stringify({
     }))
   },
   quality: qualityReport,
-  noSalesByCategory: app.groupPresentationsWithoutSalesByCategory(rows)
+  noSalesByCategory: app.groupPresentationsWithoutSalesByCategory(rows),
+  clientNegotiationModels: {
+    availablePeriods: clientNegotiationModels.availablePeriods,
+    diagnostics: clientNegotiationModels.diagnostics,
+    performance: clientNegotiationModels.performance,
+    tableColumns: clientNegotiationModels.summaryTableColumns.length
+  }
 }, null, 2));
 `;
 
