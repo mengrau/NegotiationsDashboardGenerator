@@ -16,7 +16,7 @@ El workbook de referencia contiene 18.319 filas. Un enfoque directo volvería a 
 | --- | ---: | --- |
 | `filterCache` | 12 | resultados de filtros |
 | `analysisCache` | 8 | análisis completos |
-| `noSalesCache` | 8 | presentaciones sin ventas |
+| `negotiationUsageCache` | 8 | relaciones cliente-negociacion sin uso |
 | `contributionModelCache` | 8 | modelos del explorador |
 | `facetedOptionsCache` | 12 | opciones facetadas |
 | `timelineCache` | 8 | modelos temporales |

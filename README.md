@@ -46,6 +46,8 @@ Por cada período, `summaryTableColumns` prepara venta, descuento, cumplimiento 
 
 Los KPI principales usan un período canónico construido con `Año` y `Mes`, con `Año Mes` validado como respaldo. **Ventas totales** resuelve `TotalVentaMes` una sola vez por `Cliente SAP - Clave` y período; si coexisten ceros y un único valor no cero, conserva el valor no cero, y si hay dos valores no cero distintos marca conflicto. El objetivo mensual y el objetivo total se resuelven una sola vez por `ID Actividad`.
 
+**Clientes negociados sin ventas** cuenta clientes únicos cuyos registros contienen `TotalVentaMes` informado explícitamente como cero y un cliente SAP y actividad válidos. Esas filas no incluyen `Año`, `Mes` ni `Año Mes`; el indicador no exige, completa ni infiere un período y el filtro Mes no las excluye. Un valor vacío, nulo, inválido o positivo no se clasifica como cero.
+
 Cuando una actividad contiene varios clientes, el cumplimiento se calcula con las ventas conjuntas de todos los clientes asociados. Si un cliente tiene varias actividades vigentes en el mismo período, la atribución usa `Ventas cajas físicas (sin rep)` por cliente, actividad, presentación y período. Si esa fuente no permite atribuir la venta, la actividad queda marcada como ambigua y no se duplica ni distribuye `TotalVentaMes`. La venta individual se presenta como contribución a la negociación, nunca como cumplimiento frente al objetivo completo.
 
 Si `Ventas cajas físicas (sin rep)` viene vacía, se interpreta como `0` para conservar la clasificación de venta. Un `TotalVentaMes` vacío permanece ausente; no se inventa un cero. Los valores numéricos no válidos se registran como incidencias de calidad.
@@ -62,7 +64,7 @@ El Excel se procesa localmente en el navegador. No se sube a ningún servidor, n
 
 El dashboard descargado incluye los datos procesados como JSON dentro del HTML. El título se construye con la columna `Región SAP`: si hay una sola región se muestra como `Negociaciones Antioquia`, si hay varias se muestra `Negociaciones múltiples regiones`, y si no hay región disponible se mantiene `Negociaciones`.
 
-El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, explorador de presentaciones sin ventas desde KPI, explorador de contribución multicliente y exportación CSV. No genera comparativos para dimensiones con un único valor; esos valores se muestran como contexto. El encabezado incluye un indicador discreto de calidad y no clasifica las presentaciones sin información de venta como datos corruptos.
+El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, explorador de clientes negociados sin ventas, explorador de contribución multicliente y exportación CSV. El modal muestra una fila por cliente, sus negociaciones y sus presentaciones sin abrir modales anidados.
 
 Los desplegables de Actividad y Cliente SAP se portalan temporalmente al documento y se posicionan con coordenadas del viewport; así quedan fuera de los contextos de apilamiento de tarjetas y gráficas. Se recalculan al desplazarse o redimensionar la ventana, y el modal conserva una capa superior.
 
@@ -80,7 +82,7 @@ La línea de tiempo se activa al seleccionar una o varias actividades o un únic
 
 ## Tipos de visualización
 
-La selección visual se declara en el registro de gráficas y consume los arreglos analíticos ya preparados. Estado de presentaciones usa donut porque compara tres proporciones; ventas por categoría usa treemap con hasta doce categorías y vuelve a barra si la cardinalidad exige comparación por eje; y el top de presentaciones usa lollipop horizontal para conservar el ranking. Las presentaciones sin ventas se exploran desde su KPI: el mismo modal presenta primero categorías y después el detalle paginado, sin cambiar los filtros globales ni requerir ECharts.
+La selección visual se declara en el registro de gráficas y consume los arreglos analíticos ya preparados. Estado de presentaciones usa donut porque compara tres proporciones; ventas por categoría usa treemap con hasta doce categorías y vuelve a barra si la cardinalidad exige comparación por eje; y el top de presentaciones usa lollipop horizontal para conservar el ranking. Los clientes negociados sin ventas se exploran desde su KPI con niveles internos de cliente, negociación y presentación, sin inventar un período ni requerir ECharts.
 
 Se mantienen barras para ventas frente al objetivo, contribución por cliente, cumplimiento por actividad, ventas por cliente y canal y cumplimiento por CEDI. En esos casos la lectura exacta contra un eje o el ranking comparativo es más importante que la variedad estética. La visualización temporal independiente fue eliminada porque la timeline explica la evolución con vigencia, objetivo y estados. Donut, treemap y lollipop tienen fallback HTML/CSS navegable por teclado y no añaden dependencias.
 

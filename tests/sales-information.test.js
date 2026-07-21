@@ -42,6 +42,7 @@ const dashboard = loadDashboardContext();
 
 // 1-7. Workbook, ventas, objetivos, cumplimiento, composición y actividades
 runSyntheticTests();
+runClientsWithoutSalesTests();
 runClientNegotiationModelTests();
 runTotalSalesComplianceRegressionTests();
 // 8-12. KPI, seguimiento, modales, gráficas, timeline y CSV
@@ -56,6 +57,94 @@ runAttachedWorkbookValidation();
 runSharedWorkbookValidation();
 
 console.log("sales-information.test.js: OK");
+
+function runClientsWithoutSalesTests() {
+  const noPeriod = { year: "", month: "", yearMonth: "", startDate: "2026-01-01", endDate: "2026-12-31" };
+  const numericZero = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-N", activityId: "A-ZERO-N", presentationCode: "P-ZERO-N", totalSales: 0 }));
+  const textZero = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-T", activityId: "A-ZERO-T", presentationCode: "P-ZERO-T", totalSales: "0" }));
+  const decimalZero = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-D", activityId: "A-ZERO-D", presentationCode: "P-ZERO-D", totalSales: "0,0" }));
+  const nullSale = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-NULL", activityId: "A-NULL", totalSales: null }));
+  const emptySale = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-EMPTY", activityId: "A-EMPTY", totalSales: "" }));
+  const positiveSale = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-POS", activityId: "A-POS", totalSales: "1" }));
+  const duplicatePresentation = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-N", activityId: "A-ZERO-N", presentationCode: "P-ZERO-N", totalSales: 0, objectiveMonth: "100" }));
+  const secondPresentation = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-N", activityId: "A-ZERO-N", presentationCode: "P-ZERO-N-2", totalSales: 0, objectiveMonth: "100" }));
+  const secondActivity = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ZERO-N", activityId: "A-ZERO-N-2", presentationCode: "P-ZERO-N-3", totalSales: 0, objectiveMonth: "200" }));
+  const analysis = dashboard.buildNegotiationUsageAnalysis([numericZero, textZero, decimalZero, nullSale, emptySale, positiveSale, duplicatePresentation, secondPresentation, secondActivity]);
+  assert.strictEqual(analysis.totalUniqueClients, 3, "Solo los ceros explicitos deben incluir clientes.");
+  assert.strictEqual(analysis.totalZeroRows, 6);
+  assert.strictEqual(analysis.relationCount, 4);
+  assert.strictEqual(Object.prototype.hasOwnProperty.call(analysis, "periodKey"), false, "El modelo no debe crear periodos artificiales.");
+  assert.deepStrictEqual(plain(analysis.clients.map((row) => row.clientSap).sort()), ["C-ZERO-D", "C-ZERO-N", "C-ZERO-T"]);
+  const multi = analysis.clients.find((row) => row.clientSap === "C-ZERO-N");
+  assert.strictEqual(multi.activityCount, 2, "Un cliente con dos actividades se cuenta una vez.");
+  assert.strictEqual(multi.monthlyObjectiveCombined, 300, "El objetivo se suma una vez por actividad.");
+  assert.strictEqual(multi.negotiations.find((row) => row.activityId === "A-ZERO-N").presentations.length, 2, "Las presentaciones se deduplican por codigo.");
+  assert.strictEqual(multi.totalReportedSales, 0);
+  assert(multi.negotiations.every((row) => row.totalReportedSales === 0));
+
+  const suppliedRegressionRows = [
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1001363259", activityId: "952521", presentationCode: "P-952521", totalSales: 0 })),
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1002883701", activityId: "912684", presentationCode: "P-912684-A", totalSales: 0 })),
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1002883701", activityId: "912684", presentationCode: "P-912684-B", totalSales: 0 })),
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1002946230", activityId: "942195", presentationCode: "P-942195", totalSales: 0 })),
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1002989230", activityId: "966039", presentationCode: "P-966039", totalSales: 0 })),
+    normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "1002989230", activityId: "966062", presentationCode: "P-966062", totalSales: 0 }))
+  ];
+  const suppliedRegression = dashboard.buildNegotiationUsageAnalysis(suppliedRegressionRows);
+  assert.strictEqual(suppliedRegression.totalUniqueClients, 4);
+  assert.strictEqual(suppliedRegression.clients.find((row) => row.clientSap === "1002883701").activityCount, 1);
+  assert.strictEqual(suppliedRegression.clients.find((row) => row.clientSap === "1002883701").negotiations[0].presentations.length, 2);
+  assert.strictEqual(suppliedRegression.clients.find((row) => row.clientSap === "1002989230").activityCount, 2);
+
+  const enriched = normalizeActivityRow({ clientId: "C-ENRICH", activityId: "A-OTHER", clientName: "Cliente enriquecido", nit: "901234", totalSales: "25", yearMonth: "202607" });
+  const sparse = normalizeActivityRow(Object.assign({}, noPeriod, { clientId: "C-ENRICH", activityId: "A-ZERO-ENRICH", clientName: "", nit: "", totalSales: 0 }));
+  dashboard.initializeDashboardDataset([enriched, sparse]);
+  const enrichedAnalysis = dashboard.buildNegotiationUsageAnalysis([sparse]);
+  assert.strictEqual(enrichedAnalysis.clients[0].clientName, "Cliente enriquecido");
+  assert.strictEqual(enrichedAnalysis.clients[0].nit, "901234");
+  const compatibleFilters = plain(dashboard.getNegotiationUsageCompatibleFilters({ Mes: ["JUL"], "A\u00f1o": ["2026"], "Cliente SAP - Clave": ["C-ENRICH"] }));
+  assert.deepStrictEqual(compatibleFilters, { "Cliente SAP - Clave": ["C-ENRICH"] }, "El filtro Mes no participa en este KPI.");
+
+  const config = dashboard.buildNegotiationUsageExplorerConfig(analysis);
+  assert.strictEqual(config.title, "Clientes negociados sin ventas");
+  assert.strictEqual(config.rows.length, 3);
+  assert(!config.exportColumns.some((column) => /período|año|mes$/i.test(column.label)), "El CSV principal no debe inventar periodos.");
+  const negotiationsConfig = dashboard.buildNegotiationUsagePresentationConfig(multi);
+  assert.strictEqual(negotiationsConfig.rows.length, 2);
+  assert.strictEqual(negotiationsConfig.title, "Negociaciones asociadas");
+  assert.strictEqual(negotiationsConfig.summary[1].label, "Negociaciones");
+  assert(negotiationsConfig.columns.some((column) => column.id === "contractualStatusLabel"));
+  const singleClient = analysis.clients.find((row) => row.clientSap === "C-ZERO-T");
+  const singleNegotiationConfig = dashboard.buildNegotiationUsagePresentationConfig(singleClient);
+  assert.strictEqual(singleNegotiationConfig.title, "Negociaci\u00f3n asociada");
+  assert.strictEqual(singleNegotiationConfig.summary[1].label, "Negociaci\u00f3n");
+  const presentationsConfig = dashboard.buildNegotiationUsageNegotiationPresentationsConfig(multi, multi.negotiations[0]);
+  assert.strictEqual(presentationsConfig.rows.length, 2);
+  assert(presentationsConfig.columns.some((column) => column.id === "physicalSales"));
+
+  dashboard.initializeDashboardDataset([numericZero, duplicatePresentation, secondPresentation, secondActivity]);
+  const cached = dashboard.getNegotiationUsageAnalysisCached("without-period", [numericZero, duplicatePresentation, secondPresentation, secondActivity]);
+  const cachedAgain = dashboard.getNegotiationUsageAnalysisCached("without-period", [numericZero, duplicatePresentation, secondPresentation, secondActivity]);
+  assert.strictEqual(cached, cachedAgain, "El detalle debe reutilizar la cache LRU.");
+  assert.strictEqual(dashboard.getDashboardPerformanceSnapshot().counters.negotiationUsageModelsBuilt, 1);
+  assert.strictEqual(dashboard.getDashboardPerformanceSnapshot().counters.negotiationUsageCacheHits, 1);
+
+  const elements = makeDetailExplorerElements();
+  withDashboardElements(elements, () => {
+    dashboard.openNegotiationUsageExplorer(null, null, analysis);
+    assert(elements.detailExplorerBody.innerHTML.includes("Ver negociaciones"));
+    assert(elements.detailExplorerBody.innerHTML.includes("Ver negociaci\u00f3n"));
+    dashboard.openNegotiationUsagePresentations(multi, null);
+    assert.strictEqual(dashboard.getDetailExplorerState().type, "negotiationUsageNegotiations");
+    assert(elements.detailExplorerBody.innerHTML.includes("Ver presentaciones"));
+    assert(elements.detailExplorerBody.innerHTML.includes("negotiation-record"));
+    assert(!elements.detailExplorerBody.innerHTML.includes("<table"));
+    dashboard.openNegotiationUsageNegotiationPresentations(multi, multi.negotiations[0], null);
+    assert.strictEqual(dashboard.getDetailExplorerState().type, "negotiationUsagePresentations");
+    assert.strictEqual(dashboard.getModalNavigationSnapshot().depth > 1, true);
+    dashboard.closeDetailExplorer();
+  });
+}
 
 function runDocumentationTests() {
   const docsDir = path.join(ROOT, "docs");
@@ -541,7 +630,7 @@ function runSyntheticTests() {
   const globalMultiModel = dashboard.buildContextualKpiModel(globalMultiAnalysis, {});
   assert.strictEqual(globalMultiModel.contextType, "GLOBAL");
   assert.deepStrictEqual(plain(globalMultiModel.items.map((item) => item.id)), [
-    "periodSales", "latestSales", "comparableSales", "monthlyObjectives", "activityCompliance", "objectiveDifference", "withoutSales", "activeNegotiations"
+    "periodSales", "latestSales", "comparableSales", "monthlyObjectives", "activityCompliance", "objectiveDifference", "clientsWithoutMonthlySales", "activeNegotiations"
   ]);
   assert.strictEqual(globalMultiModel.items.find((item) => item.id === "comparableSales").value, "No disponible");
   assert.strictEqual(globalMultiModel.items.find((item) => item.id === "monthlyObjectives").value, "No disponible");
@@ -1435,7 +1524,7 @@ function runSyntheticTests() {
   assert(!regionLabels.includes("Sin dato"));
 
   const html = dashboard.generatedHtml({ rows: [withoutSales, zeroSale, withSale], metadata: {} });
-  assert(html.includes("open-no-sales-explorer"));
+  assert(html.includes("open-negotiation-usage"));
   assert(html.includes("RESUMEN POR CATEGORÍA"));
   assert(!html.includes("chartSinVentasCategoria"));
   assert(html.includes("detailExplorerOverlay"));
@@ -2757,10 +2846,10 @@ function normalizeActivityRow(options = {}) {
     "Canal": "Tradicional",
     "Región SAP": "Centro Sur",
     "Categoría AS400 de la venta": options.category || "Gaseosa",
-    "Nit cliente - Clave": options.nit || "900001",
-    "Cliente AS400 - Texto": options.clientName || ("Cliente " + (options.clientId || "C-ACT")),
+    "Nit cliente - Clave": Object.prototype.hasOwnProperty.call(options, "nit") ? options.nit : "900001",
+    "Cliente AS400 - Texto": Object.prototype.hasOwnProperty.call(options, "clientName") ? options.clientName : ("Cliente " + (options.clientId || "C-ACT")),
     "Cliente SAP - Clave": options.clientId || "C-ACT",
-    "Cliente AS400 - Nombre negocio (Texto)": options.clientName || ("Negocio " + (options.clientId || "C-ACT")),
+    "Cliente AS400 - Nombre negocio (Texto)": Object.prototype.hasOwnProperty.call(options, "clientName") ? options.clientName : ("Negocio " + (options.clientId || "C-ACT")),
     "Presentación AS400 de la venta - Texto": options.presentationName || ("Presentación " + (options.presentationCode || "P-ACT")),
     "Presentación AS400 de la venta - Clave": options.presentationCode || "P-ACT",
     "ID Actividad": options.activityId || "A-ACT",

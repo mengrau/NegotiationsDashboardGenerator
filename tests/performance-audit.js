@@ -18,8 +18,12 @@ function measure(name, callback) {
   measurements[name] = Math.round((performance.now() - startedAt) * 100) / 100;
   return value;
 }
-const matrix = measure("readWorkbookXmlMs", function () { return readXlsxFirstSheet(workbookPath); });
+const matrix = fs.existsSync(workbookPath) ? measure("readWorkbookXmlMs", function () { return readXlsxFirstSheet(workbookPath); }) : null;
 const rows = measure("normalizationMs", function () {
+  if (!matrix) return Array.from({ length: 14623 }, function (_, index) {
+    const relation = index % 500, presentation = index % 10;
+    return normalizeActivityRow({ clientId: "C-PERF-" + relation, activityId: "A-PERF-" + relation, presentationCode: "P-PERF-" + presentation, physicalSales: presentation ? "1" : "0", totalSales: "10", yearMonth: "202607" });
+  });
   const headers = matrix[0].map(app.normalizeCellText);
   const headerMap = app.buildHeaderMap(headers);
   return matrix.slice(1).filter(function (row) { return row && !row.every(app.isEmptyCell); }).map(function (row) {
@@ -68,6 +72,9 @@ measure("modalScrollBoundaryChecks1000Ms", function () {
 });
 if (JSON.stringify(dashboard.getDashboardPerformanceSnapshot().counters) !== scrollCountersBefore) throw new Error("El scroll del modal modificó contadores de análisis o render");
 measure("noSalesAnalysisMs", function () { return dashboard.getNoSalesAnalysis(rows); });
+const negotiationUsageCold = measure("negotiationUsageColdMs", function () { return dashboard.getNegotiationUsageAnalysisCached("audit:usage", rows); });
+const negotiationUsageCached = measure("negotiationUsageCacheHitMs", function () { return dashboard.getNegotiationUsageAnalysisCached("audit:usage", rows); });
+if (negotiationUsageCold !== negotiationUsageCached) throw new Error("La cache de uso no reutilizo el modelo preparado.");
 measure("dimensionOptionsMs", function () {
   return ["Región SAP", "Canal", "Categoría AS400 de la venta", "Cliente SAP - Clave", "Cedi"].map(function (field) {
     return dashboard.getUniqueOptions(rows, field);
@@ -99,7 +106,7 @@ const comparableFormulaConsistency = dashboard.reconcileComparablePerformance({
 });
 if (!comparableFormulaConsistency.consistent) throw new Error("Las fórmulas comparables no se reconcilian");
 if (visibleChartDefinitions.some(function (definition) { return definition.id === "salesTrend" || definition.elementId === "chartMes"; })) throw new Error("Evolución de ventas sigue activa");
-if (visibleChartDefinitions.some(function (definition) { return definition.id === "noSales" || definition.elementId === "chartSinVentasCategoria"; })) throw new Error("La gráfica de presentaciones sin ventas sigue activa");
+if (visibleChartDefinitions.some(function (definition) { return definition.id === "noSales" || definition.elementId === "chartSinVentasCategoria"; })) throw new Error("La gráfica anterior de ausencia de venta sigue activa");
 const visualOptions = measure("visualOptionConstructionMs", function () {
   const categoryType = dashboard.chooseCompositionChartType(fullAnalysis.categorySales, { treemapLimit: 12, fallbackType: "bar" });
   return {
@@ -189,7 +196,7 @@ console.log(JSON.stringify({
     rowFillCards: adaptiveChartLayout.filter(function (item) { return item.layoutClass.includes("chart-row-fill"); }).length,
     analysisRebuiltForLayout: false,
     categoryVisualType: visualOptions.categoryType,
-    noSalesExplorer: "kpi-modal",
+    negotiationUsageExplorer: "kpi-modal",
     presentationVisualType: "lollipop"
   },
   indicatorConsistency: {

@@ -736,6 +736,21 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-card:focus-visible { outline: 3px solid rgba(13, 148, 136, 0.28); outline-offset: 3px; }
 .detail-card strong { color: var(--ink); }
 .detail-card span { color: var(--muted); font-size: 0.82rem; font-weight: 800; }
+.negotiation-list { display: grid; gap: 12px; }
+.negotiation-record { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.negotiation-record-header { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--soft-bg); }
+.negotiation-record-identity { display: grid; gap: 5px; min-width: 0; }
+.negotiation-record-identity small { color: var(--muted); font-size: 0.68rem; font-weight: 900; text-transform: uppercase; }
+.negotiation-record-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.negotiation-record-title strong { color: var(--ink); font-size: 1rem; }
+.negotiation-record-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.7rem; font-weight: 900; }
+.negotiation-record-badge.is-neutral { background: var(--subtle); color: var(--muted); }
+.negotiation-record-header .button { flex: 0 0 auto; min-height: 36px; white-space: nowrap; }
+.negotiation-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1px; background: var(--line); }
+.negotiation-field { min-width: 0; padding: 12px 16px; background: var(--panel); }
+.negotiation-field small { display: block; margin-bottom: 5px; color: var(--muted); font-size: 0.67rem; font-weight: 900; text-transform: uppercase; }
+.negotiation-field strong { display: block; color: var(--ink); font-size: 0.86rem; line-height: 1.4; overflow-wrap: break-word; }
+.negotiation-field-wide { grid-column: span 2; }
 .contribution-card-head, .contribution-card-metrics { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
 .contribution-card-name { display: grid; gap: 2px; }
 .contribution-card-metrics { padding-top: 8px; border-top: 1px solid var(--line); }
@@ -799,6 +814,8 @@ tbody tr:hover { background: var(--primary-soft); }
   .detail-toolbar .quick-search { grid-column: 1 / -1; }
   .detail-table-wrap { display: none; }
   .detail-card-list { display: grid; }
+  .negotiation-record-header { align-items: stretch; }
+  .negotiation-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .timeline-heading { display: grid; }
   .timeline-action { width: 100%; }
   .timeline-summary-state > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -813,6 +830,10 @@ tbody tr:hover { background: var(--primary-soft); }
   .sidebar-note { display: none; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .kpi-card { min-height: 0; padding: 13px; }
+  .negotiation-record-header { display: grid; }
+  .negotiation-record-header .button { width: 100%; }
+  .negotiation-fields { grid-template-columns: 1fr; }
+  .negotiation-field-wide { grid-column: auto; }
   .kpi-card.kpi-secondary { min-height: 0; }
   .kpi-value { font-size: 1.25rem; }
   .chart-card, .chart-compact, .chart-standard, .chart-featured { min-height: 0; padding: 14px; }
@@ -879,7 +900,7 @@ const UI_COPY = Object.freeze({
       monthlyObjective: { title: "Objetivo mensual", description: "Meta en cajas f\u00edsicas de las negociaciones evaluadas." },
       monthlyCompliance: { title: "Cumplimiento mensual", description: "Resultado de ventas en cajas f\u00edsicas frente al objetivo del mes en cajas f\u00edsicas." },
       objectiveGap: { title: "Diferencia frente al objetivo", positive: "Cajas f\u00edsicas por encima del objetivo.", negative: "Cajas f\u00edsicas pendientes para alcanzar el objetivo.", neutral: "Sin diferencia en cajas f\u00edsicas frente al objetivo." },
-      withoutSales: { title: "Presentaciones sin ventas", description: "Presentaciones sin resultado de venta.", action: "Ver detalle" },
+      withoutUse: { title: "Clientes negociados sin ventas", description: "Clientes negociados con venta total reportada en cero.", action: "Ver detalle" },
       activeNegotiations: { title: "Negociaciones vigentes", description: "Negociaciones activas a la fecha." }
     },
     shared: {
@@ -924,7 +945,7 @@ const UI_COPY = Object.freeze({
   emptyStates: {
     filters: "No hay resultados para los filtros seleccionados.",
     negotiations: "No hay negociaciones evaluables en este per\u00edodo.",
-    withoutSales: "No hay presentaciones sin ventas.",
+    withoutUse: "No hay clientes negociados sin ventas.",
     visualization: "No fue posible cargar esta visualizaci\u00f3n.",
     unavailable: "Informaci\u00f3n no disponible."
   },
@@ -990,7 +1011,7 @@ const WITHOUT_SALES_DETAIL_COLUMNS = [
   "Fecha fin",
   "Cedi"
 ];
-const NO_SALES_EXPLORER_COLUMNS = [
+const NEGOTIATION_USAGE_PRESENTATION_COLUMNS = [
   { id: "presentationCode", label: "Código" },
   { id: "presentation", label: "Presentación" },
   { id: "category", label: "Categoría" },
@@ -1003,11 +1024,39 @@ const NO_SALES_EXPLORER_COLUMNS = [
   { id: "period", label: "Período" },
   { id: "absenceReason", label: "Motivo" }
 ];
-const NO_SALES_EXPLORER_SORT_OPTIONS = [
+const NEGOTIATION_USAGE_PRESENTATION_SORT_OPTIONS = [
   { field: "presentation", label: "Presentación", dir: "asc" },
   { field: "objectiveMonth", label: "Objetivo mes", dir: "desc" },
   { field: "objectiveTotal", label: "Objetivo total", dir: "desc" },
   { field: "endDate", label: "Fecha fin", dir: "asc" }
+];
+// Conserva el analisis de calidad por presentacion para las visualizaciones existentes;
+// ya no alimenta el KPI ni su modal.
+const NO_SALES_EXPLORER_COLUMNS = NEGOTIATION_USAGE_PRESENTATION_COLUMNS;
+const NO_SALES_EXPLORER_SORT_OPTIONS = NEGOTIATION_USAGE_PRESENTATION_SORT_OPTIONS;
+const NEGOTIATION_USAGE_RELATION_COLUMNS = [
+  { id: "clientSap", label: "Cliente SAP" }, { id: "clientName", label: "Nombre del cliente" },
+  { id: "nit", label: "NIT" }, { id: "cedis", label: "CEDI" },
+  { id: "activityCount", label: "Negociaciones asociadas", numeric: true },
+  { id: "monthlyObjectiveCombined", label: "Objetivo mensual combinado", numeric: true },
+  { id: "totalReportedSales", label: "Venta total", numeric: true },
+  { id: "statusLabel", label: "Estado" }, { id: "actions", label: "Acciones" }
+];
+const NEGOTIATION_USAGE_SORT_OPTIONS = [
+  { field: "clientName", label: "Cliente", dir: "asc" },
+  { field: "clientSap", label: "Cliente SAP", dir: "asc" },
+  { field: "monthlyObjectiveCombined", label: "Objetivo mensual combinado", dir: "desc" },
+  { field: "activityCount", label: "Negociaciones asociadas", dir: "desc" },
+  { field: "region", label: "Regi\\u00f3n", dir: "asc" }
+];
+const NEGOTIATION_USAGE_NEGOTIATION_COLUMNS = [
+  { id: "activityId", label: "ID Actividad" }, { id: "negotiationType", label: "Tipo de negociaci\\u00f3n" },
+  { id: "startDate", label: "Fecha inicio" }, { id: "endDate", label: "Fecha fin" },
+  { id: "contractualStatusLabel", label: "Estado contractual" }, { id: "monthlyObjective", label: "Objetivo mensual", numeric: true },
+  { id: "totalObjective", label: "Objetivo total", numeric: true }, { id: "negotiationDuration", label: "Duraci\\u00f3n de la negociaci\\u00f3n", numeric: true },
+  { id: "investmentPercentage", label: "Porcentaje de inversi\\u00f3n", numeric: true }, { id: "cedi", label: "CEDI" },
+  { id: "negotiatedPresentationCount", label: "Cantidad de presentaciones", numeric: true }, { id: "categoriesLabel", label: "Categor\\u00edas negociadas" },
+  { id: "totalReportedSales", label: "Venta total reportada", numeric: true }, { id: "actions", label: "Acciones" }
 ];
 const DETAIL_EXPLORER_VISIBLE_STEP = 25;
 const DETAIL_EXPLORER_FOCUSABLE = "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
@@ -1078,7 +1127,7 @@ let dashboardInitialized = false;
 const debouncedResizeCharts = debounce(resizeCharts, 160);
 const state = {
   filters: {}, scopeRows: [], filteredRows: [], analyses: null, indexes: null, datasetVersion: 0,
-  filterCache: createLruCache(12), analysisCache: createLruCache(8), noSalesCache: createLruCache(8), contributionModelCache: createLruCache(8), facetedOptionsCache: createLruCache(12), timelineCache: createLruCache(8), clientTrackingCache: createLruCache(8), clientTrackingDetailCache: createLruCache(16),
+  filterCache: createLruCache(12), analysisCache: createLruCache(8), negotiationUsageCache: createLruCache(8), contributionModelCache: createLruCache(8), facetedOptionsCache: createLruCache(12), timelineCache: createLruCache(8), clientTrackingCache: createLruCache(8), clientTrackingDetailCache: createLruCache(16),
   clientTrackingRelationIndex: new Map(), clientTrackingRelationIndexSource: null,
   activityAnalyticsCache: { key: "", value: null }, chartSignatures: new Map(), chartLayoutSignature: "",
   pendingRenderFrame: null, renderVersion: 0, syncingControls: false,
@@ -1088,7 +1137,7 @@ const state = {
   runtimeDiagnostics: { errors: [], warnings: [] },
   clientTrackingTable: getEmptyClientTrackingTableState(),
   modalNavigation: { stack: [] },
-  noSalesAnalysis: getEmptyNoSalesAnalysis(), detailExplorer: getEmptyDetailExplorerState(), search: "",
+  negotiationUsageAnalysis: getEmptyNegotiationUsageAnalysis(), detailExplorer: getEmptyDetailExplorerState(), search: "",
   page: 1, pageSize: 10, sortField: "Ventas cajas físicas (sin rep)", sortDir: "desc"
 };
 const chartDrilldowns = {
@@ -1251,10 +1300,10 @@ function bindEvents() {
 }
 function handleKpiAction(event) {
   const target = event.target && event.target.closest ? event.target.closest("[data-kpi-action]") : null;
-  if (!target || target.dataset.kpiAction !== "open-no-sales-explorer") return;
+  if (!target || target.dataset.kpiAction !== "open-negotiation-usage") return;
   if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
   if (event.type === "keydown") event.preventDefault();
-  openNoSalesCategoryExplorer(target);
+  openNegotiationUsageExplorer(target);
 }
 function isDashboardDebugEnabled() {
   return PERFORMANCE_DEBUG || Boolean(window.__DASHBOARD_PERF_DEBUG__ || window.__DASHBOARD_DEBUG__);
@@ -1741,7 +1790,7 @@ function handleActiveFilterClick(event) {
   updateDashboardFilters({ [target.dataset.filterChipField]: [] }, { reason: "remove-filter-chip" });
 }
 function createPerformanceState() {
-  return { stages: {}, counters: { indexesBuilt: 0, analysesExecuted: 0, rendersScheduled: 0, rendersCompleted: 0, rendersCancelled: 0, chartUpdates: 0, chartInitializations: 0, chartDisposals: 0, timelineModelsBuilt: 0, timelineCacheHits: 0, timelineUpdates: 0, timelineInitializations: 0, modalRowsRendered: 0, modalModelsBuilt: 0, clientTrackingProjectionsBuilt: 0, clientTrackingCacheHits: 0, clientTrackingRowsRendered: 0, clientTrackingDetailModelsBuilt: 0, clientTrackingDetailCacheHits: 0 } };
+  return { stages: {}, counters: { indexesBuilt: 0, analysesExecuted: 0, negotiationUsageModelsBuilt: 0, negotiationUsageCacheHits: 0, rendersScheduled: 0, rendersCompleted: 0, rendersCancelled: 0, chartUpdates: 0, chartInitializations: 0, chartDisposals: 0, timelineModelsBuilt: 0, timelineCacheHits: 0, timelineUpdates: 0, timelineInitializations: 0, modalRowsRendered: 0, modalModelsBuilt: 0, clientTrackingProjectionsBuilt: 0, clientTrackingCacheHits: 0, clientTrackingRowsRendered: 0, clientTrackingDetailModelsBuilt: 0, clientTrackingDetailCacheHits: 0 } };
 }
 function performanceNow() {
   return window.performance && typeof window.performance.now === "function" ? window.performance.now() : Date.now();
@@ -1764,7 +1813,7 @@ function getDashboardPerformanceSnapshot() {
     indexes: state.indexes ? state.indexes.stats : null,
     stages: JSON.parse(JSON.stringify(state.performance.stages)),
     counters: Object.assign({}, state.performance.counters),
-    caches: { filters: state.filterCache.size(), analyses: state.analysisCache.size(), noSales: state.noSalesCache.size(), contributions: state.contributionModelCache.size(), facets: state.facetedOptionsCache.size(), timelines: state.timelineCache.size(), clientTracking: state.clientTrackingCache.size(), clientTrackingDetails: state.clientTrackingDetailCache.size(), charts: state.chartSignatures.size },
+    caches: { filters: state.filterCache.size(), analyses: state.analysisCache.size(), negotiationUsage: state.negotiationUsageCache.size(), contributions: state.contributionModelCache.size(), facets: state.facetedOptionsCache.size(), timelines: state.timelineCache.size(), clientTracking: state.clientTrackingCache.size(), clientTrackingDetails: state.clientTrackingDetailCache.size(), charts: state.chartSignatures.size },
     diagnostics: { errors: state.runtimeDiagnostics.errors.length, warnings: state.runtimeDiagnostics.warnings.length, limit: RUNTIME_DIAGNOSTIC_LIMIT }
   };
 }
@@ -1786,11 +1835,11 @@ function initializeDashboardDataset(rows) {
   disposeCharts();
   if (detailSearchDebounced && detailSearchDebounced.cancel) detailSearchDebounced.cancel();
   state.datasetVersion += 1;
-  state.filterCache.clear(); state.analysisCache.clear(); state.noSalesCache.clear(); state.contributionModelCache.clear(); state.facetedOptionsCache.clear(); state.timelineCache.clear(); state.clientTrackingCache.clear(); state.clientTrackingDetailCache.clear(); state.chartSignatures.clear();
+  state.filterCache.clear(); state.analysisCache.clear(); state.negotiationUsageCache.clear(); state.contributionModelCache.clear(); state.facetedOptionsCache.clear(); state.timelineCache.clear(); state.clientTrackingCache.clear(); state.clientTrackingDetailCache.clear(); state.chartSignatures.clear();
   state.clientTrackingRelationIndex = new Map(); state.clientTrackingRelationIndexSource = null;
   state.filters = {};
   state.scopeRows = []; state.filteredRows = []; state.analyses = null; state.search = "";
-  state.noSalesAnalysis = getEmptyNoSalesAnalysis(); state.detailExplorer = getEmptyDetailExplorerState(); state.facetedOptions = null;
+  state.negotiationUsageAnalysis = getEmptyNegotiationUsageAnalysis(); state.detailExplorer = getEmptyDetailExplorerState(); state.facetedOptions = null;
   state.clientTrackingTable = getEmptyClientTrackingTableState();
   state.chartLayoutSignature = ""; state.renderVersion += 1; state.pendingRenderFrame = null;
   state.performance = createPerformanceState();
@@ -1804,7 +1853,19 @@ function initializeDashboardDataset(rows) {
 function buildDashboardIndexes(rows) {
   const rowsByField = new Map(), fields = FILTER_FIELDS.map(function (item) { return item.field; });
   const rowsByPeriod = new Map(), clientsByActivity = new Map(), activitiesByClient = new Map(), presentationsByActivity = new Map(), vigenciaByRow = new WeakMap();
-  const clientMetadata = new Map();
+  const clientMetadata = new Map(), enrichmentByClient = new Map(), enrichmentByRelation = new Map();
+  const enrichmentFields = ["Cliente AS400 - Nombre negocio (Texto)", "Cliente AS400 - Texto", "Nit cliente - Clave", "Regi\u00f3n SAP", "Cedi", "Canal", "Tipolog\u00eda"];
+  const collectEnrichment = function (map, key, row) {
+    if (!key) return;
+    if (!map.has(key)) map.set(key, new Map());
+    const valuesByField = map.get(key);
+    enrichmentFields.forEach(function (field) {
+      const value = normalizeText(row[field]);
+      if (!value) return;
+      if (!valuesByField.has(field)) valuesByField.set(field, new Set());
+      valuesByField.get(field).add(value);
+    });
+  };
   fields.forEach(function (field) { rowsByField.set(field, new Map()); });
   rows.forEach(function (row) {
     fields.forEach(function (field) {
@@ -1816,6 +1877,8 @@ function buildDashboardIndexes(rows) {
       byValue.get(value).add(row);
     });
     const period = getYearMonthSortValue(row), activityId = normalizeText(row["ID Actividad"]), clientId = normalizeText(row["Cliente SAP - Clave"]), presentationId = normalizeText(row["Presentación AS400 de la venta - Clave"]);
+    collectEnrichment(enrichmentByClient, clientId, row);
+    collectEnrichment(enrichmentByRelation, clientId && activityId ? clientId + "||" + activityId : "", row);
     if (period !== null) { if (!rowsByPeriod.has(period)) rowsByPeriod.set(period, []); rowsByPeriod.get(period).push(row); }
     if (activityId && clientId) {
       if (!clientsByActivity.has(activityId)) clientsByActivity.set(activityId, new Set()); clientsByActivity.get(activityId).add(clientId);
@@ -1848,6 +1911,7 @@ function buildDashboardIndexes(rows) {
     rows: rows, rowsByField: rowsByField, rowsByActivity: rowsByField.get("ID Actividad"), rowsByClient: rowsByField.get("Cliente SAP - Clave"),
     rowsByPeriod: rowsByPeriod, clientsByActivity: clientsByActivity, activitiesByClient: activitiesByClient, presentationsByActivity: presentationsByActivity, vigenciaByRow: vigenciaByRow, categoryLookup: categoryLookup,
     catalogs: { activity: activityCatalog, client: clientCatalog }, clientMetadata: clientMetadata,
+    enrichmentByClient: enrichmentByClient, enrichmentByRelation: enrichmentByRelation,
     stats: { fields: rowsByField.size, activities: clientsByActivity.size, clients: activitiesByClient.size, periods: rowsByPeriod.size, rowReferences: Array.from(rowsByField.values()).reduce(function (sum, map) { return sum + Array.from(map.values()).reduce(function (inner, set) { return inner + set.size; }, 0); }, 0) }
   };
 }
@@ -1885,6 +1949,12 @@ function filterRowsUsingIndexes(baseRows, filters, indexes) {
   if (indexes && baseRows !== indexes.rows) { const allowed = new Set(baseRows); candidates = candidates.filter(function (row) { return allowed.has(row); }); }
   return applyFilters(candidates, filters);
 }
+function getNegotiationUsageAnalysisCached(signature, rows) {
+  const cached = state.negotiationUsageCache.get(signature);
+  if (cached) { state.performance.counters.negotiationUsageCacheHits += 1; return cached; }
+  state.performance.counters.negotiationUsageModelsBuilt += 1;
+  return state.negotiationUsageCache.set(signature, measurePerformance("negotiationUsageAnalysis", function () { return buildNegotiationUsageAnalysis(rows); }));
+}
 function scheduleDashboardRender(reason) {
   state.renderVersion += 1;
   const version = state.renderVersion;
@@ -1921,10 +1991,13 @@ function renderAll(reason) {
   state.scopeRows = getFilteredRowsCached(DASHBOARD_DATA, scopeFilters, "scope");
   state.filteredRows = applySearch(getFilteredRowsCached(state.scopeRows, getEntityFilters(state.filters), "entity:" + scopeSignature));
   const analysisSignature = getFilterSignature(state.filters) + "|search:" + normalizeText(state.search);
-  state.noSalesAnalysis = state.noSalesCache.get(analysisSignature) || state.noSalesCache.set(analysisSignature, measurePerformance("noSalesAnalysis", function () { return getNoSalesAnalysis(state.filteredRows, state.indexes && state.indexes.categoryLookup); }));
+  const withoutSalesFilters = getNegotiationUsageCompatibleFilters(state.filters);
+  const withoutSalesSignature = "without-sales|" + getFilterSignature(withoutSalesFilters) + "|search:" + normalizeText(state.search);
+  const withoutSalesRows = applySearch(getFilteredRowsCached(DASHBOARD_DATA, withoutSalesFilters, "without-sales"));
+  state.negotiationUsageAnalysis = getNegotiationUsageAnalysisCached(withoutSalesSignature, withoutSalesRows);
   const activityAnalytics = getCachedActivityAnalytics(state.scopeRows, state.filters);
   state.analyses = getDashboardAnalysisCached(analysisSignature, function () {
-    return buildDashboardAnalyses(state.filteredRows, state.noSalesAnalysis, { scopeRows: state.scopeRows, filters: state.filters, activityAnalytics: activityAnalytics, indexes: state.indexes });
+    return buildDashboardAnalyses(state.filteredRows, state.negotiationUsageAnalysis, { scopeRows: state.scopeRows, filters: state.filters, activityAnalytics: activityAnalytics, indexes: state.indexes });
   });
   state.facetedOptions = measurePerformance("facetedOptions", function () { return buildFacetedOptions(state.filters); });
   syncFilterControlsFromState({ refreshOptions: false });
@@ -1932,7 +2005,7 @@ function renderAll(reason) {
   safelyRenderComponent("context", function () { renderContextStrip(state.analyses); });
   safelyRenderComponent("data-health", renderDataHealth);
   safelyRenderComponent("active-filters", renderActiveFilters);
-  measurePerformance("kpiRender", function () { safelyRenderComponent("kpis", function () { renderKpis(state.filteredRows, state.noSalesAnalysis, state.analyses); }, renderKpiFailureState); });
+  measurePerformance("kpiRender", function () { safelyRenderComponent("kpis", function () { renderKpis(state.filteredRows, state.negotiationUsageAnalysis, state.analyses); }, renderKpiFailureState); });
   measurePerformance("clientTrackingRender", function () { safelyRenderComponent("client-tracking", renderClientTrackingTable, renderClientTrackingFailureState); });
   measurePerformance("chartRender", function () { safelyRenderComponent("charts", function () { renderAdaptiveCharts(state.analyses); }, renderChartFailureState); });
   safelyRenderComponent("detail-explorer", syncOpenDetailExplorer, renderDetailExplorerFailureState);
@@ -2266,7 +2339,7 @@ function applyChartFilter(field, value) {
     : current.length === 1 && current[0] === normalizedValue ? [] : [normalizedValue];
   updateDashboardFilters({ [field]: next }, { reason: "chart-filter" });
 }
-function computeKpis(rows, noSalesAnalysis, options) {
+function computeKpis(rows, negotiationUsageAnalysis, options) {
   options = options || {};
   const scopeRows = options.scopeRows || rows;
   const filters = options.filters || {};
@@ -2356,8 +2429,7 @@ function computeKpis(rows, noSalesAnalysis, options) {
   else if (selectedClientIds.length) mode = "CLIENT_AGGREGATE";
   else if (selectedActivityIds.length === 1) mode = "ACTIVITY";
   else if (selectedActivityIds.length > 1) mode = "ACTIVITY_AGGREGATE";
-  const analysis = noSalesAnalysis || getNoSalesAnalysis(rows);
-  const negotiatedPresentationCount = countUniqueBy(rows.filter(hasNegotiatedPresentationReference), getNegotiatedPresentationKey);
+  const usageAnalysis = negotiationUsageAnalysis && Object.prototype.hasOwnProperty.call(negotiationUsageAnalysis, "totalUniqueClients") ? negotiationUsageAnalysis : buildNegotiationUsageAnalysis(rows);
   const negotiatedActivityIds = selectedActivityIds.length
     ? selectedActivityIds
     : relevantPerformance.map(function (item) { return item.activityId; });
@@ -2375,10 +2447,10 @@ function computeKpis(rows, noSalesAnalysis, options) {
     uniquePresentations: countUnique(rows, "Presentación AS400 de la venta - Clave"),
     uniqueActivities: countUnique(rows, "ID Actividad"),
     activeNegotiations: countUniqueBy(rows.filter(function (row) { return getIndexedVigenciaStatus(row) === "Vigente"; }), getActivityKey),
-    presentationsWithoutSales: analysis.presentationCount,
-    percentPresentationsWithoutSales: negotiatedPresentationCount ? analysis.presentationCount / negotiatedPresentationCount : null,
-    affectedActivities: analysis.activityCount || null,
-    affectedClients: analysis.clientCount || null,
+    clientsWithoutMonthlySales: usageAnalysis.totalUniqueClients,
+    affectedActivities: usageAnalysis.activityCount || null,
+    affectedClients: usageAnalysis.clientCount || null,
+    presentationsWithoutSales: negotiationUsageAnalysis && isFiniteNumber(negotiationUsageAnalysis.presentationCount) ? negotiationUsageAnalysis.presentationCount : getNoSalesAnalysis(rows).presentationCount,
     salesResolution: salesPeriodResolution,
     activityAnalytics: activityAnalytics,
     activityPerformance: relevantPerformance,
@@ -2409,8 +2481,8 @@ function getActivityContractStatus(objective, period) {
   if (start > new Date(year, month, 0)) return "ACTIVIDAD_AUN_NO_INICIADA";
   return "SIN_ACTIVIDAD_COMPARABLE_EN_PERIODO";
 }
-function renderKpis(rows, noSalesAnalysis, analyses) {
-  const sourceAnalysis = analyses && analyses.kpis ? analyses : { kpis: computeKpis(rows, noSalesAnalysis), filters: {} };
+function renderKpis(rows, negotiationUsageAnalysis, analyses) {
+  const sourceAnalysis = analyses && analyses.kpis ? analyses : { kpis: computeKpis(rows, negotiationUsageAnalysis), filters: {} };
   const model = buildContextualKpiModel(sourceAnalysis, sourceAnalysis.filters || {});
   const container = document.getElementById("kpis");
   if (!container) return;
@@ -2423,7 +2495,7 @@ function renderKpis(rows, noSalesAnalysis, analyses) {
     const className = "kpi-card " + (secondary ? "" : "kpi-primary ") + (item.className || "");
     const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
     const icon = resolveKpiIcon(item.icon);
-    const actionAttrs = item.action ? " data-kpi-action=\\\"" + escapeHtml(item.action) + "\\\" role=\\\"button\\\" tabindex=\\\"0\\\" aria-label=\\\"" + escapeHtml(item.actionLabel || item.title) + "\\\"" : "";
+    const actionAttrs = (item.action ? " data-kpi-action=\\\"" + escapeHtml(item.action) + "\\\" role=\\\"button\\\" tabindex=\\\"0\\\" aria-label=\\\"" + escapeHtml(item.actionLabel || item.title) + "\\\"" : "") + (item.tooltip ? " title=\\\"" + escapeHtml(item.tooltip) + "\\\"" : "");
     return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
   refreshIcons(container, "data-kpi-icon");
@@ -2433,7 +2505,7 @@ function getKpiGridLayoutMetadata(count) {
   return { count: normalized, tail: normalized % 4, odd: normalized % 2 === 1 };
 }
 const KPI_ICON_FALLBACK = "circle-dot";
-const VALID_KPI_ICONS = new Set(["shopping-bag", "package-check", "target", "pie-chart", "gauge", "trending-up", "trending-down", "minus", "users", "boxes", "list-ordered", "circle-check", "calendar-check", "clipboard-list", "badge-check", "package-x", "calendar-days", "circle-help", "circle-dot"]);
+const VALID_KPI_ICONS = new Set(["shopping-bag", "package-check", "target", "pie-chart", "gauge", "trending-up", "trending-down", "minus", "users", "user-x", "boxes", "list-ordered", "circle-check", "calendar-check", "clipboard-list", "badge-check", "package-x", "calendar-days", "circle-help", "circle-dot"]);
 function resolveKpiIcon(iconName) {
   return VALID_KPI_ICONS.has(iconName) ? iconName : KPI_ICON_FALLBACK;
 }
@@ -2572,7 +2644,7 @@ function buildExecutiveKpis(context) {
     { id: "monthlyObjectives", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: formatAvailableMetric(comparableObjective), description: UI_COPY.kpis.global.monthlyObjective.description },
     { id: "activityCompliance", icon: "gauge", title: UI_COPY.kpis.global.monthlyCompliance.title, value: formatAvailablePercent(k.compliance), description: UI_COPY.kpis.global.monthlyCompliance.description + " " + coverage, className: compliance.className, status: compliance.label },
     { id: "objectiveDifference", icon: difference.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: isFiniteNumber(k.objectiveDifference) ? getObjectiveGapDescription(k.objectiveDifference) : UI_COPY.emptyStates.unavailable, className: difference.className, status: difference.label },
-    { id: "withoutSales", icon: "package-x", title: UI_COPY.kpis.global.withoutSales.title, value: formatInteger(k.presentationsWithoutSales), description: UI_COPY.kpis.global.withoutSales.description + " · " + UI_COPY.kpis.global.withoutSales.action, className: "kpi-attention kpi-secondary", action: "open-no-sales-explorer", actionLabel: UI_COPY.actions.detail },
+    { id: "clientsWithoutMonthlySales", icon: "user-x", title: UI_COPY.kpis.global.withoutUse.title, value: formatInteger(k.clientsWithoutMonthlySales), description: UI_COPY.kpis.global.withoutUse.description + " " + UI_COPY.kpis.global.withoutUse.action, tooltip: "Estos registros no tienen un per\u00edodo de venta informado en la fuente.", className: "kpi-attention kpi-secondary", action: "open-negotiation-usage", actionLabel: UI_COPY.actions.detail },
     { id: "activeNegotiations", icon: "calendar-check", title: UI_COPY.kpis.global.activeNegotiations.title, value: formatInteger(k.activeNegotiations), description: UI_COPY.kpis.global.activeNegotiations.description, className: "kpi-secondary" }
   ];
 }
@@ -2698,11 +2770,11 @@ function projectClientNegotiationModelPeriod(model, filters) {
     summaryTableColumns: columns
   });
 }
-function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
+function buildDashboardAnalyses(rows, negotiationUsageAnalysis, options) {
   options = options || {};
   const sourceRows = rows || [];
   const scopeRows = options.scopeRows || sourceRows;
-  const noSales = noSalesAnalysis || getNoSalesAnalysis(sourceRows);
+  const usageAnalysis = negotiationUsageAnalysis && Object.prototype.hasOwnProperty.call(negotiationUsageAnalysis, "totalUniqueClients") ? negotiationUsageAnalysis : buildNegotiationUsageAnalysis(sourceRows);
   const dimensionFields = ["Región SAP", "Canal", "Categoría AS400 de la venta", "Cliente SAP - Clave", "Cedi"];
   const dimensions = {};
   dimensionFields.forEach(function (field) {
@@ -2718,7 +2790,7 @@ function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
     || (DASHBOARD_META && DASHBOARD_META.clientNegotiationModels)
     || { availablePeriods: [], clientActivitySummary: [], clientSummary: [], summaryTableColumns: [], diagnostics: {} };
   const clientNegotiationModels = projectClientNegotiationModelPeriod(rawClientNegotiationModels, options.filters || {});
-  const kpis = computeKpis(sourceRows, noSales, { scopeRows: scopeRows, filters: options.filters || {}, activityAnalytics: activityAnalytics });
+  const kpis = computeKpis(sourceRows, usageAnalysis, { scopeRows: scopeRows, filters: options.filters || {}, activityAnalytics: activityAnalytics });
   const chartData = {
     regions: groupUniqueTotalSalesByField(sourceRows, "Región SAP", 12),
     channels: groupUniqueTotalSalesByField(sourceRows, "Canal", 10),
@@ -2729,7 +2801,7 @@ function buildDashboardAnalyses(rows, noSalesAnalysis, options) {
     rows: sourceRows,
     filters: options.filters || {},
     rowCount: sourceRows.length,
-    noSalesAnalysis: noSales,
+    negotiationUsageAnalysis: usageAnalysis,
     dimensions: dimensions,
     periods: periods,
     presentationStatus: presentationStatus,
@@ -3999,7 +4071,7 @@ function unlockPageScroll(force) {
   pageScrollLock.touchY = null;
 }
 function isNavigableModalType(type) {
-  return type === "clientTrackingDetail" || type === "activityContribution" || type === "activityDetail";
+  return type === "clientTrackingDetail" || type === "activityContribution" || type === "activityDetail" || type === "negotiationUsageRelations" || type === "negotiationUsageNegotiations" || type === "negotiationUsagePresentations";
 }
 function cloneDetailExplorerForNavigation(explorer) {
   return Object.assign({}, explorer, {
@@ -4192,12 +4264,27 @@ function handleDetailExplorerClick(event) {
     renderDetailExplorer();
     return;
   }
+  if (action === "usage-view-negotiations") {
+    const client = state.detailExplorer.allRows.find(function (row) { return row.clientKey === target.dataset.clientKey; });
+    if (client) openNegotiationUsagePresentations(client, target);
+    return;
+  }
+  if (action === "usage-view-presentations") {
+    const negotiation = state.detailExplorer.allRows.find(function (row) { return row.relationKey === target.dataset.relationKey; });
+    const client = state.detailExplorer.config && state.detailExplorer.config.exportContext;
+    if (client && negotiation) openNegotiationUsageNegotiationPresentations(client, negotiation, target);
+    return;
+  }
+  if (action === "usage-view-client" || action === "usage-view-activity") {
+    navigateFromNegotiationUsage(target.dataset.relationKey, action);
+    return;
+  }
   if (action === "open-category") {
     openNoSalesCategoryDetail(target.dataset.detailCategory, state.detailExplorer.config.analysis, state.detailExplorer.opener, { skipFocus: true });
     return;
   }
   if (action === "back-categories") {
-    openNoSalesCategoryExplorer(state.detailExplorer.opener, { skipFocus: true });
+    openNoSalesCategoryExplorer(state.detailExplorer.opener, { skipFocus: true }, state.detailExplorer.config.analysis);
     return;
   }
   if (action === "back-list") {
@@ -4265,12 +4352,27 @@ function handleDetailExplorerDocumentKeydown(event) {
   }
   if (event.key === "Tab") trapDetailExplorerFocus(event);
 }
-function openNoSalesCategoryDetail(category, noSalesAnalysis, opener, options) {
-  const config = buildNoSalesCategoryDetailConfig(category, noSalesAnalysis || state.noSalesAnalysis);
-  openDetailExplorer(config, opener || document.activeElement, options);
+function openNegotiationUsageExplorer(opener, options, analysis) {
+  openDetailExplorer(buildNegotiationUsageExplorerConfig(analysis || state.negotiationUsageAnalysis), opener || document.activeElement, options);
 }
-function openNoSalesCategoryExplorer(opener, options, noSalesAnalysis) {
-  openDetailExplorer(buildNoSalesCategoryExplorerConfig(noSalesAnalysis || state.noSalesAnalysis), opener || document.activeElement, options);
+function getNegotiationUsageCompatibleFilters(filters) {
+  const result = {};
+  Object.keys(filters || {}).forEach(function (field) {
+    if (["A\u00f1o", "Mes", "A\u00f1o Mes"].indexOf(field) === -1) result[field] = filters[field];
+  });
+  return result;
+}
+function openNegotiationUsagePresentations(client, opener, options) {
+  openDetailExplorer(buildNegotiationUsagePresentationConfig(client), opener || document.activeElement, options);
+}
+function openNegotiationUsageNegotiationPresentations(client, negotiation, opener, options) {
+  openDetailExplorer(buildNegotiationUsageNegotiationPresentationsConfig(client, negotiation), opener || document.activeElement, options);
+}
+function openNoSalesCategoryExplorer(opener, options, analysis) {
+  openDetailExplorer(buildNoSalesCategoryExplorerConfig(analysis || getEmptyNoSalesAnalysis()), opener || document.activeElement, options);
+}
+function openNoSalesCategoryDetail(category, analysis, opener, options) {
+  openDetailExplorer(buildNoSalesCategoryDetailConfig(category, analysis || getEmptyNoSalesAnalysis()), opener || document.activeElement, options);
 }
 function syncOpenDetailExplorer() {
   if (!state.detailExplorer.isOpen) return;
@@ -4289,11 +4391,8 @@ function syncOpenDetailExplorer() {
     if (activity) openActivityContributionDetail(activity, state.detailExplorer.opener, { preserveState: true, skipFocus: true });
     return;
   }
-  if (state.detailExplorer.type !== "noSalesCategory" && state.detailExplorer.type !== "noSalesCategories") return;
-  const category = state.detailExplorer.category;
-  const config = state.detailExplorer.type === "noSalesCategories"
-    ? buildNoSalesCategoryExplorerConfig(state.noSalesAnalysis)
-    : buildNoSalesCategoryDetailConfig(category, state.noSalesAnalysis);
+  if (state.detailExplorer.type !== "negotiationUsageRelations") return;
+  const config = buildNegotiationUsageExplorerConfig(state.negotiationUsageAnalysis);
   const message = config.rows.length ? "" : "La selección anterior ya no tiene datos con los filtros actuales.";
   openDetailExplorer(config, state.detailExplorer.opener, { preserveState: true, skipFocus: true, message: message });
 }
@@ -4419,6 +4518,18 @@ function renderDetailExplorerList() {
     renderActivityContributionList(body);
     return;
   }
+  if (state.detailExplorer.config.type === "negotiationUsageRelations") {
+    renderNegotiationUsageRelationList(body);
+    return;
+  }
+  if (state.detailExplorer.config.type === "negotiationUsageNegotiations") {
+    renderNegotiationUsageNegotiationList(body);
+    return;
+  }
+  if (state.detailExplorer.config.type === "negotiationUsagePresentations") {
+    renderNegotiationUsagePresentationList(body);
+    return;
+  }
   if (state.detailExplorer.config.type === "noSalesCategories") {
     renderNoSalesCategoryList(body);
     return;
@@ -4459,6 +4570,71 @@ function renderDetailExplorerList() {
     : "<div class=\\"detail-table-wrap\\"><table class=\\"detail-table\\">" + header + "<tbody>" + tableRows + "</tbody></table></div>" + footer;
   state.performance.counters.modalRowsRendered += visibleRows.length;
 }
+function renderNegotiationUsageRelationList(body) {
+  const explorer = state.detailExplorer, rows = getDetailExplorerSortedRows();
+  const pageCount = Math.max(1, Math.ceil(rows.length / DETAIL_EXPLORER_VISIBLE_STEP));
+  explorer.page = Math.max(1, Math.min(pageCount, explorer.page));
+  const start = (explorer.page - 1) * DETAIL_EXPLORER_VISIBLE_STEP, visibleRows = rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP);
+  if (!rows.length) { body.innerHTML = "<div class='no-data'>" + escapeHtml(explorer.query ? "No hay clientes que coincidan con la b\\u00fasqueda." : "No hay clientes negociados sin ventas para los filtros actuales.") + "</div>"; return; }
+  const header = "<thead><tr>" + NEGOTIATION_USAGE_RELATION_COLUMNS.map(function (column) { return "<th scope='col'>" + escapeHtml(column.label) + "</th>"; }).join("") + "</tr></thead>";
+  const tableRows = visibleRows.map(function (row) {
+    const values = NEGOTIATION_USAGE_RELATION_COLUMNS.slice(0, -1).map(function (column) { return "<td class='" + (column.numeric ? "numeric" : "") + "'>" + escapeHtml(getDetailExplorerCellDisplay(row, column.id)) + "</td>"; }).join("");
+    const key = escapeHtml(row.clientKey);
+    const actionLabel = row.activityCount === 1 ? "Ver negociaci\u00f3n" : "Ver negociaciones";
+    const actions = "<td><button class='button button-primary' type='button' data-detail-action='usage-view-negotiations' data-client-key='" + key + "'>" + actionLabel + "</button></td>";
+    return "<tr data-client-row='" + key + "'>" + values + actions + "</tr>";
+  }).join("");
+  body.innerHTML = "<div class='detail-table-wrap'><table class='detail-table'>" + header + "<tbody>" + tableRows + "</tbody></table></div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "cliente", "clientes", explorer.page);
+  state.performance.counters.modalRowsRendered += visibleRows.length;
+}
+function renderNegotiationUsageNegotiationList(body) {
+  const explorer = state.detailExplorer, rows = getDetailExplorerSortedRows();
+  const pageCount = Math.max(1, Math.ceil(rows.length / DETAIL_EXPLORER_VISIBLE_STEP));
+  explorer.page = Math.max(1, Math.min(pageCount, explorer.page));
+  const start = (explorer.page - 1) * DETAIL_EXPLORER_VISIBLE_STEP, visibleRows = rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP);
+  if (!rows.length) { body.innerHTML = "<div class='no-data'>No hay negociaciones asociadas para este cliente.</div>"; return; }
+  const records = visibleRows.map(function (row) {
+    const key = escapeHtml(row.relationKey);
+    const display = function (field, fallback) {
+      const value = getDetailExplorerCellDisplay(row, field);
+      return value === "" ? fallback || "No disponible" : value;
+    };
+    const field = function (label, value, wide) {
+      return "<div class='negotiation-field" + (wide ? " negotiation-field-wide" : "") + "'><small>" + escapeHtml(label) + "</small><strong>" + escapeHtml(value) + "</strong></div>";
+    };
+    const duration = isFiniteNumber(row.negotiationDuration) ? formatInteger(row.negotiationDuration) + (row.negotiationDuration === 1 ? " mes" : " meses") : "No disponible";
+    const statusClass = row.contractualStatus === "VIGENTE_HOY" ? "" : " is-neutral";
+    const fields = [
+      field("Fecha inicio", display("startDate")), field("Fecha fin", display("endDate")),
+      field("Objetivo mensual", display("monthlyObjective")), field("Objetivo total", display("totalObjective")),
+      field("Duraci\u00f3n", duration), field("Inversi\u00f3n", display("investmentPercentage")),
+      field("CEDI", display("cedi")), field("Presentaciones", display("negotiatedPresentationCount")),
+      field("Venta total reportada", display("totalReportedSales")), field("Categor\u00edas negociadas", display("categoriesLabel"), true)
+    ].join("");
+    return "<article class='negotiation-record' data-relation-row='" + key + "'><header class='negotiation-record-header'><div class='negotiation-record-identity'><small>ID Actividad</small><div class='negotiation-record-title'><strong>" + escapeHtml(row.activityId) + "</strong><span class='negotiation-record-badge'>" + escapeHtml(row.negotiationType) + "</span><span class='negotiation-record-badge" + statusClass + "'>" + escapeHtml(row.contractualStatusLabel) + "</span></div></div><button class='button button-primary' type='button' data-detail-action='usage-view-presentations' data-relation-key='" + key + "'><i data-lucide='boxes'></i> Ver presentaciones</button></header><div class='negotiation-fields'>" + fields + "</div></article>";
+  }).join("");
+  body.innerHTML = "<div class='negotiation-list'>" + records + "</div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "negociaci\\u00f3n", "negociaciones", explorer.page);
+  state.performance.counters.modalRowsRendered += visibleRows.length;
+}
+function renderNegotiationUsagePresentationList(body) {
+  const explorer = state.detailExplorer, rows = getDetailExplorerSortedRows();
+  const pageCount = Math.max(1, Math.ceil(rows.length / DETAIL_EXPLORER_VISIBLE_STEP));
+  explorer.page = Math.max(1, Math.min(pageCount, explorer.page));
+  const start = (explorer.page - 1) * DETAIL_EXPLORER_VISIBLE_STEP, visibleRows = rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP);
+  if (!rows.length) { body.innerHTML = "<div class='no-data'>No hay presentaciones negociadas para esta relaci\\u00f3n.</div>"; return; }
+  const columns = explorer.config.columns;
+  const header = "<thead><tr>" + columns.map(function (column) { return "<th scope='col'>" + escapeHtml(column.label) + "</th>"; }).join("") + "</tr></thead>";
+  const tableRows = visibleRows.map(function (row) { return "<tr>" + columns.map(function (column) { return "<td class='" + (column.numeric ? "numeric" : "") + "'>" + escapeHtml(getDetailExplorerCellDisplay(row, column.id)) + "</td>"; }).join("") + "</tr>"; }).join("");
+  body.innerHTML = "<div class='detail-table-wrap'><table class='detail-table'>" + header + "<tbody>" + tableRows + "</tbody></table></div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "presentaci\\u00f3n", "presentaciones", explorer.page);
+  state.performance.counters.modalRowsRendered += visibleRows.length;
+}
+function navigateFromNegotiationUsage(relationKey, action) {
+  const row = state.detailExplorer.allRows.find(function (item) { return item.relationKey === relationKey; });
+  if (!row) return;
+  const patch = action === "usage-view-client" ? { "Cliente SAP - Clave": [row.clientSap], "ID Actividad": [] } : { "ID Actividad": [row.activityId], "Cliente SAP - Clave": [] };
+  closeDetailExplorer();
+  updateDashboardFilters(patch, { reason: action });
+}
 function renderNoSalesCategoryList(body) {
   const explorer = state.detailExplorer;
   const rows = getDetailExplorerSortedRows();
@@ -4467,10 +4643,10 @@ function renderNoSalesCategoryList(body) {
   const start = (explorer.page - 1) * DETAIL_EXPLORER_VISIBLE_STEP;
   const visibleRows = rows.slice(start, start + DETAIL_EXPLORER_VISIBLE_STEP);
   if (!rows.length) {
-    body.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(explorer.query ? "No hay categorías que coincidan con la búsqueda." : "No hay presentaciones sin ventas para los filtros actuales.") + "</div>";
+    body.innerHTML = "<div class=\\"no-data\\">" + escapeHtml(explorer.query ? "No hay categorías que coincidan con la búsqueda." : "No hay presentaciones sin información de venta para los filtros actuales.") + "</div>";
     return;
   }
-  const header = "<thead><tr><th scope=\\"col\\">Categoría</th><th scope=\\"col\\">Presentaciones sin ventas</th><th scope=\\"col\\">Porcentaje del total</th><th scope=\\"col\\">Actividades</th><th scope=\\"col\\">Clientes</th><th scope=\\"col\\">Acción</th></tr></thead>";
+  const header = "<thead><tr><th scope=\\"col\\">Categoría</th><th scope=\\"col\\">Presentaciones sin información de venta</th><th scope=\\"col\\">Porcentaje del total</th><th scope=\\"col\\">Actividades</th><th scope=\\"col\\">Clientes</th><th scope=\\"col\\">Acción</th></tr></thead>";
   const tableRows = visibleRows.map(function (row) {
     return "<tr><td><strong>" + escapeHtml(row.category) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.presentationCount)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatRatioPercent(row.percent)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.activityCount)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatInteger(row.clientCount)) + "</td><td><button class=\\"button button-ghost row-detail-button\\" type=\\"button\\" data-detail-action=\\"open-category\\" data-detail-category=\\"" + escapeHtml(row.category) + "\\">Ver presentaciones</button></td></tr>";
   }).join("");
@@ -4724,7 +4900,7 @@ function configIsStandaloneDetail(config) {
 function getDetailExplorerRawValueForConfig(row, field, config) {
   if (field === "category") {
     if (Object.prototype.hasOwnProperty.call(row, "category")) return normalizeText(row.category);
-    const analysis = config && config.analysis ? config.analysis : state.noSalesAnalysis;
+    const analysis = config && config.analysis ? config.analysis : getEmptyNoSalesAnalysis();
     return getResolvedCategory(row, analysis.categoryLookup);
   }
   return getDetailExplorerRawValue(row, field);
@@ -4734,18 +4910,19 @@ function getDetailExplorerCellDisplay(row, field) {
   if (field === "objectiveMonth" && row.__monthlyTargetConflict) return "Revisar";
   if (field === "objectiveTotal" && row.__totalTargetConflict) return "Revisar";
   if (value === null || value === undefined || value === "") return "";
-  if (field === "objectiveMonth" || field === "objectiveTotal") return isFiniteNumber(value) ? formatNumber(value) : "";
-  if (field === "discount") return isFiniteNumber(value) ? formatPercent(value) : "";
+  if (["objectiveMonth", "objectiveTotal", "monthlyObjective", "totalObjective", "monthlyObjectiveCombined", "totalClientSales", "negotiatedPresentationSales", "totalReportedSales", "physicalSales"].indexOf(field) !== -1) return isFiniteNumber(value) ? formatNumber(value) : "N/A";
+  if (["discount", "investmentPercentage", "negotiationDiscountPercentage"].indexOf(field) !== -1) return isFiniteNumber(value) ? formatPercent(value) : "";
   if (field === "sales") return isFiniteNumber(value) ? formatNumber(value) : "N/A";
   if (field === "share") return isFiniteNumber(value) ? formatRatioPercent(value) : "N/A";
-  if (field === "rank" || field === "presentationCount" || field === "activityCount" || field === "clientCount") return isFiniteNumber(value) ? formatInteger(value) : "N/A";
+  if (field === "rank" || field === "presentationCount" || field === "activityCount" || field === "clientCount" || field === "negotiatedPresentationCount" || field === "negotiationDuration") return isFiniteNumber(value) ? formatInteger(value) : "N/A";
   if (field === "percent") return isFiniteNumber(value) ? formatRatioPercent(value) : "N/A";
   return String(value);
 }
 function getDetailExplorerRawValue(row, field) {
+  if (Object.prototype.hasOwnProperty.call(row, field)) return row[field];
   if (field === "category") {
     if (Object.prototype.hasOwnProperty.call(row, "category")) return normalizeText(row.category);
-    const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : state.noSalesAnalysis;
+    const analysis = state.detailExplorer.config && state.detailExplorer.config.analysis ? state.detailExplorer.config.analysis : { categoryLookup: new Map() };
     return getResolvedCategory(row, analysis.categoryLookup);
   }
   if (field === "presentation") return normalizeText(row["Presentación AS400 de la venta - Texto"]);
@@ -4773,7 +4950,7 @@ function getDetailExplorerRawValue(row, field) {
   return normalizeText(row[field]);
 }
 function getDetailExplorerSortValue(row, field) {
-  if (["objectiveTotal", "objectiveMonth", "discount", "sales", "share", "rank", "presentationCount", "activityCount", "clientCount", "percent"].indexOf(field) !== -1) {
+  if (["objectiveTotal", "objectiveMonth", "monthlyObjective", "totalObjective", "monthlyObjectiveCombined", "totalClientSales", "negotiatedPresentationSales", "totalReportedSales", "physicalSales", "investmentPercentage", "negotiationDiscountPercentage", "negotiationDuration", "negotiatedPresentationCount", "discount", "sales", "share", "rank", "presentationCount", "activityCount", "clientCount", "percent"].indexOf(field) !== -1) {
     const value = getDetailExplorerRawValue(row, field);
     return isFiniteNumber(value) ? value : -Number.MAX_VALUE;
   }
@@ -4958,6 +5135,80 @@ function buildActivityClientDetailFields(row) {
     ] }
   ];
 }
+function buildNegotiationUsageExplorerConfig(analysis) {
+  const model = analysis || getEmptyNegotiationUsageAnalysis();
+  return {
+    type: "negotiationUsageRelations", title: "Clientes negociados sin ventas",
+    subtitle: "Clientes negociados con venta total reportada en cero.",
+    rows: model.clients || [], columns: NEGOTIATION_USAGE_RELATION_COLUMNS,
+    exportColumns: [
+      { id: "clientSap", label: "Cliente SAP" }, { id: "clientName", label: "Nombre del cliente" }, { id: "nit", label: "NIT" },
+      { id: "region", label: "Regi\\u00f3n" }, { id: "cedis", label: "CEDI" }, { id: "channel", label: "Canal" },
+      { id: "totalReportedSales", label: "Venta total reportada" }, { id: "activityCount", label: "Cantidad de negociaciones" },
+      { id: "monthlyObjectiveCombined", label: "Objetivo mensual combinado" }, { id: "statusLabel", label: "Estado" },
+      { id: "activityIds", label: "IDs de actividades" }
+    ],
+    sortOptions: NEGOTIATION_USAGE_SORT_OPTIONS, defaultSortField: "clientName", defaultSortDir: "asc",
+    searchFields: ["clientSap", "clientName", "nit", "region", "cedis"], searchPlaceholder: "Buscar cliente, NIT, regi\\u00f3n o CEDI",
+    paginated: true, wide: true, entitySingular: "cliente", entityPlural: "clientes",
+    emptyMessage: "No hay clientes negociados con venta total reportada en cero para los filtros actuales.",
+    summary: [
+      { label: "Clientes sin ventas", value: formatInteger(model.totalUniqueClients), primary: true },
+      { label: "Negociaciones asociadas", value: formatInteger(model.relationCount) }, { label: "Registros con venta cero", value: formatInteger(model.totalZeroRows) }
+    ],
+    rowKey: function (row) { return row.clientKey; }, exportFilename: "clientes_negociados_sin_ventas.csv"
+  };
+}
+function buildNegotiationUsagePresentationConfig(client) {
+  const negotiations = client.negotiations || [];
+  const negotiationCount = negotiations.length;
+  const negotiationLabel = negotiationCount === 1 ? "Negociaci\u00f3n" : "Negociaciones";
+  const clientName = normalizeText(client.clientName);
+  return {
+    type: "negotiationUsageNegotiations", title: negotiationCount === 1 ? "Negociaci\u00f3n asociada" : "Negociaciones asociadas",
+    rows: negotiations,
+    subtitle: clientName && clientName !== "No disponible" ? client.clientSap + " \\u00b7 " + clientName : client.clientSap,
+    columns: NEGOTIATION_USAGE_NEGOTIATION_COLUMNS,
+    exportColumns: [
+      { id: "clientSap", label: "Cliente SAP" }, { id: "clientName", label: "Nombre del cliente" }, { id: "activityId", label: "ID Actividad" },
+      { id: "negotiationType", label: "Tipo de negociaci\\u00f3n" }, { id: "startDate", label: "Fecha inicio" }, { id: "endDate", label: "Fecha fin" },
+      { id: "contractualStatusLabel", label: "Estado contractual" }, { id: "monthlyObjective", label: "Objetivo mensual" }, { id: "totalObjective", label: "Objetivo total" },
+      { id: "negotiationDuration", label: "Duraci\\u00f3n de la negociaci\\u00f3n" }, { id: "investmentPercentage", label: "Porcentaje de inversi\\u00f3n" },
+      { id: "cedi", label: "CEDI" }, { id: "negotiatedPresentationCount", label: "Cantidad de presentaciones" },
+      { id: "totalReportedSales", label: "Venta total reportada" }, { id: "salesStatusLabel", label: "Estado de venta" }
+    ],
+    exportContext: client, sortOptions: [
+      { field: "activityId", label: "ID Actividad", dir: "asc" }, { field: "contractualStatusLabel", label: "Estado contractual", dir: "asc" },
+      { field: "monthlyObjective", label: "Objetivo mensual", dir: "desc" }, { field: "negotiatedPresentationCount", label: "Cantidad de presentaciones", dir: "desc" }
+    ], defaultSortField: "activityId", defaultSortDir: "asc",
+    searchFields: ["activityId", "negotiationType", "contractualStatusLabel", "cedi", "categoriesLabel"], paginated: true, wide: true,
+    entitySingular: "negociaci\\u00f3n", entityPlural: "negociaciones", rowKey: function (row) { return row.relationKey; },
+    summary: [
+      { label: "Cliente SAP", value: client.clientSap }, { label: negotiationLabel, value: formatInteger(negotiationCount), primary: true },
+      { label: "Venta total reportada", value: "0" }, { label: "Estado", value: "Sin ventas" }
+    ],
+    exportFilename: "negociaciones_cliente_sin_ventas_" + normalizeFilenamePart(client.clientSap) + ".csv"
+  };
+}
+function buildNegotiationUsageNegotiationPresentationsConfig(client, negotiation) {
+  return {
+    type: "negotiationUsagePresentations", title: "Presentaciones de la negociaci\\u00f3n",
+    subtitle: client.clientSap + " \\u00b7 " + negotiation.activityId,
+    rows: negotiation.presentations || [],
+    columns: [
+      { id: "presentationCode", label: "C\\u00f3digo de presentaci\\u00f3n" }, { id: "presentation", label: "Descripci\\u00f3n" },
+      { id: "category", label: "Categor\\u00eda" }, { id: "negotiationDiscountPercentage", label: "Porcentaje de descuento de negociaci\\u00f3n", numeric: true },
+      { id: "physicalSales", label: "Venta f\\u00edsica", numeric: true }
+    ],
+    sortOptions: NEGOTIATION_USAGE_PRESENTATION_SORT_OPTIONS, defaultSortField: "presentation", defaultSortDir: "asc",
+    searchFields: ["presentationCode", "presentation", "category"], paginated: true,
+    entitySingular: "presentaci\\u00f3n", entityPlural: "presentaciones", rowKey: function (row) { return row.presentationKey; },
+    summary: [
+      { label: "Cliente SAP", value: client.clientSap }, { label: "ID Actividad", value: negotiation.activityId },
+      { label: "Presentaciones", value: formatInteger(negotiation.negotiatedPresentationCount), primary: true }, { label: "Venta total reportada", value: "0" }
+    ]
+  };
+}
 function buildNoSalesCategoryExplorerConfig(noSalesAnalysis) {
   const analysis = noSalesAnalysis || getEmptyNoSalesAnalysis();
   const rows = buildNoSalesCategoryExplorerRows(analysis);
@@ -4965,19 +5216,19 @@ function buildNoSalesCategoryExplorerConfig(noSalesAnalysis) {
     type: "noSalesCategories",
     category: "",
     analysis: analysis,
-    title: "Presentaciones sin ventas",
+    title: "Calidad de venta por presentación",
     subtitle: "RESUMEN POR CATEGORÍA",
     rows: rows,
     columns: [],
     exportColumns: [
       { id: "category", label: "Categoría" },
-      { id: "presentationCount", label: "Presentaciones sin ventas" },
+      { id: "presentationCount", label: "Presentaciones sin información de venta" },
       { id: "percent", label: "Porcentaje del total" },
       { id: "activityCount", label: "Actividades relacionadas" },
       { id: "clientCount", label: "Clientes relacionados" }
     ],
     sortOptions: [
-      { field: "presentationCount", label: "Presentaciones sin ventas", dir: "desc" },
+      { field: "presentationCount", label: "Presentaciones sin información de venta", dir: "desc" },
       { field: "percent", label: "Porcentaje del total", dir: "desc" },
       { field: "category", label: "Categoría", dir: "asc" },
       { field: "activityCount", label: "Actividades", dir: "desc" },
@@ -4987,12 +5238,12 @@ function buildNoSalesCategoryExplorerConfig(noSalesAnalysis) {
     defaultSortDir: "desc",
     searchFields: ["category"],
     searchPlaceholder: "Buscar categoría",
-    emptyMessage: "No hay presentaciones sin ventas con los filtros actuales.",
+    emptyMessage: "No hay presentaciones sin información de venta con los filtros actuales.",
     entitySingular: "categoría",
     entityPlural: "categorías",
     paginated: true,
     summary: [
-      { label: "Presentaciones sin ventas", value: formatInteger(analysis.presentationCount), primary: true },
+      { label: "Presentaciones sin información de venta", value: formatInteger(analysis.presentationCount), primary: true },
       { label: "Categorías", value: formatInteger(rows.length) },
       { label: "Actividades", value: formatInteger(analysis.activityCount) },
       { label: "Clientes", value: formatInteger(analysis.clientCount) }
@@ -5033,7 +5284,7 @@ function buildNoSalesCategoryDetailConfig(category, noSalesAnalysis) {
     type: "noSalesCategory",
     category: category,
     analysis: analysis,
-    title: "Presentaciones sin ventas — " + category,
+    title: "Calidad de venta por presentación — " + category,
     subtitle: "DETALLE DE PRESENTACIONES",
     rows: rows,
     columns: NO_SALES_EXPLORER_COLUMNS,
@@ -5173,11 +5424,12 @@ function exportDetailExplorerCsv() {
   const columns = config.exportColumns || config.columns;
   const header = columns.map(function (column) { return serializeCsvCell(column.label, column.label); });
   const body = rows.map(function (row) {
+    const exportRow = Object.assign({}, config.exportContext || {}, row);
     return columns.map(function (column) {
-      return serializeCsvCell(getDetailExplorerCellDisplay(row, column.id), getDetailExplorerRawValue(row, column.id));
+      return serializeCsvCell(getDetailExplorerCellDisplay(exportRow, column.id), getDetailExplorerRawValue(exportRow, column.id));
     }).join(",");
   });
-  downloadCsv("\\uFEFF" + header.join(",") + "\\n" + body.join("\\n"), config.exportFilename || ("presentaciones_sin_ventas_" + normalizeFilenamePart(state.detailExplorer.category) + ".csv"));
+  downloadCsv("\\uFEFF" + header.join(",") + "\\n" + body.join("\\n"), config.exportFilename || "clientes_negociados_sin_ventas.csv");
 }
 function normalizeFilenamePart(value) {
   return normalizeText(value).toLocaleLowerCase("es-CO").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "detalle";
@@ -5382,9 +5634,6 @@ function groupByUniqueField(rows, groupField, uniqueKeyGetter, valueField, limit
   if (limit) result = result.slice(0, limit);
   return result;
 }
-function isWithoutSalesInformation(row) {
-  return row && row.estadoInformacionVenta === SALES_INFORMATION_STATUS.WITHOUT_SALES_INFO;
-}
 function hasNegotiatedPresentationReference(row) {
   return Boolean(
     normalizeText(row["Presentación AS400 de la venta - Clave"]) ||
@@ -5424,25 +5673,6 @@ function groupRowsByKey(rows, keyGetter) {
   });
   return grouped;
 }
-function uniqueResolvedNoSalesPresentations(rows) {
-  const grouped = groupRowsByKey(rows, getNegotiatedPresentationKey);
-  return Array.from(grouped, function (entry) {
-    return buildResolvedNoSalesPresentation(entry[1]);
-  });
-}
-function buildResolvedNoSalesPresentation(rows) {
-  const base = Object.assign({}, rows[0]);
-  const monthlyResolution = resolveUniqueNumericField(rows, "Objetivo mes ");
-  const totalResolution = resolveUniqueNumericField(rows, "Objetivo cajas total");
-  base["Objetivo mes "] = monthlyResolution.value;
-  base["Objetivo cajas total"] = totalResolution.value;
-  base.__sourceRowCount = rows.length;
-  base.__monthlyTargetConflict = monthlyResolution.conflict;
-  base.__monthlyTargetValues = monthlyResolution.values;
-  base.__totalTargetConflict = totalResolution.conflict;
-  base.__totalTargetValues = totalResolution.values;
-  return base;
-}
 function resolveUniqueNumericField(rows, field) {
   const values = [];
   rows.forEach(function (row) {
@@ -5455,63 +5685,173 @@ function resolveUniqueNumericField(rows, field) {
   if (values.length === 1) return { value: values[0], values: values, conflict: false };
   return { value: null, values: values, conflict: true };
 }
-function getEmptyNoSalesAnalysis() {
+function resolveEnrichedText(rows, field, clientSap, activityId, alternateField) {
+  const fields = [field].concat(alternateField ? [alternateField] : []);
+  for (let index = 0; index < fields.length; index += 1) {
+    const currentField = fields[index];
+    const ownValues = Array.from(new Set((rows || []).map(function (row) { return normalizeText(row[currentField]); }).filter(Boolean)));
+    if (ownValues.length === 1) return ownValues[0];
+    const clientValues = state.indexes && state.indexes.enrichmentByClient && state.indexes.enrichmentByClient.get(clientSap);
+    const clientCandidates = clientValues && clientValues.get(currentField);
+    if (clientCandidates && clientCandidates.size === 1) return Array.from(clientCandidates)[0];
+    const relationValues = state.indexes && state.indexes.enrichmentByRelation && state.indexes.enrichmentByRelation.get(clientSap + "||" + activityId);
+    const relationCandidates = relationValues && relationValues.get(currentField);
+    if (relationCandidates && relationCandidates.size === 1) return Array.from(relationCandidates)[0];
+  }
+  return "No disponible";
+}
+function getEmptyNegotiationUsageAnalysis() {
+  return { totalUniqueClients: 0, totalZeroRows: 0, relationCount: 0, multiActivityClientCount: 0, clients: [], buildMs: 0 };
+}
+function hasExplicitZeroTotalMonthlySales(row) {
+  if (!row) return false;
+  const rawValue = row.TotalVentaMes;
+  const hasExplicitValue = rawValue !== null && rawValue !== undefined && String(rawValue).trim() !== "";
+  if (!hasExplicitValue) return false;
+  const value = isFiniteNumber(rawValue) ? rawValue : parseNumberLike(rawValue, "TotalVentaMes");
+  return isFiniteNumber(value) && value === 0;
+}
+function buildNegotiationUsageAnalysis(filteredRows) {
+  const startedAt = performanceNow();
+  const sourceRows = filteredRows || [];
+  const zeroRows = sourceRows.filter(hasExplicitZeroTotalMonthlySales);
+  const clientsByActivity = state.indexes && state.indexes.clientsByActivity
+    ? new Map(Array.from(state.indexes.clientsByActivity, function (entry) { return [entry[0], new Set(entry[1])]; }))
+    : new Map();
+  sourceRows.forEach(function (row) {
+    const activityId = normalizeText(row["ID Actividad"]), clientSap = normalizeText(row["Cliente SAP - Clave"]);
+    if (!activityId || !clientSap) return;
+    if (!clientsByActivity.has(activityId)) clientsByActivity.set(activityId, new Set());
+    clientsByActivity.get(activityId).add(clientSap);
+  });
+  const relationGroups = groupRowsByKey(zeroRows, function (row) {
+    const clientSap = normalizeText(row["Cliente SAP - Clave"]), activityId = normalizeText(row["ID Actividad"]);
+    return clientSap && activityId ? clientSap + "||" + activityId : "";
+  });
+  const negotiationsByClient = new Map();
+  relationGroups.forEach(function (relationRows, relationKey) {
+    if (!relationKey) return;
+    const relation = buildNegotiationUsageRelation(relationRows, clientsByActivity);
+    if (!negotiationsByClient.has(relation.clientSap)) negotiationsByClient.set(relation.clientSap, []);
+    negotiationsByClient.get(relation.clientSap).push(relation);
+  });
+  const clients = Array.from(negotiationsByClient, function (entry) { return buildClientWithoutMonthlySales(entry[0], entry[1]); });
   return {
-    rows: [],
-    uniquePresentations: [],
-    byCategory: [],
-    categoryLookup: new Map(),
-    presentationCount: 0,
-    activityCount: 0,
-    clientCount: 0,
-    presentationsWithoutCategory: 0
+    totalUniqueClients: clients.length, totalZeroRows: zeroRows.length, relationCount: relationGroups.size,
+    multiActivityClientCount: clients.filter(function (item) { return item.activityCount > 1; }).length,
+    clients: clients,
+    buildMs: performanceNow() - startedAt
   };
+}
+function buildNegotiationUsageRelation(rows, clientsByActivity) {
+  const first = rows[0] || {};
+  const clientSap = normalizeText(first["Cliente SAP - Clave"]), activityId = normalizeText(first["ID Actividad"]);
+  const datePairs = Array.from(new Set(rows.map(function (row) {
+    const start = normalizeText(row["Fecha inicio"]), end = normalizeText(row["Fecha fin"]);
+    return start || end ? start + "||" + end : "";
+  }).filter(Boolean)));
+  const pair = datePairs.length === 1 ? datePairs[0].split("||") : [];
+  const startDate = pair[0] || "", endDate = pair[1] || "";
+  const dateStatus = !datePairs.length ? "FECHAS_NO_DISPONIBLES" : datePairs.length > 1 || !dateOnly(startDate) || !dateOnly(endDate) ? "FECHAS_CONFLICTIVAS" : "OK";
+  const objective = resolveUniqueNumericField(rows, "Objetivo mes ");
+  const totalObjective = resolveUniqueNumericField(rows, "Objetivo cajas total");
+  const investment = resolveUniqueNumericField(rows, "% De inversi\u00f3n");
+  const duration = resolveUniqueNumericField(rows, "Periodo negociacion");
+  const presentationGroups = groupRowsByKey(rows.filter(hasNegotiatedPresentationReference), function (row, index) {
+    return normalizeText(row["Presentaci\\u00f3n AS400 de la venta - Clave"]) || normalizeText(row["Presentaci\\u00f3n AS400 de la venta - Texto"]) || "fila-" + index;
+  });
+  const presentations = Array.from(presentationGroups, function (entry) { return buildNegotiationUsagePresentation(entry[1], entry[0]); });
+  const categories = Array.from(new Set(presentations.map(function (item) { return item.category; }).filter(Boolean))).sort();
+  const contractualStatus = getContractualStatusWithoutSalesPeriod(dateStatus, startDate, endDate);
+  return {
+    relationKey: clientSap + "||" + activityId, clientSap: clientSap, activityId: activityId,
+    negotiationType: (clientsByActivity.get(activityId) || new Set()).size > 1 ? "Compartida" : "Individual",
+    startDate: startDate, endDate: endDate, monthlyObjective: objective.conflict ? null : objective.value,
+    totalObjective: totalObjective.conflict ? null : totalObjective.value,
+    investmentPercentage: investment.conflict ? null : investment.value,
+    negotiationDuration: duration.conflict ? null : duration.value,
+    cedi: resolveEnrichedText(rows, "Cedi", clientSap, activityId), negotiatedPresentationCount: presentations.length,
+    categories: categories, categoriesLabel: categories.length ? categories.join(" | ") : "No disponible", presentations: presentations,
+    contractualStatus: contractualStatus.status, contractualStatusLabel: contractualStatus.label,
+    totalReportedSales: 0, salesStatusLabel: "Sin ventas", sourceRows: rows
+  };
+}
+function buildNegotiationUsagePresentation(rows, presentationKey) {
+  const first = rows[0] || {};
+  const physicalSales = resolveUniqueNumericField(rows, "Ventas cajas f\u00edsicas (sin rep)");
+  const discount = resolveUniqueNumericField(rows, "Porcentaje descuento negociaci\u00f3n");
+  return {
+    presentationKey: presentationKey,
+    presentationCode: normalizeText(first["Presentaci\\u00f3n AS400 de la venta - Clave"]),
+    presentation: normalizeText(first["Presentaci\\u00f3n AS400 de la venta - Texto"]),
+    category: getDirectCategory(first), negotiationDiscountPercentage: discount.conflict ? null : discount.value,
+    physicalSales: physicalSales.conflict ? null : physicalSales.value
+  };
+}
+function getContractualStatusWithoutSalesPeriod(dateStatus, startDate, endDate) {
+  if (dateStatus === "FECHAS_NO_DISPONIBLES") return { status: dateStatus, label: "Fechas no disponibles" };
+  if (dateStatus === "FECHAS_CONFLICTIVAS") return { status: dateStatus, label: "Fechas conflictivas" };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const start = dateOnly(startDate), end = dateOnly(endDate);
+  if (today < start) return { status: "PLANEADA", label: "Planeada" };
+  if (today > end) return { status: "FINALIZADA", label: "Finalizada" };
+  return { status: "VIGENTE_HOY", label: "Vigente hoy" };
+}
+function buildClientWithoutMonthlySales(clientSap, negotiations) {
+  const objectives = negotiations.map(function (item) { return item.monthlyObjective; });
+  const combinedMonthlyObjective = objectives.length && objectives.every(isFiniteNumber)
+    ? objectives.reduce(function (sum, value) { return sum + value; }, 0)
+    : null;
+  const sourceRows = negotiations.reduce(function (all, item) { return all.concat(item.sourceRows || []); }, []);
+  const relationRows = sourceRows.length ? sourceRows : ((state.indexes && state.indexes.rowsByClient && state.indexes.rowsByClient.get(clientSap)) ? Array.from(state.indexes.rowsByClient.get(clientSap)) : []);
+  const firstActivity = negotiations[0] && negotiations[0].activityId || "";
+  const enrichmentActivity = negotiations.length === 1 ? firstActivity : "";
+  const cedis = Array.from(new Set(negotiations.map(function (item) { return item.cedi; }).filter(function (value) { return value && value !== "No disponible"; }))).sort();
+  return {
+    clientKey: clientSap, clientSap: clientSap,
+    clientName: resolveEnrichedText(relationRows, "Cliente AS400 - Nombre negocio (Texto)", clientSap, enrichmentActivity, "Cliente AS400 - Texto"),
+    nit: resolveEnrichedText(relationRows, "Nit cliente - Clave", clientSap, enrichmentActivity),
+    region: resolveEnrichedText(relationRows, "Regi\\u00f3n SAP", clientSap, enrichmentActivity),
+    cedis: cedis.length ? cedis.join(" | ") : resolveEnrichedText(relationRows, "Cedi", clientSap, enrichmentActivity),
+    channel: resolveEnrichedText(relationRows, "Canal", clientSap, enrichmentActivity),
+    totalMonthlySales: 0, totalReportedSales: 0, status: "CLIENTE_NEGOCIADO_SIN_VENTAS", statusLabel: "Sin ventas",
+    activityCount: negotiations.length, monthlyObjectiveCombined: combinedMonthlyObjective,
+    negotiations: negotiations, activityIds: negotiations.map(function (item) { return item.activityId; }).join(" | ")
+  };
+}
+function getEmptyNoSalesAnalysis() {
+  return { rows: [], uniquePresentations: [], byCategory: [], categoryLookup: new Map(), presentationCount: 0, activityCount: 0, clientCount: 0, presentationsWithoutCategory: 0 };
 }
 function getNoSalesAnalysis(filteredRows, preparedCategoryLookup) {
   const sourceRows = filteredRows || [];
-  const rows = sourceRows.filter(isWithoutSalesInformation);
-  const uniquePresentations = uniqueResolvedNoSalesPresentations(rows.filter(hasNegotiatedPresentationReference));
-  const categoryLookup = preparedCategoryLookup || buildCategoryLookup(sourceRows);
-  const byCategory = groupNoSalesPresentationsByCategory(uniquePresentations, categoryLookup);
-  const groupedPresentationCount = byCategory.reduce(function (acc, item) {
-    return acc + numberForCalc(item.value);
-  }, 0);
+  const rows = sourceRows.filter(function (row) { return row && row.estadoInformacionVenta === SALES_INFORMATION_STATUS.WITHOUT_SALES_INFO; });
+  const grouped = groupRowsByKey(rows.filter(hasNegotiatedPresentationReference), getNegotiatedPresentationKey);
+  const uniquePresentations = Array.from(grouped, function (entry) {
+    const base = Object.assign({}, entry[1][0]);
+    const monthly = resolveUniqueNumericField(entry[1], "Objetivo mes "), total = resolveUniqueNumericField(entry[1], "Objetivo cajas total");
+    base["Objetivo mes "] = monthly.value; base["Objetivo cajas total"] = total.value;
+    base.__sourceRowCount = entry[1].length; base.__monthlyTargetConflict = monthly.conflict; base.__monthlyTargetValues = monthly.values;
+    base.__totalTargetConflict = total.conflict; base.__totalTargetValues = total.values;
+    return base;
+  });
+  const categoryLookup = preparedCategoryLookup || buildCategoryLookup(sourceRows), categories = new Map();
+  uniquePresentations.forEach(function (row, index) {
+    const category = getResolvedCategory(row, categoryLookup, index);
+    if (category) categories.set(category, (categories.get(category) || 0) + 1);
+  });
+  const byCategory = Array.from(categories, function (entry) { return { label: entry[0], value: entry[1] }; }).sort(function (a, b) { return b.value - a.value; });
   return {
-    rows: rows,
-    uniquePresentations: uniquePresentations,
-    byCategory: byCategory,
-    categoryLookup: categoryLookup,
-    presentationCount: uniquePresentations.length,
-    activityCount: countUniqueFromRows(uniquePresentations, "ID Actividad"),
+    rows: rows, uniquePresentations: uniquePresentations, byCategory: byCategory, categoryLookup: categoryLookup,
+    presentationCount: uniquePresentations.length, activityCount: countUniqueFromRows(uniquePresentations, "ID Actividad"),
     clientCount: countUniqueFromRows(uniquePresentations, "Cliente SAP - Clave"),
-    presentationsWithoutCategory: Math.max(0, uniquePresentations.length - groupedPresentationCount)
+    presentationsWithoutCategory: Math.max(0, uniquePresentations.length - byCategory.reduce(function (sum, item) { return sum + item.value; }, 0))
   };
-}
-function getUniquePresentationsWithoutSales(rows) {
-  return getNoSalesAnalysis(rows).uniquePresentations;
 }
 function countUniqueBy(rows, keyGetter) {
   return uniqueRowsByKey(rows, keyGetter).length;
 }
 function countUniqueFromRows(rows, field) {
   return new Set(rows.map(function (row) { return normalizeText(row[field]); }).filter(Boolean)).size;
-}
-function groupNoSalesPresentationsByCategory(uniquePresentations, categoryLookup) {
-  const grouped = new Map();
-  const lookup = categoryLookup || buildCategoryLookup(uniquePresentations);
-  uniquePresentations.forEach(function (row, index) {
-    const category = getResolvedCategory(row, lookup, index);
-    if (!category) return;
-    grouped.set(category, (grouped.get(category) || 0) + 1);
-  });
-  return Array.from(grouped, function (entry) {
-    return { label: entry[0], value: entry[1] };
-  }).sort(function (a, b) {
-    return b.value - a.value;
-  });
-}
-function groupPresentationsWithoutSalesByCategory(rows) {
-  return getNoSalesAnalysis(rows).byCategory;
 }
 function buildCategoryLookup(rows) {
   const lookup = new Map();

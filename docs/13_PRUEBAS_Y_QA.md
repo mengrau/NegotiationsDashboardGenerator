@@ -17,6 +17,13 @@ Ejecuta `tests/sales-information.test.js`. Carga `app.js` y el script generado e
 
 - normalización numérica, fechas y períodos;
 - resolución de `TotalVentaMes` y objetivos;
+- clasificación por `TotalVentaMes` explícito igual a `0`, `"0"` o `"0,0"`;
+- exclusión de vacíos, nulos, inválidos y valores positivos;
+- conteo único por cliente, consolidación cliente–actividad y deduplicación de presentaciones;
+- ausencia de período artificial e independencia frente al filtro Mes;
+- enriquecimiento solo con valores únicos y consistentes del cliente o relación;
+- modal de clientes, negociaciones y presentaciones, restauración al volver y CSV sin período inventado;
+- caché analítica, búsqueda, ordenamiento, paginación, listeners únicos y bloqueo de scroll;
 - actividades individuales, compartidas y multiactividad;
 - KPI contextuales y reconciliación comparable;
 - ausencia de la visualización temporal eliminada;

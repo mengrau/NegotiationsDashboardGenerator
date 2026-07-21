@@ -57,7 +57,10 @@ En cada combinación revisar:
 - [ ] Histórico previo con marcador hueco, comparable con mayor peso y posterior al fin con diamante atenuado.
 - [ ] Cliente multiactividad conserva Gantt y no mezcla negociaciones en una línea única.
 - [ ] Donut con leyenda legible; treemap sin bloques caóticos ni texto cortado; lollipop con etiquetas completas o tooltip accesible.
-- [ ] El KPI de presentaciones sin ventas abre un único modal con categorías, detalle, búsqueda, ordenamiento, paginación de 25 y CSV en ambos niveles.
+- [ ] El KPI **Clientes negociados sin ventas** cuenta clientes únicos con `TotalVentaMes` explícitamente igual a cero y abre un único modal con clientes, negociaciones y presentaciones.
+- [ ] `TotalVentaMes` vacío, nulo, inválido o positivo no se convierte en cero ni entra al KPI.
+- [ ] Año, Mes y Año Mes vacíos no impiden la clasificación; el filtro Mes no excluye estas filas ni se infiere un período.
+- [ ] Objetivos y presentaciones se deduplican por actividad y código, respectivamente; volver restaura página, orden, selección y scroll.
 - [ ] KPI, tabla, modales, gráficas y CSV usan los textos definidos en `UI_COPY`.
 - [ ] La diferencia positiva indica cajas físicas por encima del objetivo y la negativa indica cajas físicas pendientes.
 - [ ] La interfaz no muestra nombres técnicos de estados ni variables internas.

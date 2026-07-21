@@ -10,9 +10,9 @@ Una actividad compartida suma una sola vez la venta total de cada cliente asocia
 
 ## Inventario original
 
-Los KPI originales del HTML generado eran ventas del período, ventas del último mes, objetivo del mes, cumplimiento, diferencia frente al objetivo, presentaciones sin ventas y negociaciones vigentes. Clientes, presentaciones, actividades y descuento ya habían dejado de mostrarse como KPI principales, aunque seguían calculándose.
+Los KPI del HTML generado incluyen ventas del período, ventas del último mes, objetivo, cumplimiento, diferencia, clientes negociados sin ventas y negociaciones vigentes.
 
-Las visualizaciones originales se renderizaban siempre: Región SAP, canal, categoría, clientes, presentaciones, CEDI, serie mensual y presentaciones sin ventas. Esto producía mapas, filtros y comparativos de un solo valor. El detalle completo permanecía como tabla paginada, además del drill-down de presentaciones sin ventas.
+Las visualizaciones adaptativas cubren Región SAP, canal, categoría, clientes, presentaciones, CEDI y serie mensual. El detalle de clientes negociados sin ventas se concentra en el KPI y su modal paginado para evitar una gráfica redundante.
 
 ## Granularidad y reglas de agregación
 
@@ -104,7 +104,7 @@ Los filtros aplicados desde el panel, chips, gráficas o exploradores se refleja
 - Cumplimiento agregado: suma de ventas de actividades comparables / suma de objetivos de esas mismas actividades. Nunca se promedian porcentajes simples.
 - Diferencia agregada: ventas atribuibles comparables menos objetivos comparables.
 - Cobertura: actividades comparables sobre actividades elegibles. Las ambiguas permanecen visibles, pero fuera del cociente.
-- Presentaciones sin ventas: negociación-presentación única en estado `SIN_INFORMACION_VENTA`.
+- Clientes negociados sin ventas: cliente SAP único con al menos una actividad y `TotalVentaMes` explícitamente igual a cero. No requiere ni infiere período.
 - Negociaciones vigentes: actividades únicas con fechas válidas que contienen la fecha actual.
 
 Los umbrales de cumplimiento son: favorable desde 100 %, atención desde 90 % hasta menos de 100 %, y desfavorable por debajo de 90 %.
@@ -125,7 +125,9 @@ Los umbrales de cumplimiento son: favorable desde 100 %, atención desde 90 % ha
 - Región, canal, cliente y CEDI requieren al menos dos valores.
 - Categoría y presentación requieren al menos dos grupos con valores analizables.
 - Estado de presentaciones requiere al menos dos estados con conteo positivo.
-- Presentaciones sin ventas se consulta desde el KPI: agrupa las presentaciones únicas sin información de venta por categoría y conserva el detalle dentro del mismo modal, sin alterar filtros ni población.
+- Clientes negociados sin ventas se consulta desde el KPI: una fila por cliente, segundo nivel de negociaciones y tercer nivel de presentaciones. El mismo modal conserva página, orden, selección y scroll al volver.
+
+La clasificación está centralizada en `hasExplicitZeroTotalMonthlySales()`. La venta física y la composición negociada/no negociada no determinan este KPI. Los objetivos se deduplican por actividad y son solo informativos.
 
 ## Riesgos corregidos
 

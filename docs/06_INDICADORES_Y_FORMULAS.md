@@ -26,7 +26,16 @@ Las fórmulas se evalúan con números completos. El formato `es-CO` se aplica d
 | Objetivo mensual | `activityAggregate.objective` / `kpis.comparableObjective` | suma de objetivos únicos comparables | No usa `objectiveAll` en la tarjeta reconciliable. |
 | Cumplimiento mensual | mismos numerador y denominador | ventas comparables / objetivo comparable | No promedia porcentajes. |
 | Diferencia frente al objetivo | misma población | ventas comparables - objetivo comparable | Positiva sobre objetivo; negativa bajo objetivo. Los valores se expresan en cajas físicas. |
-| Presentaciones sin ventas | `noSalesAnalysis.presentationCount` | conteo único de presentaciones negociadas sin contexto de venta | Distingue sin información de venta de venta cero. |
+| Clientes negociados sin ventas | `negotiationUsageAnalysis.totalUniqueClients` | conteo único de `Cliente SAP` | Incluye filas con actividad válida y `TotalVentaMes` explícitamente igual a cero; no requiere período. |
+
+```text
+Cliente negociado sin ventas = cliente SAP válido
+                              ∧ ID Actividad válido
+                              ∧ TotalVentaMes informado
+                              ∧ TotalVentaMes === 0
+```
+
+La venta física y la composición negociada/no negociada son informativas y no cambian este estado. Año, Mes y Año Mes no se completan ni se infieren.
 | Negociaciones vigentes | actividad única con vigencia actual | conteo único | No cuenta filas ni clientes. |
 
 La cobertura se muestra como texto secundario: `Cobertura: X de Y actividades`. Ya no ocupa una tarjeta principal.

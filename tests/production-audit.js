@@ -59,8 +59,11 @@ checkProduction(dashboardSource.includes("function portalComboboxPanel") && dash
 checkProduction(dashboardSource.includes("position: fixed; z-index: 1000") && dashboardSource.includes("z-index: 2000"), "Jerarquía de capas de dropdown/modal inválida");
 checkProduction(dashboardSource.includes('window.addEventListener("scroll", repositionOpenComboboxPanel, true)') && dashboardSource.includes("getBoundingClientRect()"), "El dropdown no se reposiciona tras scroll");
 checkProduction(!dashboardSource.includes('id: "salesTrend"') && !dashboardSource.includes('"chartMes"') && !dashboardSource.includes("Evolución de ventas"), "La gráfica Evolución de ventas no fue eliminada completamente");
-checkProduction(!dashboardSource.includes('id: "noSales"') && !dashboardSource.includes('"chartSinVentasCategoria"') && !dashboardSource.includes("renderNoSalesCategoryChart"), "La gráfica de presentaciones sin ventas no fue eliminada completamente");
-checkProduction(dashboardSource.includes('action: "open-no-sales-explorer"') && dashboardSource.includes("buildNoSalesCategoryExplorerConfig"), "Falta el explorador del KPI de presentaciones sin ventas");
+checkProduction(!dashboardSource.includes('id: "noSales"') && !dashboardSource.includes('"chartSinVentasCategoria"') && !dashboardSource.includes("renderNoSalesCategoryChart"), "La gráfica anterior de ausencia de venta no fue eliminada completamente");
+checkProduction(dashboardSource.includes('action: "open-negotiation-usage"') && dashboardSource.includes("buildNegotiationUsageExplorerConfig"), "Falta el explorador del KPI de clientes negociados sin ventas");
+checkProduction(dashboardSource.includes("function hasExplicitZeroTotalMonthlySales") && dashboardSource.includes("value === 0"), "La regla de venta total cero explicita no esta centralizada");
+checkProduction(dashboardSource.includes("function getNegotiationUsageCompatibleFilters") && dashboardSource.includes('["A\\u00f1o", "Mes", "A\\u00f1o Mes"]'), "El KPI no excluye correctamente los filtros temporales");
+checkProduction(!dashboardSource.includes("NEGOCIACION_SIN_USO") && !dashboardSource.includes("totalWithoutUse"), "Permanece la clasificacion anterior de negociaciones sin uso");
 checkProduction(dashboardSource.includes('title: "Ventas comparables"'), "Falta el KPI de ventas comparables");
 checkProduction(productionRows.length > 0, "Workbook sin filas");
 checkProduction(clientNegotiationModels.clientActivitySummary.length > 0, "Modelo cliente-negociacion vacio");

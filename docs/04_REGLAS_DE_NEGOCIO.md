@@ -132,6 +132,12 @@ Dos objetivos mensuales distintos para la misma actividad impiden comparación. 
 
 Un `TotalVentaMes` ausente no se convierte en cero. La venta física vacía sí se normaliza a cero para clasificar presentaciones, porque esa columna tiene una regla distinta.
 
+## Clientes negociados sin ventas
+
+La unidad del KPI es `Cliente SAP`. Se incluyen únicamente filas con cliente SAP, actividad y `TotalVentaMes` informado explícitamente como cero; vacíos, nulos, inválidos y positivos quedan fuera. Primero se consolidan `Cliente SAP + ID Actividad` y luego el cliente, por lo que presentaciones y actividades repetidas no aumentan el indicador.
+
+Estas filas no tienen `Año`, `Mes` ni `Año Mes`. No se asigna el último período, el filtro seleccionado, la fecha contractual ni otro período artificial. El filtro Mes no participa en este KPI. Las fechas solo producen el estado contractual informativo Vigente hoy, Planeada, Finalizada, Fechas no disponibles o Fechas conflictivas.
+
 ### Actividad aún no iniciada
 
 La venta histórica puede mostrarse, pero cumplimiento, diferencia y venta comparable quedan como no disponibles. El objetivo contractual puede mostrarse con la aclaración de que todavía no es comparable.

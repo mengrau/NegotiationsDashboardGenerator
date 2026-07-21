@@ -120,6 +120,10 @@ El ciclo de vida del explorador mantiene listeners delegados sobre el contenedor
 
 Toda interacción llama a updateDashboardFilters: normaliza vacíos, elimina duplicados, valida contra el catálogo, compara la firma y programa como máximo un render. La sincronización posterior lee el estado central de forma silenciosa; no dispara eventos change ni crea ciclos.
 
+`negotiationUsageCache` es una LRU de 8 entradas, identificada por filtros compatibles y búsqueda, excluyendo Año, Mes y Año Mes. `buildNegotiationUsageAnalysis()` filtra ceros explícitos y agrupa en una pasada con `Map` por cliente, relación cliente–actividad y presentación. Abrir, buscar, ordenar, paginar, exportar o volver consume el modelo preparado; no recalcula el workbook ni crea listeners.
+
+Auditoría sintética de 14.623 filas (runtime Node de Cursor, sin pintura del navegador): construcción en frío de `negotiationUsageAnalysis` 121,25 ms y lectura desde caché 0,08 ms. La instrumentación confirmó una construcción, un acierto de caché y LRU de tamaño 1. Estos tiempos son de referencia del equipo de prueba, no un SLA de navegador.
+
 Los combobox de actividad y cliente comparten el mismo componente, búsqueda preprocesada y listeners delegados. El estado de apertura, consulta y opción resaltada vive en filterUi, no en el DOM. Al limpiar todos los filtros se cierran los paneles, se cancelan búsquedas pendientes y se conserva el tema.
 
 La disponibilidad facetada se obtiene con una pasada sobre el resultado completo y una pasada adicional por cada dimensión que tenga selección, excluyendo temporalmente esa dimensión. Los resultados se cachean por dataset y firma estable. El modo de diagnóstico reporta la etapa facetedOptions y el tamaño de la caché facets.
