@@ -64,13 +64,15 @@ El Excel se procesa localmente en el navegador. No se sube a ningún servidor, n
 
 El dashboard descargado incluye los datos procesados como JSON dentro del HTML. El título se construye con la columna `Región SAP`: si hay una sola región se muestra como `Negociaciones Antioquia`, si hay varias se muestra `Negociaciones múltiples regiones`, y si no hay región disponible se mantiene `Negociaciones`.
 
-El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, explorador de clientes negociados sin ventas, explorador de contribución multicliente y exportación CSV. El modal muestra una fila por cliente, sus negociaciones y sus presentaciones sin abrir modales anidados.
+El HTML compartido contiene KPI priorizados, contexto compacto, filtros con variación real, una línea de tiempo analítica, visualizaciones adaptativas, búsqueda, explorador de clientes negociados sin ventas y explorador de contribución multicliente. La descarga general de datos filtrados no se muestra; las exportaciones contextuales permanecen en las tablas y modales analíticos. El modal muestra una fila por cliente, sus negociaciones y sus presentaciones sin abrir modales anidados.
 
 Los desplegables de Actividad y Cliente SAP se portalan temporalmente al documento y se posicionan con coordenadas del viewport; así quedan fuera de los contextos de apilamiento de tarjetas y gráficas. Se recalculan al desplazarse o redimensionar la ventana, y el modal conserva una capa superior.
 
 Los KPI se adaptan al contexto. Una actividad compartida presenta ventas conjuntas, objetivo, cumplimiento y contribuciones; una actividad individual omite la contribución de 100 % y la posición 1 de 1. Al filtrar un cliente, el objetivo continúa identificado como objetivo completo de la actividad. Para varias actividades, los objetivos únicos y las ventas comparables se agregan mediante totales, sin promediar porcentajes.
 
 En la vista global, **Ventas totales** representa `TotalVentaMes` resuelto por cliente y período. **Ventas comparables** representa esa venta total restringida a vigencias evaluables, sin duplicar cliente-período. El objetivo visible reconciliable usa la misma población comparable; la cobertura se muestra como ayuda secundaria.
+
+Al pasar sobre **Ventas comparables**, la interfaz aclara que son cajas registradas dentro de la vigencia de la negociación y que por eso pueden diferir de las ventas generales o del último mes. Los estados **No evaluable** conservan y muestran su causa, como negociación aún no iniciada, fechas u objetivos conflictivos, ausencia de objetivo válido o atribución de venta no confiable.
 
 La interfaz usa un registro central `UI_COPY` para mantener títulos, estados, acciones, encabezados, tooltips y mensajes vacíos consistentes. Los textos visibles son ejecutivos; las reglas de resolución, deduplicación y comparabilidad permanecen en la documentación técnica y no se infieren desde las etiquetas.
 
@@ -156,7 +158,7 @@ Si cambia el Excel de origen, genera un nuevo HTML. El dashboard descargado cont
 
 El HTML generado incluye, después de KPI y filtros, una tabla cuya fila representa `Cliente SAP + ID Actividad`. El estado mensual usa el mes filtrado o el último período disponible; el avance contra el objetivo total se presenta como un estado independiente. Los filtros locales de estado, el ordenamiento y la paginación operan sobre `clientActivitySummary`, no sobre las filas del Excel. La segmentación por cliente, NIT, actividad, región o CEDI se hace exclusivamente con los filtros globales superiores.
 
-La tabla muestra 25 relaciones por página de forma predeterminada y permite 50 o 100. En móvil genera únicamente tarjetas de la página visible. **Ver detalle** abre el modal único con contrato, resultados mensuales dinámicos y advertencias. **Ver cliente** y **Ver negociación** actualizan los filtros centrales. El CSV de resumen exporta todas las coincidencias y agrega cuatro columnas por período real; el CSV de detalle conserva meses y advertencias.
+La tabla muestra 10 relaciones por página de forma predeterminada y permite ampliar a 25, 50 o 100. En móvil genera únicamente tarjetas de la página visible. **Ver detalle** abre el modal único con contrato, resultados mensuales dinámicos y advertencias. **Ver cliente** y **Ver negociación** actualizan los filtros centrales. El CSV de resumen exporta todas las coincidencias y agrega cuatro columnas por período real; el CSV de detalle conserva meses y advertencias.
 
 La tabla compacta prioriza **Estado mensual**, **Estado total**, **Cliente**, **Negociación**, **Objetivo mensual**, **Venta del mes**, **Mix de venta**, **Dcto. mes**, **Cumplimiento**, **Avance total**, **Inversión** y **Acción**. Región, CEDI y acumulados permanecen en el detalle. Los porcentajes se muestran desde decimales normalizados, evitando que un `10` contractual aparezca como `1.000 %`.
 

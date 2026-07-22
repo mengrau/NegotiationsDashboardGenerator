@@ -1628,10 +1628,13 @@ function runClientNegotiationModelTests() {
   assert.strictEqual(individual.totalDifference, null);
   assert.deepStrictEqual(plain(individual.monthlyComplianceByMonth), { 202605: 2, 202606: null });
   assert.deepStrictEqual(plain(individual.monthlyStatusByMonth), { 202605: "CUMPLE_MES", 202606: "NO_EVALUABLE_MES" });
+  assert.strictEqual(individual.monthlyEvaluationReasonByMonth[202605], "");
+  assert.strictEqual(individual.monthlyEvaluationReasonByMonth[202606], "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
   assert.strictEqual(individual.selectedStatusPeriod, 202606);
   assert.strictEqual(individual.selectedMonthlyCompliance, null);
   assert.strictEqual(individual.selectedMonthlyStatus, "NO_EVALUABLE_MES");
   assert.strictEqual(individual.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
+  assert.strictEqual(individual.totalEvaluationReason, "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD");
   assert.strictEqual(individual.negotiationType, "INDIVIDUAL");
   assert.strictEqual(individual.investmentPercentage, 0.15);
   assert.strictEqual(individual.negotiationDiscount.status, "VARIOS");
@@ -1648,7 +1651,9 @@ function runClientNegotiationModelTests() {
   assert(shared.warnings.includes("REQUIERE_DISTRIBUCION_MULTIACTIVIDAD:202606"));
   const noPeriod = model.clientActivitySummary.find((row) => row.activityId === "A-NO-PERIOD");
   assert(noPeriod && noPeriod.selectedMonthlyStatus === "NO_EVALUABLE_MES");
+  assert.strictEqual(noPeriod.selectedMonthlyEvaluationReason, "ACTIVIDAD_AUN_NO_INICIADA");
   assert.strictEqual(noPeriod.totalObjectiveStatus, "NO_EVALUABLE_TOTAL");
+  assert.strictEqual(noPeriod.totalEvaluationReason, "ACTIVIDAD_AUN_NO_INICIADA");
   assert(noPeriod.warnings.includes("SIN_PERIODO_DE_VENTA"));
   const client = model.clientSummary.find((row) => row.clientSap === "C-1");
   assert.strictEqual(client.activityCount, 2);
@@ -1662,6 +1667,7 @@ function runClientNegotiationModelTests() {
   const mayIndividual = mayModel.clientActivitySummary.find((row) => row.activityId === "A-MODEL");
   assert.strictEqual(mayModel.selectedStatusPeriod, 202605);
   assert.strictEqual(mayIndividual.selectedMonthlyStatus, "CUMPLE_MES");
+  assert.strictEqual(mayIndividual.selectedMonthlyEvaluationReason, "");
   assert(mayModel.summaryTableColumns.find((column) => column.id === "selectedMonthlyStatus").label.includes("MAY 2026"));
   assert.strictEqual(model.diagnostics.rowsWithoutPeriod, 1);
   assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 0, NO_CUMPLE_MES: 1, NO_EVALUABLE_MES: 4 });
@@ -1679,6 +1685,14 @@ function runClientNegotiationModelTests() {
   assert.strictEqual(dashboard.resolveClientModelSelectedPeriod(model, { Mes: "MAY" }).key, 202605);
   const mayAnalyses = dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: { Mes: "MAY" }, clientNegotiationModels: model });
   assert.strictEqual(mayAnalyses.clientNegotiationModels.selectedStatusPeriod, 202605);
+
+  const conflictingObjectiveModel = app.buildClientNegotiationModels([
+    normalizeActivityRow({ activityId: "A-CONFLICT", clientId: "C-CONFLICT", yearMonth: "62026", month: "JUN", presentationCode: "P-1", totalSales: "100", objectiveMonth: "100", objectiveTotal: "200", startDate: "2026-06-01", endDate: "2026-06-30" }),
+    normalizeActivityRow({ activityId: "A-CONFLICT", clientId: "C-CONFLICT", yearMonth: "62026", month: "JUN", presentationCode: "P-2", totalSales: "100", objectiveMonth: "200", objectiveTotal: "200", startDate: "2026-06-01", endDate: "2026-06-30" })
+  ]);
+  const conflictingObjective = conflictingObjectiveModel.clientActivitySummary[0];
+  assert.strictEqual(conflictingObjective.selectedMonthlyEvaluationReason, "OBJETIVO_CONFLICTIVO");
+  assert.strictEqual(conflictingObjective.totalEvaluationReason, "OBJETIVO_CONFLICTIVO");
 }
 
 function runClientTrackingTableTests() {
@@ -1772,6 +1786,8 @@ function runClientTrackingTableTests() {
   assert(source.includes("getClientTrackingMonthlyDiscountDisplay(row, period && period.key)"));
   const controlsMarkup = dashboard.buildClientTrackingControlsMarkup();
   assert(!controlsMarkup.includes('type=\\"search\\"') && !controlsMarkup.includes("Buscar cliente"));
+  assert.strictEqual(dashboard.getClientTrackingTableState().pageSize, 10);
+  [10, 25, 50, 100].forEach((size) => assert(controlsMarkup.includes('value="' + size + '"')));
   assert(!source.includes("clientTrackingTable.query") && !source.includes("trackingSearchText") && !source.includes("clientTrackingSearchDebounced"));
   assert.deepStrictEqual(Object.keys(plain(dashboard.getClientTrackingTableState())).sort(), ["compactLayout", "monthlyStatus", "page", "pageSize", "selectedRowKey", "sortDirection", "sortField", "totalStatus"].sort());
   assert(source.includes('updateDashboardFilters(patch, { reason: action })'));
@@ -2223,6 +2239,9 @@ function runLayoutPresentationTests() {
   assert(filterLayout[1].includes("filter-control-wide"));
   assert(filterLayout.slice(2).every((item) => item.includes("filter-control-tail-3")));
   const templateSource = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
+  assert(!templateSource.includes('id="exportCsvButton"'));
+  assert(templateSource.includes("clearFiltersButton") && templateSource.includes("filter-grid-actions"));
+  assert(templateSource.includes("negotiation-usage-table") && templateSource.includes("white-space: nowrap"));
   assert.strictEqual(countOccurrences(templateSource, 'window.addEventListener("resize", debouncedResizeCharts)'), 1);
   assert.strictEqual(countOccurrences(templateSource, 'charts.addEventListener("click", handleTimelineAction)'), 1);
   assert.strictEqual(countOccurrences(templateSource, 'container.addEventListener("click", handleFilterPanelClick)'), 1);
@@ -2254,6 +2273,10 @@ function runExecutiveCopyTests() {
   assert.strictEqual(copy.statuses.monthly.CUMPLE_MES, "Cumple");
   assert.strictEqual(copy.statuses.total.EN_PROGRESO_OBJETIVO_TOTAL, "En progreso");
   assert.strictEqual(copy.tooltips.salesMix, "Distribución de la venta entre presentaciones negociadas y no negociadas.");
+  assert(copy.tooltips.attributableSales.includes("período vigente de la negociación"));
+  assert(copy.tooltips.attributableSales.includes("ventas generales"));
+  assert.strictEqual(dashboard.formatEvaluationReason("ACTIVIDAD_AUN_NO_INICIADA"), "La negociación aún no ha iniciado.");
+  assert(dashboard.clientTrackingMonthlyBadge("NO_EVALUABLE_MES", "OBJETIVO_CONFLICTIVO").includes("objetivos mensuales"));
   assert.strictEqual(dashboard.getObjectiveGapDescription(10), "Cajas físicas por encima del objetivo.");
   assert.strictEqual(dashboard.getObjectiveGapDescription(-10), "Cajas físicas pendientes para alcanzar el objetivo.");
   const registry = dashboard.getChartRegistry();

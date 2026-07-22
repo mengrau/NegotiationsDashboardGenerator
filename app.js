@@ -1468,6 +1468,39 @@ function summarizeActivityAnalytics(objectives, relations, performance) {
   };
 }
 
+function getMonthlyEvaluationReason({ objective, period, active, performance, activeActivities, numerator, periodAttributionReliable }) {
+  if (!objective || objective.dateStatus !== "OK") return "FECHAS_CONFLICTIVAS";
+  if (!active) {
+    const start = dateOnly(objective.startDate);
+    const end = dateOnly(objective.endDate);
+    const year = Math.floor(period / 100);
+    const month = period % 100;
+    if (start && start > new Date(year, month, 0)) return "ACTIVIDAD_AUN_NO_INICIADA";
+    if (end && end < new Date(year, month - 1, 1)) return "ACTIVIDAD_FINALIZADA";
+    return "FUERA_DE_VIGENCIA";
+  }
+  if (objective.objectiveStatus === "OBJETIVO_CONFLICTIVO") return "OBJETIVO_CONFLICTIVO";
+  if (objective.objectiveStatus !== "OK" || !isFiniteMetric(objective.objectiveMonthly) || objective.objectiveMonthly <= 0) return "SIN_OBJETIVO_MENSUAL_VALIDO";
+  if (activeActivities.size > 1) return "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD";
+  if (performance && performance.status && performance.status !== "OK") return performance.status;
+  if (!isFiniteMetric(numerator)) return "SIN_VENTA_ATRIBUIBLE";
+  if (!periodAttributionReliable) return "ATRIBUCION_NO_CONFIABLE";
+  return "";
+}
+
+function getTotalEvaluationReason(objective, monthlyReasons, comparableSales, hasUnreliableActivePeriod) {
+  if (!objective || objective.dateStatus !== "OK") return "FECHAS_CONFLICTIVAS";
+  if (objective.objectiveTotalStatus === "OBJETIVO_CONFLICTIVO") return "OBJETIVO_TOTAL_CONFLICTIVO";
+  if (objective.objectiveTotalStatus !== "OK" || !isFiniteMetric(objective.objectiveTotal) || objective.objectiveTotal <= 0) return "SIN_OBJETIVO_TOTAL_VALIDO";
+  const reasons = Object.values(monthlyReasons).filter(Boolean);
+  if (reasons.length && reasons.every((reason) => reason === "ACTIVIDAD_AUN_NO_INICIADA")) return "ACTIVIDAD_AUN_NO_INICIADA";
+  if (hasUnreliableActivePeriod) {
+    return reasons.find((reason) => !["ACTIVIDAD_AUN_NO_INICIADA", "ACTIVIDAD_FINALIZADA", "FUERA_DE_VIGENCIA"].includes(reason)) || "PERIODOS_NO_EVALUABLES";
+  }
+  if (!comparableSales.length) return "SIN_PERIODOS_COMPARABLES";
+  return "PERIODOS_NO_EVALUABLES";
+}
+
 function buildClientNegotiationModels(rows, options = {}) {
   const sourceRows = rows || [];
   const startedAt = typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
@@ -1527,6 +1560,7 @@ function buildClientNegotiationModels(rows, options = {}) {
     const monthlyDiscountStatusByMonth = {};
     const monthlyComplianceByMonth = {};
     const monthlyStatusByMonth = {};
+    const monthlyEvaluationReasonByMonth = {};
     const comparableSales = [];
     const warnings = [];
     let hasUnreliableActivePeriod = false;
@@ -1560,6 +1594,15 @@ function buildClientNegotiationModels(rows, options = {}) {
       const periodAttributionReliable = Boolean(performance && performance.status === "OK" && isFiniteMetric(numerator) && activeActivities.size <= 1);
       const comparable = active && objective.dateStatus === "OK" && objective.objectiveStatus === "OK" && objective.objectiveMonthly > 0 && isFiniteMetric(numerator) && periodAttributionReliable;
       const compliance = comparable ? numerator / objective.objectiveMonthly : null;
+      monthlyEvaluationReasonByMonth[period.key] = comparable ? "" : getMonthlyEvaluationReason({
+        objective,
+        period: period.key,
+        active,
+        performance,
+        activeActivities,
+        numerator,
+        periodAttributionReliable
+      });
       if (comparable) comparableSalesByMonth[period.key] = numerator;
       monthlyDifferenceByMonth[period.key] = comparable ? numerator - objective.objectiveMonthly : null;
       monthlyComplianceByMonth[period.key] = compliance;
@@ -1594,8 +1637,10 @@ function buildClientNegotiationModels(rows, options = {}) {
     const totalProgress = totalComparable ? accumulatedComparableAttributableSales / objective.objectiveTotal : null;
     const totalDifference = totalComparable ? accumulatedComparableAttributableSales - objective.objectiveTotal : null;
     const totalObjectiveStatus = !totalComparable ? "NO_EVALUABLE_TOTAL" : totalProgress >= 1 ? "CUMPLIO_OBJETIVO_TOTAL" : "EN_PROGRESO_OBJETIVO_TOTAL";
+    const totalEvaluationReason = totalComparable ? "" : getTotalEvaluationReason(objective, monthlyEvaluationReasonByMonth, comparableSales, hasUnreliableActivePeriod);
     const selectedMonthlyCompliance = selectedStatusPeriod ? monthlyComplianceByMonth[selectedStatusPeriod.key] : null;
     const selectedMonthlyStatus = selectedStatusPeriod ? monthlyStatusByMonth[selectedStatusPeriod.key] : "NO_EVALUABLE_MES";
+    const selectedMonthlyEvaluationReason = selectedStatusPeriod ? monthlyEvaluationReasonByMonth[selectedStatusPeriod.key] || "SIN_PERIODO_SELECCIONADO" : "SIN_PERIODO_SELECCIONADO";
     if (settings.totalObjectiveFormulaWarning) warnings.push("OBJETIVO_TOTAL_NO_COINCIDE_CON_FORMULA");
     if (!rowsForRelation.some((row) => Number.isInteger(row.periodKey || getYearMonthSortValue(row)))) warnings.push("SIN_PERIODO_DE_VENTA");
     if (objective.objectiveStatus && objective.objectiveStatus !== "OK") warnings.push(objective.objectiveStatus);
@@ -1667,11 +1712,14 @@ function buildClientNegotiationModels(rows, options = {}) {
       monthlyCompliance: monthlyComplianceByMonth,
       monthlyComplianceByMonth,
       monthlyStatusByMonth,
+      monthlyEvaluationReasonByMonth,
       selectedMonthlyCompliance,
       selectedMonthlyStatus,
+      selectedMonthlyEvaluationReason,
       selectedStatusPeriod: selectedStatusPeriod ? selectedStatusPeriod.key : null,
       totalCompliance: totalProgress,
       totalObjectiveStatus,
+      totalEvaluationReason,
       warnings: Array.from(new Set(warnings)),
       navigation: { clientSap, activityId }
     });
@@ -1808,6 +1856,7 @@ function selectClientNegotiationModelPeriod(model, selection = {}) {
     ...row,
     selectedMonthlyCompliance: selected ? row.monthlyComplianceByMonth[selected.key] : null,
     selectedMonthlyStatus: selected ? row.monthlyStatusByMonth[selected.key] : "NO_EVALUABLE_MES",
+    selectedMonthlyEvaluationReason: selected && row.monthlyEvaluationReasonByMonth ? row.monthlyEvaluationReasonByMonth[selected.key] || "" : "SIN_PERIODO_SELECCIONADO",
     selectedStatusPeriod: selected ? selected.key : null
   });
   return {

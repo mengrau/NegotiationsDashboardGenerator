@@ -68,8 +68,6 @@ function generateDashboardHtml(payload) {
           <div class="header-actions">
             <span id="healthBadge" class="badge badge-success"><i data-lucide="check-circle-2"></i> Datos cargados</span>
             <button id="themeToggle" class="button button-ghost theme-toggle" type="button" aria-label="Cambiar a modo oscuro"><i data-lucide="moon"></i> Oscuro</button>
-            <button id="exportCsvButton" class="button button-primary" type="button"><i data-lucide="download"></i> Descargar CSV</button>
-            <button id="clearFiltersButton" class="button button-ghost" type="button"><i data-lucide="filter-x"></i> Limpiar filtros</button>
           </div>
         </header>
 
@@ -386,6 +384,8 @@ label, .kpi-label {
 .tracking-status.is-negative { border-color: rgba(239,68,68,.34); background: var(--red-soft); color: var(--red); }
 .tracking-status.is-progress { border-color: rgba(13,148,136,.3); background: var(--primary-soft); color: var(--primary); }
 .tracking-status.is-neutral { background: var(--soft-bg); color: var(--muted); }
+.tracking-status-cell { display: grid; gap: 5px; justify-items: start; min-width: 170px; }
+.tracking-status-reason { max-width: 230px; color: var(--muted); font-size: 0.68rem; font-weight: 700; line-height: 1.35; }
 .client-tracking-pagination { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
 .client-tracking-pagination-actions { display: flex; gap: 8px; }
 .client-tracking-cards { display: grid; gap: 10px; }
@@ -437,6 +437,8 @@ label, .kpi-label {
 }
 .quick-search input { border: 0; outline: 0; background: transparent; color: var(--ink); font-weight: 700; }
 .filters-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; overflow: visible; }
+.filter-grid-actions { grid-column: span 3; display: flex; align-items: end; }
+.filter-grid-actions .button { width: 100%; min-height: 44px; }
 .filter-control { position: relative; display: grid; align-content: start; gap: 6px; min-width: 0; }
 .filter-control-wide { grid-column: span 6; }
 .filter-control-standard { grid-column: span 3; }
@@ -716,6 +718,19 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-table td.numeric { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .detail-table thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 .detail-table tbody tr.is-selected-client { background: var(--primary-soft); box-shadow: inset 3px 0 0 var(--primary); }
+.negotiation-usage-table { min-width: 1380px; table-layout: fixed; }
+.negotiation-usage-table th, .negotiation-usage-table td { overflow-wrap: normal; word-break: normal; }
+.negotiation-usage-table td { white-space: nowrap; }
+.negotiation-usage-table th:nth-child(1) { width: 120px; }
+.negotiation-usage-table th:nth-child(2) { width: 190px; }
+.negotiation-usage-table th:nth-child(3) { width: 120px; }
+.negotiation-usage-table th:nth-child(4) { width: 190px; }
+.negotiation-usage-table th:nth-child(5) { width: 150px; }
+.negotiation-usage-table th:nth-child(6) { width: 190px; }
+.negotiation-usage-table th:nth-child(7), .negotiation-usage-table th:nth-child(8) { width: 110px; }
+.negotiation-usage-table th:nth-child(9) { width: 180px; }
+.negotiation-usage-table td:nth-child(2), .negotiation-usage-table td:nth-child(4) { white-space: normal; }
+.negotiation-usage-table td:last-child .button { width: 100%; white-space: nowrap; }
 .client-identity { display: grid; gap: 2px; min-width: 140px; }
 .client-identity strong { color: var(--ink); }
 .client-identity span { color: var(--muted); font-size: 0.76rem; }
@@ -780,7 +795,7 @@ tbody tr:hover { background: var(--primary-soft); }
   .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .sidebar-note { position: static; margin-top: 12px; padding: 10px 12px; }
   .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3 { grid-column: auto; }
+  .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3, .filter-grid-actions { grid-column: auto; }
   .filter-control-wide { grid-column: 1 / -1; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-grid > .kpi-card,
@@ -802,7 +817,7 @@ tbody tr:hover { background: var(--primary-soft); }
   .active-filters-block { justify-items: start; }
   .filters-grid, .charts-grid { grid-template-columns: 1fr; }
   .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .filter-control, .filter-control-wide, .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3 { grid-column: auto; }
+  .filter-control, .filter-control-wide, .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3, .filter-grid-actions { grid-column: auto; }
   .chart-wide, .chart-featured, .chart-timeline, .chart-row-fill { grid-column: auto; }
   .multi-combobox-panel { z-index: 1000; width: calc(100vw - 24px); max-width: none; max-height: min(72vh, 560px); }
   .multi-combobox-list { max-height: min(44vh, 340px); }
@@ -940,7 +955,8 @@ const UI_COPY = Object.freeze({
   },
   tooltips: {
     salesMix: "Distribuci\u00f3n de la venta entre presentaciones negociadas y no negociadas.",
-    monthlyCompliance: "El cumplimiento considera la venta total del cliente durante el per\u00edodo v\u00e1lido."
+    monthlyCompliance: "El cumplimiento considera la venta total del cliente durante el per\u00edodo v\u00e1lido.",
+    attributableSales: "Son las cajas registradas dentro del per\u00edodo vigente de la negociaci\u00f3n. Por eso pueden diferir de las ventas generales del per\u00edodo o de las ventas del \u00faltimo mes."
   },
   emptyStates: {
     filters: "No hay resultados para los filtros seleccionados.",
@@ -1286,10 +1302,6 @@ function bindEvents() {
     state.page = 1;
     debouncedDashboardRender();
   });
-  const exportButton = document.getElementById("exportCsvButton");
-  if (exportButton) exportButton.addEventListener("click", function () {
-    downloadCsv(exportFilteredCsv(getTableRows()), "datos_filtrados.csv");
-  });
   const charts = document.getElementById("charts");
   if (charts) charts.addEventListener("click", handleTimelineAction);
   const kpis = document.getElementById("kpis");
@@ -1385,7 +1397,8 @@ function populateFilters() {
   const container = document.getElementById("filtersGrid");
   if (!container) return;
   const filterConfigs = getAvailableFilterConfigs(DASHBOARD_DATA);
-  const filterLayout = assignAdaptiveFilterLayout(filterConfigs);
+  const filterLayout = assignAdaptiveFilterLayout(filterConfigs.concat([{ item: { field: "__actions" } }]));
+  const actionLayout = filterLayout.pop();
   container.innerHTML = filterConfigs.map(function (config, index) {
     const item = config.item;
     const layoutClass = filterLayout[index];
@@ -1394,7 +1407,7 @@ function populateFilters() {
     return "<label class=\\"filter-control " + layoutClass + "\\"><span class=\\"filter-control-label\\">" + escapeHtml(item.label) + "</span><select data-filter-field=\\"" + escapeHtml(item.field) + "\\"><option value=\\"\\">Todos</option>" + config.options.map(function (option) {
       return "<option value=\\"" + escapeHtml(option) + "\\">" + escapeHtml(option) + "</option>";
     }).join("") + "</select></label>";
-  }).join("");
+  }).join("") + "<div class=\\"filter-grid-actions " + actionLayout + "\\"><button id=\\"clearFiltersButton\\" class=\\"button button-ghost\\" type=\\"button\\"><i data-lucide=\\"filter-x\\"></i> Limpiar filtros</button></div>";
   bindFilterPanelEvents();
   state.facetedOptions = measurePerformance("facetedOptions", function () { return buildFacetedOptions(state.filters); });
   syncFilterControlsFromState({ refreshOptions: true });
@@ -2029,7 +2042,7 @@ function renderDetailExplorerFailureState() {
   if (body) body.innerHTML = '<div class="empty-state empty-state-error" role="alert"><strong>Detalle no disponible</strong><span>El explorador puede cerrarse con el botón o la tecla Escape.</span></div>';
 }
 function getEmptyClientTrackingTableState() {
-  return { monthlyStatus: "ALL", totalStatus: "ALL", sortField: "selectedMonthlyStatus", sortDirection: "asc", page: 1, pageSize: 25, selectedRowKey: "", compactLayout: null };
+  return { monthlyStatus: "ALL", totalStatus: "ALL", sortField: "selectedMonthlyStatus", sortDirection: "asc", page: 1, pageSize: 10, selectedRowKey: "", compactLayout: null };
 }
 function getClientTrackingTableState() {
   return state.clientTrackingTable;
@@ -2054,7 +2067,7 @@ function bindClientTrackingEvents() {
     if (target.id === "clientTrackingMonthlyStatus") state.clientTrackingTable.monthlyStatus = target.value;
     else if (target.id === "clientTrackingTotalStatus") state.clientTrackingTable.totalStatus = target.value;
     else if (target.id === "clientTrackingSort") state.clientTrackingTable.sortField = target.value;
-    else if (target.id === "clientTrackingPageSize") state.clientTrackingTable.pageSize = [25, 50, 100].indexOf(Number(target.value)) !== -1 ? Number(target.value) : 25;
+    else if (target.id === "clientTrackingPageSize") state.clientTrackingTable.pageSize = [10, 25, 50, 100].indexOf(Number(target.value)) !== -1 ? Number(target.value) : 10;
     else return;
     state.clientTrackingTable.page = 1;
     renderClientTrackingTable();
@@ -2191,7 +2204,8 @@ function getClientTrackingDetailModel(row, periods) {
         monthlyDiscount: row.monthlyDiscountByMonth && row.monthlyDiscountByMonth[period.key],
         monthlyDiscountStatus: row.monthlyDiscountStatusByMonth && row.monthlyDiscountStatusByMonth[period.key] || "SIN_DATO",
         compliance: row.monthlyComplianceByMonth && row.monthlyComplianceByMonth[period.key],
-        status: row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key] || "NO_EVALUABLE_MES"
+        status: row.monthlyStatusByMonth && row.monthlyStatusByMonth[period.key] || "NO_EVALUABLE_MES",
+        evaluationReason: row.monthlyEvaluationReasonByMonth && row.monthlyEvaluationReasonByMonth[period.key] || ""
       };
     })
   };
@@ -2232,20 +2246,20 @@ function buildClientTrackingControlsMarkup() {
   return "<label>Estado mensual<select id=\\"clientTrackingMonthlyStatus\\">" + optionMarkup(monthly, value.monthlyStatus) + "</select></label>" +
     "<label>Estado objetivo total<select id=\\"clientTrackingTotalStatus\\">" + optionMarkup(totals, value.totalStatus) + "</select></label>" +
     "<label class=\\"tracking-sort\\">Ordenar por<select id=\\"clientTrackingSort\\">" + optionMarkup(sorts, value.sortField) + "</select></label>" +
-    "<label class=\\"tracking-page-size\\">Filas<select id=\\"clientTrackingPageSize\\">" + [25, 50, 100].map(function (size) { return "<option value=\\"" + size + "\\"" + (size === value.pageSize ? " selected" : "") + ">" + size + "</option>"; }).join("") + "</select></label>" +
+    "<label class=\\"tracking-page-size\\">Filas<select id=\\"clientTrackingPageSize\\">" + [10, 25, 50, 100].map(function (size) { return "<option value=\\"" + size + "\\"" + (size === value.pageSize ? " selected" : "") + ">" + size + "</option>"; }).join("") + "</select></label>" +
     "<div class=\\"client-tracking-actions\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"sort-direction\\"><i data-lucide=\\"" + (value.sortDirection === "asc" ? "arrow-up" : "arrow-down") + "\\"></i> " + (value.sortDirection === "asc" ? "Ascendente" : "Descendente") + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"export-summary\\"><i data-lucide=\\"download\\"></i> " + UI_COPY.actions.downloadCsv + "</button></div>";
 }
 function buildClientTrackingDesktopTable(rows, period) {
   const headers = UI_COPY.tables.tracking;
   return "<div class=\\"client-tracking-table-wrap\\"><table class=\\"client-tracking-table\\"><thead><tr>" + headers.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join("") + "</tr></thead><tbody>" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>" + escapeHtml(row.clientSap) + (row.clientNit ? " · " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></td></tr>";
+    return "<tr><td>" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus, row.selectedMonthlyEvaluationReason) + "</td><td>" + clientTrackingTotalBadge(row.totalObjectiveStatus, row.totalEvaluationReason) + "</td><td><span class=\\"tracking-client\\"><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><small>" + escapeHtml(row.clientSap) + (row.clientNit ? " · " + escapeHtml(row.clientNit) : "") + "</small></span></td><td class=\\"tracking-code\\"><strong>" + escapeHtml(row.activityId) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</td><td>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</td><td class=\\"numeric\\">" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(row.investmentPercentage)) + "</td><td class=\\"tracking-action\\"><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></td></tr>";
   }).join("") + "</tbody></table></div>";
 }
 function buildClientTrackingCards(rows, period) {
   return "<div class=\\"client-tracking-cards\\">" + rows.map(function (row) {
     const key = getClientTrackingRowKey(row);
-    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Negociación " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus) + clientTrackingTotalBadge(row.totalObjectiveStatus) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta del mes " + escapeHtml(period ? period.label : "") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-composition\\"><small>Mix de venta</small>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || UI_COPY.emptyStates.unavailable) + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></div></article>";
+    return "<article class=\\"client-tracking-card\\"><div class=\\"client-tracking-card-head\\"><div><strong>" + escapeHtml(row.clientName || row.clientSap) + "</strong><span>" + escapeHtml(row.clientSap + " · Negociación " + row.activityId) + "</span></div><span class=\\"badge badge-muted\\">" + escapeHtml(row.negotiationType === "COMPARTIDA" ? "Compartida" : "Individual") + "</span></div><div class=\\"client-tracking-card-statuses\\">" + clientTrackingMonthlyBadge(row.selectedMonthlyStatus, row.selectedMonthlyEvaluationReason) + clientTrackingTotalBadge(row.totalObjectiveStatus, row.totalEvaluationReason) + "</div><div class=\\"client-tracking-card-metrics\\"><span><small>Venta del mes " + escapeHtml(period ? period.label : "") + "</small><strong>" + escapeHtml(formatAvailableMetric(getClientTrackingComparableSales(row, period && period.key))) + "</strong></span><span><small>Objetivo mensual</small><strong>" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</strong></span><span><small>Dcto. mes</small><strong>" + escapeHtml(getClientTrackingMonthlyDiscountDisplay(row, period && period.key)) + "</strong></span><span><small>Cumplimiento</small><strong>" + escapeHtml(formatAvailablePercent(row.selectedMonthlyCompliance)) + "</strong></span><span><small>Avance total</small><strong>" + escapeHtml(formatAvailablePercent(row.totalProgress)) + "</strong></span></div><div class=\\"client-tracking-card-composition\\"><small>Mix de venta</small>" + buildClientTrackingCompositionMarkup(row, period && period.key) + "</div><div class=\\"client-tracking-card-actions\\"><small>" + escapeHtml([row.region, row.cedi].filter(Boolean).join(" · ") || UI_COPY.emptyStates.unavailable) + "</small><button class=\\"button button-primary\\" type=\\"button\\" data-tracking-action=\\"open-detail\\" data-tracking-row-key=\\"" + escapeHtml(key) + "\\">" + UI_COPY.actions.detail + "</button></div></article>";
   }).join("") + "</div>";
 }
 function buildClientTrackingPagination(total, start, visibleCount, pageCount) {
@@ -2258,15 +2272,44 @@ function buildClientTrackingEmptyState(projection) {
   else if (projection.globalCount && (state.clientTrackingTable.monthlyStatus !== "ALL" || state.clientTrackingTable.totalStatus !== "ALL")) title = "No hay resultados para los estados seleccionados.";
   return "<div class=\\"empty-state empty-state-info\\" role=\\"status\\"><i data-lucide=\\"info\\"></i><strong>" + escapeHtml(title) + "</strong><button class=\\"button button-ghost\\" type=\\"button\\" data-tracking-action=\\"clear-local\\">Limpiar filtros de la tabla</button></div>";
 }
-function clientTrackingMonthlyBadge(status) {
+function formatEvaluationReason(reason) {
+  const messages = {
+    FECHAS_CONFLICTIVAS: "Las fechas de la negociación son conflictivas.",
+    ACTIVIDAD_AUN_NO_INICIADA: "La negociación aún no ha iniciado.",
+    ACTIVIDAD_FINALIZADA: "El período está después del fin de la negociación.",
+    FUERA_DE_VIGENCIA: "El período está fuera de la vigencia de la negociación.",
+    OBJETIVO_CONFLICTIVO: "Hay conflicto entre los objetivos mensuales informados.",
+    OBJETIVO_TOTAL_CONFLICTIVO: "Hay conflicto entre los objetivos totales informados.",
+    SIN_OBJETIVO_MENSUAL_VALIDO: "No hay un objetivo mensual válido.",
+    SIN_OBJETIVO_TOTAL_VALIDO: "No hay un objetivo total válido.",
+    REQUIERE_DISTRIBUCION_MULTIACTIVIDAD: "La venta requiere distribución entre varias negociaciones activas.",
+    VENTA_CONFLICTIVA: "La fuente contiene valores de venta conflictivos.",
+    VENTA_ACTIVIDAD_AMBIGUA: "La venta atribuible a la negociación es ambigua.",
+    SIN_VENTAS: "No hay información de venta confiable para evaluar.",
+    SIN_VENTA_ATRIBUIBLE: "No hay venta atribuible confiable dentro de la vigencia.",
+    ATRIBUCION_NO_CONFIABLE: "La atribución de ventas no es confiable.",
+    SIN_PERIODOS_COMPARABLES: "No existen períodos vigentes y comparables.",
+    PERIODOS_NO_EVALUABLES: "Existen períodos vigentes que no pueden evaluarse.",
+    SIN_PERIODO_SELECCIONADO: "No hay un período disponible para evaluar."
+  };
+  return messages[reason] || (reason ? formatClientTrackingWarning(reason) : "");
+}
+function buildTrackingStatusMarkup(badge, status, nonEvaluableStatus, reason) {
+  if (status !== nonEvaluableStatus) return badge;
+  const message = formatEvaluationReason(reason);
+  return message ? "<span class=\\"tracking-status-cell\\">" + badge + "<small class=\\"tracking-status-reason\\">" + escapeHtml(message) + "</small></span>" : badge;
+}
+function clientTrackingMonthlyBadge(status, reason) {
   const map = { CUMPLE_MES: [UI_COPY.statuses.monthly.CUMPLE_MES, "is-positive", "check-circle-2"], NO_CUMPLE_MES: [UI_COPY.statuses.monthly.NO_CUMPLE_MES, "is-negative", "x-circle"], NO_EVALUABLE_MES: [UI_COPY.statuses.monthly.NO_EVALUABLE_MES, "is-neutral", "circle-help"] };
   const item = map[status] || map.NO_EVALUABLE_MES;
-  return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+  const badge = "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+  return buildTrackingStatusMarkup(badge, status, "NO_EVALUABLE_MES", reason);
 }
-function clientTrackingTotalBadge(status) {
+function clientTrackingTotalBadge(status, reason) {
   const map = { CUMPLIO_OBJETIVO_TOTAL: [UI_COPY.statuses.total.CUMPLIO_OBJETIVO_TOTAL, "is-positive", "badge-check"], EN_PROGRESO_OBJETIVO_TOTAL: [UI_COPY.statuses.total.EN_PROGRESO_OBJETIVO_TOTAL, "is-progress", "clock-3"], NO_EVALUABLE_TOTAL: [UI_COPY.statuses.total.NO_EVALUABLE_TOTAL, "is-neutral", "circle-help"] };
   const item = map[status] || map.NO_EVALUABLE_TOTAL;
-  return "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+  const badge = "<span class=\\"tracking-status " + item[1] + "\\"><i data-lucide=\\"" + item[2] + "\\"></i>" + item[0] + "</span>";
+  return buildTrackingStatusMarkup(badge, status, "NO_EVALUABLE_TOTAL", reason);
 }
 function renderClientTrackingFailureState() {
   const body = document.getElementById("clientTrackingBody");
@@ -2623,7 +2666,7 @@ function buildAggregateActivityKpis(k, sales, objective, achievement, gap, sales
   const comparableObjective = hasComparablePopulation && objective > 0 ? objective : null;
   const coverage = buildComparableCoverageText(k.activityAggregate);
   return [
-    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description + " " + coverage : UI_COPY.emptyStates.negotiations + " " + coverage },
+    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description + " " + coverage : UI_COPY.emptyStates.negotiations + " " + coverage, tooltip: UI_COPY.tooltips.attributableSales },
     { id: "aggregateObjective", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: formatAvailableMetric(comparableObjective), description: UI_COPY.kpis.global.monthlyObjective.description },
     { id: "aggregateCompliance", icon: "gauge", title: UI_COPY.kpis.global.monthlyCompliance.title, value: formatAvailablePercent(achievement), description: UI_COPY.kpis.global.monthlyCompliance.description + " " + coverage, className: compliance.className, status: compliance.label },
     { id: "aggregateDifference", icon: difference.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(gap) ? formatSignedNumber(gap) : "No disponible", description: isFiniteNumber(gap) ? getObjectiveGapDescription(gap) : UI_COPY.emptyStates.unavailable, className: difference.className, status: difference.label },
@@ -2640,7 +2683,7 @@ function buildExecutiveKpis(context) {
   return [
     { id: "periodSales", icon: "shopping-bag", title: UI_COPY.kpis.global.periodSales.title, value: formatAvailableMetric(k.salesPeriod), description: UI_COPY.kpis.global.periodSales.description },
     { id: "latestSales", icon: "calendar-days", title: UI_COPY.kpis.global.latestSales.title, value: formatAvailableMetric(k.salesMonth), description: UI_COPY.kpis.global.latestSales.description },
-    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description : UI_COPY.emptyStates.negotiations },
+    { id: "comparableSales", icon: "package-check", title: UI_COPY.kpis.global.comparableSales.title, value: formatAvailableMetric(comparableSales), description: isFiniteNumber(comparableSales) ? UI_COPY.kpis.global.comparableSales.description : UI_COPY.emptyStates.negotiations, tooltip: UI_COPY.tooltips.attributableSales },
     { id: "monthlyObjectives", icon: "target", title: UI_COPY.kpis.global.monthlyObjective.title, value: formatAvailableMetric(comparableObjective), description: UI_COPY.kpis.global.monthlyObjective.description },
     { id: "activityCompliance", icon: "gauge", title: UI_COPY.kpis.global.monthlyCompliance.title, value: formatAvailablePercent(k.compliance), description: UI_COPY.kpis.global.monthlyCompliance.description + " " + coverage, className: compliance.className, status: compliance.label },
     { id: "objectiveDifference", icon: difference.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(k.objectiveDifference) ? formatSignedNumber(k.objectiveDifference) : "No disponible", description: isFiniteNumber(k.objectiveDifference) ? getObjectiveGapDescription(k.objectiveDifference) : UI_COPY.emptyStates.unavailable, className: difference.className, status: difference.label },
@@ -2756,6 +2799,7 @@ function projectClientNegotiationModelPeriod(model, filters) {
     return Object.assign({}, row, {
       selectedMonthlyCompliance: selected && row.monthlyComplianceByMonth ? row.monthlyComplianceByMonth[selected.key] : null,
       selectedMonthlyStatus: status || "NO_EVALUABLE_MES",
+      selectedMonthlyEvaluationReason: selected && row.monthlyEvaluationReasonByMonth ? row.monthlyEvaluationReasonByMonth[selected.key] || "" : "SIN_PERIODO_SELECCIONADO",
       selectedStatusPeriod: selected ? selected.key : null
     });
   };
@@ -4584,7 +4628,7 @@ function renderNegotiationUsageRelationList(body) {
     const actions = "<td><button class='button button-primary' type='button' data-detail-action='usage-view-negotiations' data-client-key='" + key + "'>" + actionLabel + "</button></td>";
     return "<tr data-client-row='" + key + "'>" + values + actions + "</tr>";
   }).join("");
-  body.innerHTML = "<div class='detail-table-wrap'><table class='detail-table'>" + header + "<tbody>" + tableRows + "</tbody></table></div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "cliente", "clientes", explorer.page);
+  body.innerHTML = "<div class='detail-table-wrap'><table class='detail-table negotiation-usage-table'>" + header + "<tbody>" + tableRows + "</tbody></table></div>" + buildDetailExplorerFooter(visibleRows.length, rows.length, "cliente", "clientes", explorer.page);
   state.performance.counters.modalRowsRendered += visibleRows.length;
 }
 function renderNegotiationUsageNegotiationList(body) {
@@ -4745,10 +4789,10 @@ function buildClientTrackingDetailConfig(detailModelOrRow) {
     subtitle: "Cliente " + row.clientSap + " · Negociación " + row.activityId,
     rows: [], defaultSortField: "client", defaultSortDir: "asc", searchFields: [],
     summary: [
-      { label: "Estado mensual", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus), primary: true, note: row.selectedStatusPeriod ? formatCanonicalPeriod(row.selectedStatusPeriod) : "Período no disponible" },
+      { label: "Estado mensual", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus), primary: true, note: row.selectedMonthlyStatus === "NO_EVALUABLE_MES" ? formatEvaluationReason(row.selectedMonthlyEvaluationReason) : row.selectedStatusPeriod ? formatCanonicalPeriod(row.selectedStatusPeriod) : "Período no disponible" },
       { label: "Cumplimiento", value: formatAvailablePercent(row.selectedMonthlyCompliance), primary: true },
       { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress), primary: true },
-      { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus), primary: true }
+      { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus), primary: true, note: row.totalObjectiveStatus === "NO_EVALUABLE_TOTAL" ? formatEvaluationReason(row.totalEvaluationReason) : "" }
     ]
   };
 }
@@ -4762,7 +4806,7 @@ function renderClientTrackingDetail() {
   const participation = row.isSharedActivity && isFiniteNumber(contribution) && isFiniteNumber(joint) && joint !== 0 ? contribution / joint : null;
   const monthlyRows = detailModel.periods.map(function (period) {
     const discountDisplay = period.monthlyDiscountStatus === "DESCUENTO_MENSUAL_CONFLICTIVO" ? "Revisar" : isFiniteNumber(period.monthlyDiscount) ? formatRatioPercent(period.monthlyDiscount) : "No disponible";
-    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.negotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.nonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.negotiatedShare)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key])) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(isFiniteNumber(period.comparableSales) && period.comparableSales !== 0 && isFiniteNumber(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key]) ? row.clientContributionSalesByMonth[period.key] / period.comparableSales : null)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status) + "</td></tr>";
+    return "<tr><td><strong>" + escapeHtml(period.label) + "</strong></td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.generalSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.negotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.nonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.negotiatedShare)) + "</td>" + (row.isSharedActivity ? "<td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.comparableSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(period.jointNonNegotiatedSales)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key])) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(isFiniteNumber(period.comparableSales) && period.comparableSales !== 0 && isFiniteNumber(row.clientContributionSalesByMonth && row.clientContributionSalesByMonth[period.key]) ? row.clientContributionSalesByMonth[period.key] / period.comparableSales : null)) + "</td>" : "") + "<td class=\\"numeric\\">" + escapeHtml(discountDisplay) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailableMetric(row.monthlyObjective)) + "</td><td class=\\"numeric\\">" + escapeHtml(formatAvailablePercent(period.compliance)) + "</td><td>" + clientTrackingMonthlyBadge(period.status, period.evaluationReason) + "</td></tr>";
   }).join("");
   const warnings = (row.warnings || []).length ? "<section class=\\"detail-section\\"><h3>" + UI_COPY.modal.warnings + "</h3><div class=\\"extra-columns\\">" + row.warnings.map(function (warning) { return "<span class=\\"extra-chip\\">" + escapeHtml(formatClientTrackingWarning(warning)) + "</span>"; }).join("") + "</div></section>" : "";
   const sharedFields = row.isSharedActivity ? [
