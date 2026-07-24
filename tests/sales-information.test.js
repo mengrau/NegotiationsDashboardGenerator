@@ -53,6 +53,7 @@ runExecutiveCopyTests();
 // 13-15. Seguridad, rendimiento y regresiones reales
 runProductionHardeningTests();
 runDocumentationTests();
+runSharedZeroWithoutPeriodRegressionTests();
 runAttachedWorkbookValidation();
 runSharedWorkbookValidation();
 
@@ -1670,7 +1671,7 @@ function runClientNegotiationModelTests() {
   assert.strictEqual(shared.isSharedActivity, true);
   assert.strictEqual(shared.negotiationType, "COMPARTIDA");
   assert.strictEqual(shared.associatedClientCount, 2);
-  assert.strictEqual(shared.jointActivitySalesByMonth[202606], undefined);
+  assert.strictEqual(shared.jointActivitySalesByMonth[202606], 75);
   assert.strictEqual(shared.monthlyComplianceByMonth[202606], null);
   assert.strictEqual(shared.monthlyStatusByMonth[202606], "NO_EVALUABLE_MES");
   assert.strictEqual(shared.totalProgress, null);
@@ -1697,7 +1698,7 @@ function runClientNegotiationModelTests() {
   assert.strictEqual(mayIndividual.selectedMonthlyEvaluationReason, "");
   assert(mayModel.summaryTableColumns.find((column) => column.id === "selectedMonthlyStatus").label.includes("MAY 2026"));
   assert.strictEqual(model.diagnostics.rowsWithoutPeriod, 1);
-  assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 0, NO_CUMPLE_MES: 1, NO_EVALUABLE_MES: 4 });
+  assert.deepStrictEqual(plain(model.diagnostics.monthlyStatusCountsByPeriod[202606]), { label: "JUN 2026", CUMPLE_MES: 0, NO_CUMPLE_MES: 1, INFORMACION_PARCIAL_MES: 0, NO_EVALUABLE_MES: 4 });
   assert.deepStrictEqual(plain(model.diagnostics.totalObjectiveStatusCounts), { CUMPLIO_OBJETIVO_TOTAL: 1, EN_PROGRESO_OBJETIVO_TOTAL: 0, NO_EVALUABLE_TOTAL: 4 });
   assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 8);
   assert(model.summaryTableColumns.some((column) => column.id === "compliance_202605"));
@@ -1792,6 +1793,8 @@ function runClientTrackingTableTests() {
   assert(csv.includes("Venta total MAY 2026") && csv.includes("Venta negociada MAY 2026") && csv.includes("% negociada MAY 2026"));
   assert(csv.includes("Venta no negociada JUN 2026") && csv.includes("% no negociada JUN 2026"));
   assert(csv.includes("Dcto. JUN 2026") && csv.includes("Cumplimiento JUN 2026") && csv.includes("Estado JUN 2026"));
+  assert(csv.includes("Estado de resolución de venta") && csv.includes("Origen de resolución"));
+  assert(csv.includes("Información completa de la actividad") && csv.includes("Clientes resueltos") && csv.includes("Clientes asociados"));
   assert(csv.includes('"9 %"') && !csv.includes('"900 %"'), "El CSV debe formatear el descuento mensual normalizado");
   assert(csv.includes("'=C-001"), "El resumen debe conservar protección contra inyección CSV");
   assert.strictEqual((csv.match(/A-00[12]/g) || []).length, 2, "El CSV debe incluir todas las coincidencias, no una sola página");
@@ -1811,6 +1814,8 @@ function runClientTrackingTableTests() {
   assert(detailCsv.includes("Venta total") && detailCsv.includes("Venta negociada"));
   assert(detailCsv.includes("Venta conjunta") && detailCsv.includes("Aporte del cliente"));
   assert(detailCsv.includes("MAY 2026") && detailCsv.includes("JUN 2026"));
+  assert(detailCsv.includes("Estado de resolución de venta") && detailCsv.includes("Origen de resolución"));
+  assert(detailCsv.includes("Información completa de la actividad") && detailCsv.includes("Clientes resueltos"));
   assert(detailCsv.includes('"9 %"'));
   const source = fs.readFileSync(path.join(ROOT, "dashboard-template.js"), "utf8");
   assert(source.includes('id="clientTracking"') && source.includes('data-tracking-action=\\\\"open-detail\\\\"'));
@@ -1989,6 +1994,215 @@ function runModalNavigationAndScrollTests(base, periods, source) {
   assert(!source.includes('overlay.addEventListener("scroll"'));
   assert(!source.includes("backdrop-filter: blur"));
   assert(source.includes("overscroll-behavior: contain"));
+}
+
+function runSharedZeroWithoutPeriodRegressionTests() {
+  const activityId = "A-SHARED-ZERO";
+  const periodSales = [120, 90, 50, 30, 10];
+  const periodRows = periodSales.map((sales, index) => normalizeActivityRow({
+    activityId,
+    clientId: "C-Z" + (index + 1),
+    presentationCode: "P-Z" + (index + 1),
+    year: "2026",
+    month: "JUN",
+    yearMonth: "62026",
+    totalSales: sales,
+    physicalSales: sales,
+    objectiveMonth: 290,
+    objectiveTotal: 3480,
+    startDate: "2026-05-30",
+    endDate: "2027-03-28"
+  }));
+  const explicitZeroRows = ["P-ZERO-1", "P-ZERO-2", "P-ZERO-3"].map((presentationCode) => normalizeActivityRow({
+    activityId,
+    clientId: "C-ZERO",
+    presentationCode,
+    year: "",
+    month: "",
+    yearMonth: "",
+    totalSales: 0,
+    physicalSales: 0,
+    objectiveMonth: 290,
+    objectiveTotal: 3480,
+    startDate: "2026-05-30",
+    endDate: "2027-03-28"
+  }));
+  const rows = periodRows.concat(explicitZeroRows);
+  const analytics = app.buildActivityAnalytics(rows);
+  const performance = analytics.activityPerformance.find((item) => item.activityId === activityId && item.period === 202606);
+  assert(performance);
+  assert.strictEqual(performance.status, "OK");
+  assert.strictEqual(performance.informationComplete, true);
+  assert.strictEqual(performance.resolvedClientCount, 6);
+  assert.strictEqual(performance.associatedClientCount, 6);
+  assert.strictEqual(performance.totalSales, 300);
+  assert.strictEqual(performance.objectiveMonthly, 290);
+  assert.strictEqual(performance.achievement, 300 / 290);
+  assert.strictEqual(performance.gap, 10);
+  assert.strictEqual(performance.comparable, true);
+  const zeroContribution = performance.contributionRows.find((item) => item.clientId === "C-ZERO");
+  assert(zeroContribution);
+  assert.strictEqual(zeroContribution.sales, 0);
+  assert.strictEqual(zeroContribution.resolutionStatus, "ZERO_EXPLICIT_WITHOUT_PERIOD");
+  assert.strictEqual(zeroContribution.sourceType, "ZERO_EXPLICIT_WITHOUT_PERIOD");
+  assert.strictEqual(zeroContribution.informationStatus, "SIN_VENTAS");
+  assert.strictEqual(zeroContribution.isFallback, true);
+  assert.strictEqual(performance.contributionRows.filter((item) => item.clientId === "C-ZERO").length, 1);
+  assert.strictEqual(performance.contributionRows.reduce((sum, item) => sum + item.sales, 0), 300);
+
+  const model = app.buildClientNegotiationModels(rows);
+  const relations = model.clientActivitySummary.filter((item) => item.activityId === activityId);
+  assert.strictEqual(relations.length, 6);
+  assert(relations.every((item) => item.monthlyStatusByMonth[202606] === "CUMPLE_MES"));
+  assert(relations.every((item) => item.selectedMonthlyStatus !== "NO_EVALUABLE_MES"));
+  assert(relations.every((item) => item.jointActivitySalesByMonth[202606] === 300));
+  assert(relations.every((item) => item.monthlyObjective === 290));
+  const zeroRelation = relations.find((item) => item.clientSap === "C-ZERO");
+  assert.strictEqual(zeroRelation.salesByMonth[202606], 0);
+  assert.strictEqual(zeroRelation.clientContributionSalesByMonth[202606], 0);
+  assert.strictEqual(zeroRelation.clientSalesResolutionStatusByMonth[202606], "ZERO_EXPLICIT_WITHOUT_PERIOD");
+  assert.strictEqual(zeroRelation.resolvedClientCountByMonth[202606], 6);
+  assert.strictEqual(zeroRelation.associatedClientCountByMonth[202606], 6);
+
+  const resolver = analytics.monthlySalesResolver;
+  const zeroResolutionInput = {
+    clientSap: "C-ZERO",
+    activityId,
+    periodKey: 202606,
+    activity: analytics.objectivesByActivity.find((item) => item.activityId === activityId),
+    indexes: resolver
+  };
+  const cachedFirst = app.resolveClientActivityMonthlySales(zeroResolutionInput);
+  const cachedSecond = app.resolveClientActivityMonthlySales(zeroResolutionInput);
+  assert.strictEqual(cachedFirst, cachedSecond);
+  assert(resolver.stats.cacheHits >= 2);
+
+  const periodPriorityRows = [
+    normalizeActivityRow({ activityId: "A-PRIORITY", clientId: "C-PRIORITY", totalSales: 50, physicalSales: 50, yearMonth: "62026", month: "JUN" }),
+    normalizeActivityRow({ activityId: "A-PRIORITY", clientId: "C-PRIORITY", presentationCode: "P-PRIORITY-ZERO", totalSales: 0, physicalSales: 0, year: "", month: "", yearMonth: "" })
+  ];
+  const priorityAnalytics = app.buildActivityAnalytics(periodPriorityRows);
+  const priorityResolution = app.resolveClientActivityMonthlySales({
+    clientSap: "C-PRIORITY", activityId: "A-PRIORITY", periodKey: 202606,
+    activity: priorityAnalytics.objectivesByActivity[0], indexes: priorityAnalytics.monthlySalesResolver
+  });
+  assert.strictEqual(priorityResolution.sales, 50);
+  assert.strictEqual(priorityResolution.resolutionStatus, "PERIOD_SPECIFIC_SALES");
+
+  const blankRows = periodRows.map((row) => Object.assign({}, row, {
+    activityId: "A-PARTIAL",
+    "ID Actividad": "A-PARTIAL"
+  })).concat([
+    normalizeActivityRow({ activityId: "A-PARTIAL", clientId: "C-MISSING", totalSales: null, physicalSales: 0, year: "", month: "", yearMonth: "", objectiveMonth: 290, objectiveTotal: 3480, startDate: "2026-05-30", endDate: "2027-03-28" })
+  ]);
+  const partialAnalytics = app.buildActivityAnalytics(blankRows);
+  const partial = partialAnalytics.activityPerformance.find((item) => item.period === 202606);
+  assert.strictEqual(partial.status, "SHARED_ACTIVITY_PARTIAL_INFORMATION");
+  assert.strictEqual(partial.informationComplete, false);
+  assert.strictEqual(partial.resolvedClientCount, 5);
+  assert.strictEqual(partial.associatedClientCount, 6);
+  assert.strictEqual(partial.totalSales, 300);
+  assert.strictEqual(partial.achievement, null);
+  assert.strictEqual(partial.gap, null);
+  const partialModel = app.buildClientNegotiationModels(blankRows);
+  const partialRelations = partialModel.clientActivitySummary.filter((item) => item.activityId === "A-PARTIAL");
+  assert(partialRelations.every((item) => item.monthlyStatusByMonth[202606] === "INFORMACION_PARCIAL_MES"));
+  assert(partialRelations.filter((item) => item.clientSap !== "C-MISSING").every((item) => Number.isFinite(item.salesByMonth[202606])));
+
+  const conflictRows = [
+    normalizeActivityRow({ activityId: "A-CONFLICT-ZERO", clientId: "C-CONFLICT", totalSales: 0, physicalSales: 0, year: "", month: "", yearMonth: "" }),
+    normalizeActivityRow({ activityId: "A-CONFLICT-ZERO", clientId: "C-CONFLICT", presentationCode: "P-CONFLICT-2", totalSales: 50, physicalSales: 50, year: "", month: "", yearMonth: "" }),
+    normalizeActivityRow({ activityId: "A-SEED", clientId: "C-SEED", totalSales: 1, physicalSales: 1, yearMonth: "62026", month: "JUN" })
+  ];
+  const conflictIndexes = app.buildClientActivityMonthlySalesIndexes(conflictRows);
+  const conflictActivity = app.buildObjectivesByActivity(conflictRows).find((item) => item.activityId === "A-CONFLICT-ZERO");
+  const conflictResolution = app.resolveClientActivityMonthlySales({
+    clientSap: "C-CONFLICT", activityId: "A-CONFLICT-ZERO", periodKey: 202606, activity: conflictActivity, indexes: conflictIndexes
+  });
+  assert.strictEqual(conflictResolution.resolutionStatus, "CONFLICTING_MONTHLY_SALES");
+  assert.strictEqual(conflictResolution.sales, null);
+
+  const distinctPositiveRows = [
+    normalizeActivityRow({ activityId: "A-DISTINCT", clientId: "C-DISTINCT", totalSales: 50, physicalSales: 50, yearMonth: "62026", month: "JUN" }),
+    normalizeActivityRow({ activityId: "A-DISTINCT", clientId: "C-DISTINCT", presentationCode: "P-DISTINCT-2", totalSales: 80, physicalSales: 80, yearMonth: "62026", month: "JUN" })
+  ];
+  const distinctAnalytics = app.buildActivityAnalytics(distinctPositiveRows);
+  const distinctResolution = app.resolveClientActivityMonthlySales({
+    clientSap: "C-DISTINCT", activityId: "A-DISTINCT", periodKey: 202606,
+    activity: distinctAnalytics.objectivesByActivity[0], indexes: distinctAnalytics.monthlySalesResolver
+  });
+  assert.strictEqual(distinctResolution.resolutionStatus, "CONFLICTING_MONTHLY_SALES");
+
+  const outsideRows = explicitZeroRows.map((row) => Object.assign({}, row, {
+    activityId: "A-OUTSIDE",
+    "ID Actividad": "A-OUTSIDE",
+    startDate: "2026-07-01",
+    "Fecha inicio": "2026-07-01"
+  })).concat([normalizeActivityRow({ activityId: "A-OUTSIDE-SEED", clientId: "C-OUTSIDE-SEED", totalSales: 1, yearMonth: "62026", month: "JUN" })]);
+  const outsideAnalytics = app.buildActivityAnalytics(outsideRows);
+  const outsideResolution = app.resolveClientActivityMonthlySales({
+    clientSap: "C-ZERO", activityId: "A-OUTSIDE", periodKey: 202606,
+    activity: outsideAnalytics.objectivesByActivity.find((item) => item.activityId === "A-OUTSIDE"),
+    indexes: outsideAnalytics.monthlySalesResolver
+  });
+  assert.strictEqual(outsideResolution.resolutionStatus, "OUTSIDE_ACTIVITY_VALIDITY");
+
+  const dashboardAnalytics = dashboard.buildActivityAnalytics(rows);
+  const dashboardPerformance = dashboardAnalytics.activityPerformance.find((item) => item.activityId === activityId && item.period === 202606);
+  assert.strictEqual(dashboardPerformance.totalSales, 300);
+  assert.strictEqual(dashboardPerformance.resolvedClientCount, 6);
+  assert.strictEqual(dashboardPerformance.status, "OK");
+  assert.strictEqual(dashboard.formatActivityValidity(dashboardPerformance), "Vigente en el período");
+  assert.notStrictEqual(dashboard.formatActivityValidity(dashboardPerformance), "Fuera del período");
+  dashboard.initializeDashboardDataset(rows);
+  const contributionConfig = dashboard.buildActivityContributionConfig(dashboardPerformance, ["C-ZERO"]);
+  const zeroContributionRow = contributionConfig.rows.find((item) => item.clientId === "C-ZERO");
+  assert.strictEqual(zeroContributionRow.informationStatusLabel, "Sin ventas");
+  assert.strictEqual(zeroContributionRow.resolutionSourceLabel, "Cero explícito sin período");
+  assert(contributionConfig.summary.some((item) => item.label === "Clientes resueltos" && item.value === "6 de 6"));
+  assert(contributionConfig.summary.some((item) => item.label === "Estado de información" && item.value === "Evaluación completa"));
+  assert(contributionConfig.columns.some((item) => item.label === "Estado de información"));
+  assert(contributionConfig.exportColumns.some((item) => item.label === "Origen de resolución"));
+
+  const realWorkbookPath = process.env.FUERA_PERIODO_DASH_XLSX || path.join(
+    os.homedir(),
+    "OneDrive - Gaseosas Postobon S.A",
+    "Escritorio",
+    "Validaciones",
+    "FueraDelPeriodoDash.xlsx"
+  );
+  if (fs.existsSync(realWorkbookPath)) {
+    const realRows = processWorkbook(realWorkbookPath);
+    const realAnalytics = app.buildActivityAnalytics(realRows);
+    const realPerformance = realAnalytics.activityPerformance.find((item) => item.activityId === "912684" && item.period === 202606);
+    assert(realPerformance, "La actividad 912684 debe existir para JUN 2026.");
+    assert.strictEqual(realPerformance.associatedClientCount, 6);
+    assert.strictEqual(realPerformance.resolvedClientCount, 6);
+    assert.strictEqual(realPerformance.informationComplete, true);
+    assert.strictEqual(realPerformance.status, "OK");
+    assert.strictEqual(realPerformance.totalSales, 769.467);
+    assert(Math.abs(realPerformance.achievement - 769.467 / 290) < 1e-12);
+    assert.strictEqual(realPerformance.gap, 479.467);
+    const realZero = realPerformance.contributionRows.find((item) => item.clientId === "1002883701");
+    assert(realZero);
+    assert.strictEqual(realZero.sales, 0);
+    assert.strictEqual(realZero.resolutionStatus, "ZERO_EXPLICIT_WITHOUT_PERIOD");
+    assert.strictEqual(realZero.informationStatus, "SIN_VENTAS");
+    assert.strictEqual(realZero.isFallback, true);
+    assert.strictEqual(dashboard.formatActivityValidity(realPerformance), "Vigente en el período");
+    const realModel = app.buildClientNegotiationModels(realRows);
+    const realRelations = realModel.clientActivitySummary.filter((item) => item.activityId === "912684");
+    assert.strictEqual(realRelations.length, 6);
+    assert(realRelations.every((item) => item.monthlyStatusByMonth[202606] === "CUMPLE_MES"));
+    assert(realRelations.every((item) => item.jointActivitySalesByMonth[202606] === 769.467));
+    const realZeroRelation = realRelations.find((item) => item.clientSap === "1002883701");
+    assert.strictEqual(realZeroRelation.salesByMonth[202606], 0);
+    assert.strictEqual(realZeroRelation.selectedClientSalesResolutionSource, "ZERO_EXPLICIT_WITHOUT_PERIOD");
+    assert.strictEqual(realZeroRelation.selectedResolvedClientCount, 6);
+    assert.strictEqual(realZeroRelation.selectedAssociatedClientCount, 6);
+  } else {
+    console.warn("FueraDelPeriodoDash.xlsx no encontrado; se omite la regresión real 912684.");
+  }
 }
 
 function runAttachedWorkbookValidation() {
@@ -2448,6 +2662,8 @@ function runProductionHardeningTests() {
   assert.strictEqual(countOccurrences(templateSource, "const RUNTIME_DIAGNOSTIC_LIMIT = 40"), 1);
   assert(templateSource.includes("function safelyRenderComponent"));
   assert(templateSource.includes("function reportDashboardDiagnostic"));
+  assert(templateSource.includes("contributionMetadataByActivity"), "El modal debe reutilizar metadatos precalculados por actividad.");
+  assert(!templateSource.includes("const rows = indexedRows ? Array.from(indexedRows) : [];"), "El modal no debe recorrer nuevamente las filas de la actividad.");
   assert(!templateSource.includes("console.warn("));
   assert(!templateSource.includes("console.error("));
 }
@@ -2470,7 +2686,7 @@ function runSharedWorkbookValidation() {
     assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 8);
     assert(model.clientActivitySummary.length >= model.clientSummary.length);
     assert(model.clientActivitySummary.every((row) => row.navigation.clientSap === row.clientSap && row.navigation.activityId === row.activityId));
-    assert(model.clientActivitySummary.every((row) => ["CUMPLE_MES", "NO_CUMPLE_MES", "NO_EVALUABLE_MES"].includes(row.selectedMonthlyStatus)));
+    assert(model.clientActivitySummary.every((row) => ["CUMPLE_MES", "NO_CUMPLE_MES", "INFORMACION_PARCIAL_MES", "NO_EVALUABLE_MES"].includes(row.selectedMonthlyStatus)));
     assert(model.clientActivitySummary.every((row) => ["CUMPLIO_OBJETIVO_TOTAL", "EN_PROGRESO_OBJETIVO_TOTAL", "NO_EVALUABLE_TOTAL"].includes(row.totalObjectiveStatus)));
     assert(model.clientActivitySummary.every((row) => row.totalProgress === null || Number.isFinite(row.totalProgress)));
     assert(model.clientActivitySummary.every((row) => row.totalDifference === null || Number.isFinite(row.totalDifference)));

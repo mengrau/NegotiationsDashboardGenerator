@@ -197,3 +197,9 @@ El objetivo total responde otra pregunta. `CUMPLIO_OBJETIVO_TOTAL` indica avance
 La tabla consume `clientActivitySummary` a granularidad cliente–actividad. La venta mostrada para reconciliar cumplimiento usa el numerador comparable: aporte atribuible en actividad individual y venta conjunta en actividad compartida. El detalle conserva además `TotalVentaMes` del cliente y su aporte individual, con una advertencia explícita de que venta general y venta atribuible no son equivalentes. Los filtros locales solo cambian la proyección; las acciones de navegación llaman a `updateDashboardFilters()`.
 
 Los campos `% De inversión`, `Porcentaje descuento mes`, `Porcentaje descuento venta` y `Porcentaje descuento negociación` se normalizan al cargar mediante `normalizePercentage()`. Internamente siempre son decimales: un `10`, `10.00`, `10,00` o `10%` se convierte en `0.10`; un `0.10` permanece `0.10`. La tabla y el detalle formatean el decimal al presentar. Valores diferentes conservan el estado de conflicto o `VARIOS` y no se promedian.
+
+## Resolución mensual por cliente y actividad
+
+`resolveClientActivityMonthlySales()` aplica esta jerarquía: `PERIOD_SPECIFIC_SALES`, `ZERO_EXPLICIT_WITHOUT_PERIOD`, `MISSING_MONTHLY_INFORMATION`, `CONFLICTING_MONTHLY_SALES`, `OUTSIDE_ACTIVITY_VALIDITY` e `INVALID_ACTIVITY_DATES`. Las filas del mes siempre tienen prioridad. El fallback de cero solo se habilita dentro de la vigencia, con todos los totales sin período explícitamente en cero, ventas físicas compatibles y ausencia de positivos o conflictos.
+
+Una actividad compartida completa suma una vez cada venta resuelta. Una actividad incompleta conserva `totalSales` como venta conjunta conocida, informa cobertura y usa `SHARED_ACTIVITY_PARTIAL_INFORMATION`; `achievement` y `gap` permanecen nulos hasta completar la cobertura.

@@ -60,3 +60,9 @@ El diálogo tiene `role="dialog"`, `aria-modal`, título y descripción. El foco
 `contributionModelCache` es LRU de ocho entradas por dataset, actividad y selección. Reabrir, buscar, ordenar o paginar reutiliza el modelo y no recorre el workbook. Los listeners se delegan una sola vez sobre el overlay estable y el debounce se cancela al cerrar o cambiar dataset.
 
 El fondo se bloquea con `lockPageScroll()` mientras el flujo está abierto. El contador evita desbloquearlo al pasar de detalle a contribución; rueda, teclado y tacto permanecen dentro del contenedor desplazable. No hay listeners de scroll ni render durante el desplazamiento normal.
+
+## Resolución y cobertura
+
+El explorador consume `contributionRows` ya preparados. La cabecera presenta ventas conjuntas, objetivo, cumplimiento, brecha, clientes resueltos, estado de información y vigencia. Cada cliente presenta venta, aporte, participación, estado y origen de resolución.
+
+`ZERO_EXPLICIT_WITHOUT_PERIOD` se muestra como `Sin ventas` / `Cero explícito sin período`. En información parcial se mantienen las ventas de clientes resueltos y se presenta la cobertura; abrir el modal no vuelve a recorrer el workbook.

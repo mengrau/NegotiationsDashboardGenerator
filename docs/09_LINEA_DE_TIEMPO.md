@@ -81,3 +81,9 @@ KPI y timeline comparten `activityAnalytics`: una venta comparable en la timelin
 - `947124`: detalle compartido con venta 541, objetivo 1.100 y banda contractual.
 - `874894`: detalle individual con venta 549,252 y objetivo 500.
 - `1002559342`: mayo/junio históricos y Gantt para actividades `965821` y `965923` desde julio.
+
+## Información parcial y vigencia
+
+La línea de tiempo determina vigencia exclusivamente por intersección mensual: `inicio <= fin del mes` y `fin >= inicio del mes`. La falta de período en una fila no cambia la vigencia contractual.
+
+`INFORMACION_PARCIAL` muestra la venta conjunta conocida y conserva el objetivo, pero no dibuja cumplimiento definitivo. `ZERO_EXPLICIT_WITHOUT_PERIOD` cuenta como información resuelta y no produce el texto `Fuera del período`.

@@ -182,3 +182,9 @@ diferencia total = ventas atribuibles comparables acumuladas - objetivo total
 El estado principal se resuelve por período: `CUMPLE_MES` con venta atribuible comparable / objetivo mensual mayor o igual a 1; `NO_CUMPLE_MES` con cociente válido inferior a 1; y `NO_EVALUABLE_MES` sin objetivo mensual, vigencia o atribución confiable. Los porcentajes mensuales nunca se promedian: un resumen multiactividad divide la suma de ventas comparables entre la suma de objetivos mensuales únicos.
 
 El objetivo total conserva un estado independiente: `CUMPLIO_OBJETIVO_TOTAL`, `EN_PROGRESO_OBJETIVO_TOTAL` o `NO_EVALUABLE_TOTAL`. En actividad compartida ambos numeradores usan la venta conjunta y los estados pertenecen a la negociación; el aporte individual queda separado. Por eso son válidas combinaciones como “cumple mes y total en progreso” o “no cumple mes y objetivo total cumplido”.
+
+## Cero explícito sin período
+
+Un registro sin `Año`, `Mes` y `Año Mes` no recibe un período artificial. No obstante, puede aportar cero al análisis de un mes vigente cuando todas las filas de la misma relación cliente–actividad tienen `TotalVentaMes = 0`, sus ventas físicas son cero o están clasificadas consistentemente sin venta, y no existe ningún positivo ni conflicto.
+
+La prioridad es: información específica del mes; cero explícito sin período; información mensual no disponible. Los conflictos nunca se degradan a cero. En actividades compartidas, todos los clientes resueltos —incluidos los ceros— producen evaluación completa. Si falta alguno, se conserva la venta conocida bajo `SHARED_ACTIVITY_PARTIAL_INFORMATION`, sin calcular cumplimiento definitivo.

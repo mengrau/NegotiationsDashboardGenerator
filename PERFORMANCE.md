@@ -153,3 +153,9 @@ El snapshot expone tamaño de la LRU, proyecciones, aciertos y filas renderizada
 La apertura del detalle usa `clientTrackingRelationIndex`, un `Map` construido cuando se renderiza la proyección, para localizar `Cliente SAP + ID Actividad` sin buscar filas del workbook. `clientTrackingDetailCache` conserva hasta 16 modelos por versión de dataset, relación y firma de períodos. Cada modelo contiene únicamente el registro preparado, sus períodos contractuales y valores mensuales. Abrir o cerrar no agrega listeners, no llama a `updateDashboardFilters()` y no renderiza nuevamente KPI o gráficas.
 
 El overlay registra una sola vez eventos delegados de clic, teclado, rueda y tacto. No existe listener de `scroll`: desplazarse no modifica el DOM ni consulta análisis. Se retiraron `backdrop-filter` y el encabezado sticky redundante; tarjetas y secciones independientes limitan su pintura. `state.modalNavigation.stack` conserva referencias a modelos ya preparados y estados de vista, por lo que **Volver** solo renderiza el nivel recuperado. `lockPageScroll()` fija el body, compensa la barra lateral y usa contador para cadenas de vistas; `unlockPageScroll()` restaura estilos y coordenadas exactas.
+
+## Índice y caché de resolución mensual
+
+La preparación construye `rowsByClientActivityPeriod`, `periodlessRowsByClientActivity` y `rowsByClientActivity` en una sola pasada. La caché usa `datasetVersion + clientSap + activityId + periodKey`. La agregación compartida consume esas resoluciones; filtros, paginación, ordenamiento, modales y CSV leen el modelo preparado y no recorren nuevamente el workbook.
+
+`performance.monthlyResolutionCacheHits`, `monthlyResolutionCacheMisses` y `monthlyResolutionCacheSize` exponen la preparación del generador. `window.__getDashboardPerformance()` incluye el tamaño y los contadores de la caché del dashboard. `tests/performance-audit.js` mide resolución en frío y desde caché.

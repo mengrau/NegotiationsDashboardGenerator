@@ -100,3 +100,15 @@ En cada combinación revisar:
 - [ ] Abrir un detalle individual y uno compartido; separar venta general, aporte y venta conjunta.
 - [ ] Usar Ver cliente, Ver negociación y Ver contribución; confirmar chips sincronizados.
 - [ ] En 390 × 844 confirmar tarjetas únicas, modal usable y scroll interno mensual.
+
+## Ceros sin período e información parcial
+
+- [ ] Una fila válida del mes prevalece sobre cualquier cero sin período.
+- [ ] Un cero sin período solo se usa con actividad vigente, totales explícitos en cero y sin contradicciones.
+- [ ] Vacíos, positivos o valores distintos no se convierten en cero.
+- [ ] El cliente resuelto en cero aparece como `Sin ventas` y aporta `0` una sola vez.
+- [ ] Una actividad completa muestra cobertura `n de n` y calcula cumplimiento.
+- [ ] Una actividad parcial conserva ventas conocidas, muestra cobertura y no declara cumplimiento.
+- [ ] El texto `Fuera del período` no aparece cuando la vigencia intersecta el mes.
+- [ ] Tabla, modal y CSV muestran estado y origen de resolución.
+- [ ] El KPI `Clientes negociados sin ventas` conserva su regla independiente.

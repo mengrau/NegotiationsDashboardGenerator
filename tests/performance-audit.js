@@ -54,6 +54,14 @@ measure("clientComboboxSearchMs", function () {
   return facetedOptions.get("Cliente SAP - Clave").filter(function (item) { return item.searchText.includes(query); });
 });
 const activityAnalytics = measure("activityAnalyticsMs", function () { return dashboard.buildActivityAnalytics(rows); });
+const resolutionIndexes = app.buildClientActivityMonthlySalesIndexes(rows, 1);
+const resolutionActivity = app.buildObjectivesByActivity(rows)[0];
+const resolutionClient = resolutionActivity ? Array.from(app.buildActivityClientRelations(rows, [resolutionActivity]).activityClients.get(resolutionActivity.activityId) || [])[0] : "";
+const resolutionPeriod = activityAnalytics.activityClientRelations.periods[activityAnalytics.activityClientRelations.periods.length - 1];
+const resolutionInput = { clientSap: resolutionClient, activityId: resolutionActivity && resolutionActivity.activityId, periodKey: resolutionPeriod, activity: resolutionActivity, indexes: resolutionIndexes };
+const monthlyResolutionCold = measure("monthlySalesResolutionColdMs", function () { return app.resolveClientActivityMonthlySales(resolutionInput); });
+const monthlyResolutionCached = measure("monthlySalesResolutionCacheHitMs", function () { return app.resolveClientActivityMonthlySales(resolutionInput); });
+if (monthlyResolutionCold !== monthlyResolutionCached) throw new Error("La caché mensual no reutilizó la resolución preparada.");
 const clientNegotiationModels = measure("clientNegotiationModelColdMs", function () { return app.buildClientNegotiationModels(rows); });
 measure("clientNegotiationModelReadMs", function () { return clientNegotiationModels.clientActivitySummary.length + clientNegotiationModels.clientSummary.length; });
 const trackingRows = measure("clientTrackingProjectionMs", function () {

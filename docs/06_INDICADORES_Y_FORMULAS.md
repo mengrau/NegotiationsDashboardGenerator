@@ -164,3 +164,15 @@ Para una actividad compartida, la columna de avance representa el estado conjunt
 ## Lectura en la tabla de seguimiento
 
 **Venta comparable del mes** es el numerador del estado mostrado. En una actividad individual corresponde a `totalClientSalesByMonth[periodo]`; en una compartida, a `jointActivitySalesByMonth[periodo]`. El detalle agrega el aporte del cliente y la composición por separado.
+
+## Cobertura de actividades compartidas
+
+Para cada cliente asociado se resuelve una sola venta mensual. La venta conjunta conocida es la suma de resoluciones finitas; un cero explícito aporta `0` sin invalidar la suma.
+
+```text
+venta_conjunta = suma(venta_resuelta_por_cliente)
+cobertura = clientes_resueltos / clientes_asociados
+cumplimiento = venta_conjunta / objetivo_mensual
+```
+
+El último cociente solo se publica con cobertura completa. Con cobertura parcial se muestran venta conocida y `x de n clientes`, mientras cumplimiento y brecha permanecen no disponibles.

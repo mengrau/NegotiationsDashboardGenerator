@@ -84,7 +84,7 @@ checkProduction(clientNegotiationModels.clientActivitySummary.every(function (ro
 checkProduction((trackingCsv.match(/\n/g) || []).length === clientNegotiationModels.clientActivitySummary.length, "CSV de seguimiento no exporta todas las relaciones");
 checkProduction(clientNegotiationModels.availablePeriods.every(function (period) {
   const counts = clientNegotiationModels.diagnostics.monthlyStatusCountsByPeriod[period.key];
-  return counts && counts.CUMPLE_MES + counts.NO_CUMPLE_MES + counts.NO_EVALUABLE_MES === clientNegotiationModels.clientActivitySummary.length;
+  return counts && counts.CUMPLE_MES + counts.NO_CUMPLE_MES + counts.INFORMACION_PARCIAL_MES + counts.NO_EVALUABLE_MES === clientNegotiationModels.clientActivitySummary.length;
 }), "Auditoria mensual incompleta");
 checkProduction(Object.values(clientNegotiationModels.diagnostics.totalObjectiveStatusCounts).reduce(function (sum, value) { return sum + value; }, 0) === clientNegotiationModels.clientActivitySummary.length, "Auditoria de objetivo total incompleta");
 checkProduction(productionAnalytics.summary.activityCount > 0, "Cantidad de actividades invalida");

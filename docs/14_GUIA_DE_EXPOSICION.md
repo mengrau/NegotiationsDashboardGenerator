@@ -184,3 +184,9 @@ Frases ejecutivas recomendadas:
 - “El tablero compara la venta total del cliente contra el objetivo mensual durante la vigencia de la negociación”.
 - “La composición permite identificar qué parte de la venta corresponde a presentaciones negociadas y no negociadas”.
 - “El resultado mensual y el avance del objetivo total se presentan por separado”.
+
+## Cómo explicar un cero sin período
+
+“El cliente reportó explícitamente venta total cero. Aunque sus filas no traen mes, no existe una venta positiva o conflictiva y la negociación está vigente. Por eso aporta cero, cuenta como información resuelta y no invalida a los demás clientes.”
+
+Para información parcial: “Se conservan las ventas conocidas y se informa la cobertura. El dashboard no declara cumplimiento hasta resolver todos los clientes.” No describir este caso como fuera de vigencia ni como ausencia de ventas cuando existe un cero verificable.

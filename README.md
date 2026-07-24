@@ -165,3 +165,9 @@ La tabla muestra 10 relaciones por página de forma predeterminada y permite amp
 La tabla compacta prioriza **Estado mensual**, **Estado total**, **Cliente**, **Negociación**, **Objetivo mensual**, **Venta del mes**, **Mix de venta**, **Dcto. mes**, **Cumplimiento**, **Avance total**, **Inversión** y **Acción**. Región, CEDI y acumulados permanecen en el detalle. Los porcentajes se muestran desde decimales normalizados, evitando que un `10` contractual aparezca como `1.000 %`.
 
 Los flujos **Ver detalle → Ver contribución → detalle del cliente** comparten un único modal. El botón **← Volver** recupera el nivel, página, orden, relación seleccionada y posición de scroll anteriores sin reaplicar filtros. Mientras el modal está abierto, el documento queda fijado en su posición y solo se desplaza el contenido interno; al cerrar se restaura exactamente el scroll original.
+
+## Cero explícito sin período en actividades compartidas
+
+La resolución mensual distingue venta del período, cero explícito sin período, información mensual faltante, conflicto y fuera de vigencia. Cuando un cliente asociado no tiene `Año`, `Mes` ni `Año Mes`, pero todas sus filas informan `TotalVentaMes = 0`, sus ventas físicas son cero y no existe un valor contradictorio, el modelo usa ese cero como evidencia analítica para cada mes vigente. La fuente no se modifica: el origen se conserva como `ZERO_EXPLICIT_WITHOUT_PERIOD`.
+
+El cero aporta una sola vez a la venta conjunta y cuenta como cliente resuelto. Si falta información real, la actividad queda en `SHARED_ACTIVITY_PARTIAL_INFORMATION`: conserva la venta conocida y la cobertura, pero no declara cumplimiento. La tabla, el detalle y los CSV presentan el estado, el origen y los clientes resueltos sobre asociados.

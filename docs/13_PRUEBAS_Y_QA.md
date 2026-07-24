@@ -115,3 +115,9 @@ La suite verifica estructura, granularidad cliente–actividad, selección mensu
 La suite se revisa en quince bloques: normalización del workbook; ventas y objetivos; cumplimiento mensual; objetivo total; composición negociada/no negociada; actividades compartidas; multiactividad; KPI; tabla de seguimiento; modales y navegación; gráficas y timeline; CSV; seguridad; rendimiento; y regresiones reales.
 
 Las pruebas de presentación validan IDs y entradas de `UI_COPY`, encabezados, títulos, estados visibles, ausencia de textos obsoletos y consistencia entre interfaz y CSV. No comparan el HTML completo.
+
+## Regresión de actividad compartida con cero sin período
+
+Las pruebas cubren prioridad del período, cero explícito con múltiples presentaciones, vacíos, positivos contradictorios, positivos distintos, vigencia, fechas inválidas, actividad parcial, cobertura, caché y paridad entre generador y dashboard.
+
+La regresión real opcional usa `FUERA_PERIODO_DASH_XLSX` o `Validaciones/FueraDelPeriodoDash.xlsx`. Para la actividad `912684` en junio de 2026 verifica seis clientes resueltos, el cliente `1002883701` en cero y la evaluación conjunta completa.
