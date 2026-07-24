@@ -96,7 +96,9 @@ El KPI de ventas atribuibles comparables lee `activityAggregate.sales`; objetivo
 
 Los registros de ejecución tienen un límite independiente de 40 errores y 40 advertencias y solo escriben en consola cuando `__DASHBOARD_DEBUG__` o `__DASHBOARD_PERF_DEBUG__` está activo. No almacenan filas, nombres de clientes, filtros ni trazas completas. La instantánea de rendimiento incluye conteos de diagnósticos y tamaños de cada caché.
 
-Al inicializar otro dataset se cancelan frames, se liberan gráficas, se cancelan búsquedas del modal y se limpian filtros, análisis, facetas, timeline, explorador, firmas, métricas y diagnósticos. La preferencia de tema y el estado persistido de sidebar permanecen en almacenamiento global.
+Al inicializar otro dataset se cancelan frames, se liberan gráficas, se cancelan búsquedas del modal y se limpian filtros, análisis, facetas, timeline, explorador, firmas, métricas y diagnósticos. Solo la preferencia de tema permanece en almacenamiento global.
+
+La eliminación del sidebar retira su listener, persistencia y resize diferido. El KPI contextual de cliente consume `clientActivitySummary` y deduplica por `ID Actividad`; no recorre el workbook ni crea listeners por tarjeta. La consolidación visual del acumulado tampoco modifica el modelo ni el CSV.
 
 La prueba de endurecimiento simula 50 cambios de filtro, 20 limpiezas, 20 ciclos de modal con búsqueda y orden, 20 construcciones de timeline y 10 CSV. También fuerza 50 entradas sobre una LRU de tamaño ocho y confirma que no crece fuera del límite.
 
@@ -111,7 +113,7 @@ La prueba de endurecimiento simula 50 cambios de filtro, 20 limpiezas, 20 ciclos
 7. Alternar tema y redimensionar; confirmar que las gráficas se actualizan sin acumular listeners ni instancias.
 8. Revisar en DevTools que no aparezcan excepciones, NaN, Infinity ni errores de ECharts.
 9. Validar la timeline con cliente 1002559342, actividades 947124 y 874894, selección multiactividad, una actividad finalizada y otra con fechas conflictivas en 1440, 1024, 768 y 390 px, tanto en tema claro como oscuro.
-10. En cada tamaño comprobar `document.documentElement.scrollWidth <= window.innerWidth`, con sidebar expandida/colapsada y zoom del navegador en 80 %, 100 % y 125 %.
+10. En cada tamaño comprobar `document.documentElement.scrollWidth <= window.innerWidth`, con zoom del navegador en 80 %, 100 % y 125 %.
 11. Abrir combobox y modal para verificar que sus capas siguen en z-index 60 y 80, respectivamente, y que el scroll necesario queda dentro del componente.
 
 El ciclo de vida del explorador mantiene listeners delegados sobre el contenedor estable, cancela la búsqueda pendiente al cerrar, restaura el foco y conserva los filtros globales. El CSV se construye solo al pulsar el botón, respeta la búsqueda activa y libera inmediatamente su Blob URL.

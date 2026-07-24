@@ -44,7 +44,7 @@ Repetir en tema claro y oscuro, con zoom 80 %, 100 % y 125 %:
 En cada combinación revisar:
 
 - [ ] `document.documentElement.scrollWidth <= window.innerWidth`.
-- [ ] Sidebar expandida y colapsada.
+- [ ] Layout central sin sidebar ni espacio reservado a la izquierda.
 - [ ] Encabezado, KPI, filtros, gráficas y timeline alineados.
 - [ ] Vista global con ocho KPI, incluyendo Ventas atribuibles comparables y sin tarjeta Actividades comparables.
 - [ ] Verificar que cumplimiento y diferencia reconcilien con ventas comparables y objetivo comparable, no con Ventas totales.
@@ -58,6 +58,10 @@ En cada combinación revisar:
 - [ ] Cliente multiactividad conserva Gantt y no mezcla negociaciones en una línea única.
 - [ ] Donut con leyenda legible; treemap sin bloques caóticos ni texto cortado; lollipop con etiquetas completas o tooltip accesible.
 - [ ] El KPI **Clientes negociados sin ventas** cuenta clientes únicos con `TotalVentaMes` explícitamente igual a cero y abre un único modal con clientes, negociaciones y presentaciones.
+- [ ] Con un cliente, el KPI global se sustituye por **Estado de la negociación** o **Negociaciones del cliente**, sin mostrar un cero irrelevante.
+- [ ] Una negociación futura muestra **Por iniciar** y su fecha; varias negociaciones cuentan cada `ID Actividad` una vez.
+- [ ] Los KPI no repiten la etiqueta `Filtros activos`.
+- [ ] El detalle acumulado usa **Ventas comparables acumuladas** y **Brecha total**; si ventas totales y comparables coinciden no crea dos tarjetas.
 - [ ] `TotalVentaMes` vacío, nulo, inválido o positivo no se convierte en cero ni entra al KPI.
 - [ ] Año, Mes y Año Mes vacíos no impiden la clasificación; el filtro Mes no excluye estas filas ni se infiere un período.
 - [ ] Objetivos y presentaciones se deduplican por actividad y código, respectivamente; volver restaura página, orden, selección y scroll.

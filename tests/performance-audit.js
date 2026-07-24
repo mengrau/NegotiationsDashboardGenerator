@@ -94,6 +94,17 @@ measure("kpisWithActivityCacheMs", function () {
 const fullAnalysis = measure("dashboardAnalysesColdMs", function () {
   return dashboard.buildDashboardAnalyses(rows, dashboard.getNoSalesAnalysis(rows), { scopeRows: rows, filters: {}, clientNegotiationModels: clientNegotiationModels });
 });
+const contextualClientId = clientNegotiationModels.clientActivitySummary[0] && clientNegotiationModels.clientActivitySummary[0].clientSap;
+const contextualClientAnalysis = Object.assign({}, fullAnalysis, {
+  kpis: Object.assign({}, fullAnalysis.kpis, {
+    selectedClientIds: contextualClientId ? [contextualClientId] : [],
+    selectedActivityIds: [], selectedActivity: null, selectedActivityContract: null, activityPerformance: []
+  })
+});
+const contextualClientKpis = measure("contextualClientKpiMs", function () {
+  return dashboard.buildContextualKpiModel(contextualClientAnalysis, contextualClientId ? { "Cliente SAP - Clave": [contextualClientId] } : {});
+});
+if (contextualClientId && !contextualClientKpis.items.some(function (item) { return item.id === "clientNegotiationContext"; })) throw new Error("El KPI contextual de cliente no se resolvió desde el modelo preparado");
 const visibleChartDefinitions = dashboard.getChartRegistry().filter(function (definition) { return definition.shouldRender(fullAnalysis); });
 const adaptiveChartLayout = measure("adaptiveChartLayoutMs", function () {
   return dashboard.assignAdaptiveChartLayout(visibleChartDefinitions);
@@ -198,6 +209,12 @@ console.log(JSON.stringify({
     categoryVisualType: visualOptions.categoryType,
     negotiationUsageExplorer: "kpi-modal",
     presentationVisualType: "lollipop"
+  },
+  contextualClientKpi: {
+    clientIdResolved: Boolean(contextualClientId),
+    contextType: contextualClientKpis.contextType,
+    title: contextualClientKpis.items.find(function (item) { return item.id === "clientNegotiationContext"; }) && contextualClientKpis.items.find(function (item) { return item.id === "clientNegotiationContext"; }).title,
+    workbookRowsReprocessed: false
   },
   indicatorConsistency: {
     generalSales: fullAnalysis.kpis.salesPeriod,

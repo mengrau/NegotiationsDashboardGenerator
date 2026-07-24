@@ -32,33 +32,8 @@ function generateDashboardHtml(payload) {
   </head>
   <body>
     <div id="dashboardApp" class="dashboard-app">
-      <aside class="sidebar">
-        <div class="sidebar-brand">
-          <span class="sidebar-logo" aria-hidden="true">
-            <svg class="sidebar-logo-mark" viewBox="0 0 64 64" focusable="false">
-              <rect width="64" height="64" rx="16"></rect>
-              <path d="M17 45h30M21 37V27m11 10V18m11 19V24"></path>
-              <path d="M41 17h7v7"></path>
-            </svg>
-          </span>
-          <strong class="sidebar-label">Dashboard</strong>
-          <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Colapsar menú" aria-expanded="true">
-            <i data-lucide="panel-left-close"></i>
-          </button>
-        </div>
-        <nav class="sidebar-nav" aria-label="Secciones">
-          <a href="#kpis" title="Indicadores"><i data-lucide="gauge"></i><span class="sidebar-label">Indicadores</span></a>
-          <a href="#charts" title="Análisis"><i data-lucide="bar-chart-3"></i><span class="sidebar-label">Análisis</span></a>
-          <a href="#filters" title="Exploración"><i data-lucide="sliders-horizontal"></i><span class="sidebar-label">Exploración</span></a>
-        </nav>
-        <div class="sidebar-note">
-          <i data-lucide="wifi"></i>
-          <span>Las gráficas usan librerías visuales por CDN. Los datos ya están incrustados en este HTML.</span>
-        </div>
-      </aside>
-
       <main class="main">
-        <div class="dashboard-content">
+        <div class="dashboard-shell">
         <header class="executive-header">
           <div>
             <p class="eyebrow">Resumen Ejecutivo</p>
@@ -73,18 +48,18 @@ function generateDashboardHtml(payload) {
 
         <section id="contextStrip" class="context-strip" aria-label="Contexto de la selección"></section>
 
-        <section id="kpis" class="kpi-grid section-enter" aria-label="Indicadores principales" aria-live="polite"></section>
-
         <section id="filters" class="filter-panel section-enter">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Exploración</p>
               <h2>Filtros interactivos</h2>
             </div>
-            <div class="active-filters-block"><span class="active-filters-label">Filtros activos</span><div id="activeFilters" class="active-filters" aria-live="polite"></div></div>
+            <div class="active-filters-block"><div id="activeFilters" class="active-filters" aria-label="Filtros aplicados" aria-live="polite"></div></div>
           </div>
           <div id="filtersGrid" class="filters-grid"></div>
         </section>
+
+        <section id="kpis" class="kpi-grid section-enter" aria-label="Indicadores principales" aria-live="polite"></section>
 
         <section id="clientTracking" class="client-tracking-panel section-enter" aria-labelledby="clientTrackingTitle">
           <div class="panel-heading client-tracking-heading">
@@ -157,9 +132,8 @@ function dashboardCss() {
   --red-soft: #fee2e2;
   --indigo: #4f46e5;
   --sky: #0284c7;
-  --shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+  --shadow: 0 8px 22px rgba(15, 23, 42, 0.055);
   --radius: 18px;
-  --sidebar-bg: #ffffff;
   --soft-bg: #f8fafc;
   --input-bg: #ffffff;
   --button-bg: #ffffff;
@@ -168,11 +142,6 @@ function dashboardCss() {
   --tooltip-bg: #ffffff;
   --chart-grid: #e2e8f0;
   --chart-text: #64748b;
-  --sidebar-link: #334155;
-  --sidebar-link-hover: #0f766e;
-  --sidebar-link-hover-bg: #f0fdfa;
-  --sidebar-toggle-bg: #ffffff;
-  --sidebar-toggle-text: #475569;
   --content-max-width: 1640px;
   --space-section: 20px;
   --space-grid: 16px;
@@ -197,8 +166,7 @@ function dashboardCss() {
   --emerald-soft: rgba(16, 185, 129, 0.16);
   --amber-soft: rgba(245, 158, 11, 0.16);
   --red-soft: rgba(239, 68, 68, 0.16);
-  --shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-  --sidebar-bg: #0f172a;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
   --soft-bg: #111827;
   --input-bg: #0b1220;
   --button-bg: #111827;
@@ -207,11 +175,6 @@ function dashboardCss() {
   --tooltip-bg: #020617;
   --chart-grid: rgba(148, 163, 184, 0.18);
   --chart-text: #cbd5e1;
-  --sidebar-link: #cbd5e1;
-  --sidebar-link-hover: #f8fafc;
-  --sidebar-link-hover-bg: rgba(45, 212, 191, 0.14);
-  --sidebar-toggle-bg: #111827;
-  --sidebar-toggle-text: #e2e8f0;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
@@ -225,93 +188,13 @@ body {
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 svg { width: 18px; height: 18px; stroke-width: 2.2; }
-body, .sidebar, .filter-panel, .kpi-card, .chart-card, .table-card, .button, .badge, input, select, th, tbody tr {
+body, .filter-panel, .kpi-card, .chart-card, .table-card, .button, .badge, input, select, th, tbody tr {
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.dashboard-app { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 100vh; transition: grid-template-columns 0.22s ease; }
-.dashboard-app.sidebar-collapsed { grid-template-columns: 84px minmax(0, 1fr); }
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  padding: 22px;
-  border-right: 1px solid var(--line);
-  background: var(--sidebar-bg);
-  overflow: hidden;
-}
-.sidebar-brand { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-bottom: 28px; font-weight: 800; }
-.sidebar-brand .sidebar-logo {
-  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: 0 0 auto;
-  overflow: hidden; border-radius: 14px; background: #fff; box-shadow: 0 10px 24px rgba(15, 118, 110, 0.14);
-}
-.sidebar-logo-mark {
-  display: block; width: 44px; height: 44px; margin: 0;
-}
-.sidebar-logo-mark rect {
-  fill: var(--primary);
-}
-.sidebar-logo-mark path {
-  fill: none; stroke: #fff; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round;
-}
-.sidebar-logo-mark path:last-child {
-  stroke: var(--primary-soft); stroke-width: 5;
-}
-.sidebar-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 1;
-  transform: translateX(0);
-  transition: opacity 0.16s ease, transform 0.16s ease, max-width 0.2s ease;
-}
-.sidebar-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--sidebar-toggle-bg);
-  color: var(--sidebar-toggle-text);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-  transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
-}
-.sidebar-toggle:hover { background: var(--sidebar-link-hover-bg); color: var(--sidebar-link-hover); transform: translateY(-1px); }
-.sidebar-nav { display: grid; gap: 8px; }
-.sidebar-nav a {
-  display: flex; gap: 10px; align-items: center; min-height: 42px; padding: 0 12px;
-  border: 1px solid transparent; border-radius: 12px; color: var(--sidebar-link); font-weight: 800; text-decoration: none;
-}
-.sidebar-nav a svg { flex: 0 0 auto; }
-.sidebar-nav a:hover { border-color: var(--line); background: var(--sidebar-link-hover-bg); color: var(--sidebar-link-hover); }
-.sidebar-note {
-  position: absolute; left: 22px; right: 22px; bottom: 22px; display: grid; gap: 9px;
-  padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--soft-bg); color: var(--muted); font-size: 0.82rem; line-height: 1.45;
-}
-.dashboard-app.sidebar-collapsed .sidebar { padding-inline: 16px; }
-.dashboard-app.sidebar-collapsed .sidebar-brand { grid-template-columns: 1fr; justify-items: center; gap: 12px; }
-.dashboard-app.sidebar-collapsed .sidebar-brand > span { width: 44px; height: 44px; }
-.dashboard-app.sidebar-collapsed .sidebar-toggle { width: 38px; height: 38px; }
-.dashboard-app.sidebar-collapsed .sidebar-label {
-  max-width: 0;
-  opacity: 0;
-  transform: translateX(-6px);
-  pointer-events: none;
-}
-.dashboard-app.sidebar-collapsed .sidebar-nav a {
-  justify-content: center;
-  padding: 0;
-}
-.dashboard-app.sidebar-collapsed .sidebar-note {
-  left: 16px;
-  right: 16px;
-  padding: 10px;
-  justify-items: center;
-}
-.dashboard-app.sidebar-collapsed .sidebar-note span { display: none; }
-.main { min-width: 0; padding: 26px var(--space-inline) 44px; }
-.dashboard-content { width: min(100%, var(--content-max-width)); min-width: 0; margin-inline: auto; }
-.dashboard-content > *, .executive-header > *, .panel-heading > *, .header-actions > * { min-width: 0; }
+.dashboard-app { min-height: 100vh; }
+.main { min-width: 0; padding-block: 24px 44px; }
+.dashboard-shell { width: min(100%, var(--content-max-width)); min-width: 0; margin-inline: auto; padding-inline: var(--space-inline); }
+.dashboard-shell > *, .executive-header > *, .panel-heading > *, .header-actions > * { min-width: 0; }
 .executive-header {
   display: flex; justify-content: space-between; gap: var(--space-section); align-items: flex-start; margin-bottom: var(--space-section);
 }
@@ -319,7 +202,7 @@ body, .sidebar, .filter-panel, .kpi-card, .chart-card, .table-card, .button, .ba
   margin: 0 0 8px; color: var(--primary); font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
 }
 h1, h2, p { margin-top: 0; }
-h1 { margin-bottom: 10px; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.03; letter-spacing: -0.04em; }
+h1 { margin-bottom: 9px; font-size: clamp(1.75rem, 3vw, 2.45rem); line-height: 1.06; letter-spacing: -0.035em; }
 h2 { margin-bottom: 0; font-size: 1.05rem; letter-spacing: -0.02em; }
 .header-context { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .header-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
@@ -484,9 +367,8 @@ label { display: grid; gap: 6px; }
 select, input[type="search"] {
   width: 100%; min-height: 40px; padding: 0 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--input-bg); color: var(--ink); font-weight: 700;
 }
-.active-filters { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; max-width: 55%; }
+.active-filters { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; max-width: 100%; }
 .active-filters-block { display: grid; justify-items: end; gap: 5px; }
-.active-filters-label { color: var(--muted); font-size: 0.68rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
 .active-filters-block .active-filters { max-width: none; }
 .filter-chip { display: inline-flex; gap: 6px; align-items: center; min-height: 30px; padding: 0 6px 0 10px; border: 0; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 0.78rem; font-weight: 800; cursor: pointer; }
 .filter-chip > span:first-child { overflow-wrap: anywhere; }
@@ -496,7 +378,7 @@ select, input[type="search"] {
 .context-item { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; max-width: 100%; padding: 0 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft-bg); color: var(--muted); font-size: 0.8rem; }
 .context-item strong { color: var(--ink); font-weight: 800; }
 .kpi-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--space-grid); margin-bottom: var(--space-section); }
-.kpi-card { grid-column: span 3; min-width: 0; min-height: 178px; padding: 16px; border-left: 4px solid transparent; animation: sectionIn 0.22s ease both; }
+.kpi-card { grid-column: span 3; min-width: 0; min-height: 176px; padding: 20px; border-left: 3px solid transparent; animation: sectionIn 0.22s ease both; }
 .kpi-grid[data-tail="1"] .kpi-card:last-child { grid-column: 4 / span 6; }
 .kpi-grid[data-tail="2"] .kpi-card:nth-last-child(-n + 2) { grid-column: span 6; }
 .kpi-grid[data-tail="3"] .kpi-card:nth-last-child(-n + 3) { grid-column: span 4; }
@@ -507,11 +389,11 @@ select, input[type="search"] {
 .kpi-card.kpi-negative { border-left-color: var(--red); background: linear-gradient(135deg, var(--panel), var(--red-soft)); }
 .kpi-card.kpi-negative .kpi-icon { background: var(--red-soft); color: var(--red); }
 .kpi-card.kpi-neutral { border-left-color: var(--line); }
-.kpi-card.kpi-secondary { min-height: 148px; background: var(--soft-bg); box-shadow: none; }
+.kpi-card.kpi-secondary { background: var(--soft-bg); box-shadow: none; }
 .kpi-card[data-kpi-action] { cursor: pointer; }
 .kpi-card[data-kpi-action]:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15, 23, 42, 0.09); }
 .kpi-card[data-kpi-action]:focus-visible { outline: 3px solid var(--primary-2); outline-offset: 3px; }
-.kpi-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+.kpi-top { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
 .kpi-icon { position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; flex: 0 0 38px; border-radius: 14px; background: var(--primary-soft); color: var(--primary); }
 .kpi-icon-fallback { display: inline-grid; place-items: center; width: 100%; height: 100%; font-size: 1.25rem; font-weight: 900; }
 .kpi-icon svg ~ .kpi-icon-fallback { display: none; }
@@ -519,7 +401,7 @@ select, input[type="search"] {
 .kpi-status { display: inline-flex; align-items: center; min-height: 24px; margin-bottom: 8px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 0.72rem; font-weight: 800; }
 .kpi-positive .kpi-status { border-color: rgba(16, 185, 129, 0.32); color: var(--emerald); background: var(--emerald-soft); }
 .kpi-negative .kpi-status { border-color: rgba(239, 68, 68, 0.32); color: var(--red); background: var(--red-soft); }
-.kpi-description { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.42; }
+.kpi-description { display: -webkit-box; margin: 0; overflow: hidden; color: var(--muted); font-size: 0.82rem; line-height: 1.42; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-grid); width: 100%; min-width: 0; margin-bottom: var(--space-section); align-items: stretch; }
 .chart-card { min-width: 0; min-height: 0; padding: var(--space-card); animation: sectionIn 0.24s ease both; }
 .chart-card p { margin: 6px 0 0; color: var(--muted); font-size: 0.9rem; }
@@ -779,21 +661,10 @@ tbody tr:hover { background: var(--primary-soft); }
 .detail-field { min-width: 0; }
 .detail-field span { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
 .detail-field strong { display: block; margin-top: 5px; color: var(--ink); overflow-wrap: anywhere; }
+.detail-field small { display: block; margin-top: 5px; color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
 .extra-columns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .extra-chip { display: inline-flex; min-height: 28px; align-items: center; padding: 0 9px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 0.78rem; font-weight: 800; }
 @media (max-width: 1180px) {
-  .dashboard-app,
-  .dashboard-app.sidebar-collapsed { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; padding: 16px var(--space-inline); border-right: 0; border-bottom: 1px solid var(--line); }
-  .sidebar-brand { margin-bottom: 14px; }
-  .dashboard-app.sidebar-collapsed .sidebar { padding: 16px var(--space-inline); }
-  .dashboard-app.sidebar-collapsed .sidebar-brand { grid-template-columns: auto minmax(0, 1fr) auto; justify-items: stretch; }
-  .dashboard-app.sidebar-collapsed .sidebar-label { max-width: none; opacity: 1; transform: none; pointer-events: auto; }
-  .dashboard-app.sidebar-collapsed .sidebar-nav a { justify-content: flex-start; padding: 0 12px; }
-  .dashboard-app.sidebar-collapsed .sidebar-note { left: auto; right: auto; padding: 14px; justify-items: start; }
-  .dashboard-app.sidebar-collapsed .sidebar-note span { display: inline; }
-  .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sidebar-note { position: static; margin-top: 12px; padding: 10px 12px; }
   .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3, .filter-grid-actions { grid-column: auto; }
   .filter-control-wide { grid-column: 1 / -1; }
@@ -809,14 +680,13 @@ tbody tr:hover { background: var(--primary-soft); }
   .client-tracking-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
 @media (max-width: 820px) {
-  .main { padding: 20px 12px 34px; }
+  .main { padding-block: 20px 34px; }
   .executive-header, .panel-heading { display: grid; }
   .header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-content: stretch; }
   .header-actions > * { width: 100%; min-width: 0; }
   .header-actions, .active-filters { max-width: none; }
   .active-filters-block { justify-items: start; }
   .filters-grid, .charts-grid { grid-template-columns: 1fr; }
-  .sidebar-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .filter-control, .filter-control-wide, .filter-control-standard, .filter-control-tail-1, .filter-control-tail-2, .filter-control-tail-3, .filter-grid-actions { grid-column: auto; }
   .chart-wide, .chart-featured, .chart-timeline, .chart-row-fill { grid-column: auto; }
   .multi-combobox-panel { z-index: 1000; width: calc(100vw - 24px); max-width: none; max-height: min(72vh, 560px); }
@@ -842,7 +712,6 @@ tbody tr:hover { background: var(--primary-soft); }
   .client-tracking-detail .detail-table-wrap { display: block; max-width: 100%; overflow-x: auto; }
 }
 @media (max-width: 560px) {
-  .sidebar-note { display: none; }
   .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .kpi-card { min-height: 0; padding: 13px; }
   .negotiation-record-header { display: grid; }
@@ -1168,7 +1037,6 @@ function initDashboard() {
   if (dashboardInitialized) return;
   dashboardInitialized = true;
   initTheme();
-  initSidebar();
   validateDashboardDataShape(DASHBOARD_DATA);
   initializeDashboardDataset(DASHBOARD_DATA);
   populateFilters();
@@ -1224,42 +1092,6 @@ function updateThemeToggle(theme) {
   toggle.setAttribute("aria-label", "Cambiar a modo " + (nextTheme === "dark" ? "oscuro" : "claro"));
   toggle.innerHTML = '<i data-lucide="' + icon + '"></i> ' + label;
   refreshIcons();
-}
-function initSidebar() {
-  const app = document.getElementById("dashboardApp");
-  const toggle = document.getElementById("sidebarToggle");
-  if (!app || !toggle) return;
-  const saved = getSidebarCollapsedPreference();
-  setSidebarCollapsed(saved);
-  toggle.addEventListener("click", function () {
-    setSidebarCollapsed(!app.classList.contains("sidebar-collapsed"));
-  });
-}
-function setSidebarCollapsed(collapsed) {
-  const app = document.getElementById("dashboardApp");
-  const toggle = document.getElementById("sidebarToggle");
-  if (!app || !toggle) return;
-  app.classList.toggle("sidebar-collapsed", collapsed);
-  toggle.setAttribute("aria-expanded", String(!collapsed));
-  toggle.setAttribute("aria-label", collapsed ? "Expandir menú" : "Colapsar menú");
-  toggle.innerHTML = collapsed ? '<i data-lucide="panel-left-open"></i>' : '<i data-lucide="panel-left-close"></i>';
-  setSidebarCollapsedPreference(collapsed);
-  refreshIcons();
-  window.setTimeout(resizeCharts, 260);
-}
-function getSidebarCollapsedPreference() {
-  try {
-    return window.localStorage.getItem("negotiationsSidebarCollapsed") === "true";
-  } catch (error) {
-    return false;
-  }
-}
-function setSidebarCollapsedPreference(collapsed) {
-  try {
-    window.localStorage.setItem("negotiationsSidebarCollapsed", String(collapsed));
-  } catch (error) {
-    reportDashboardDiagnostic("warning", "sidebar", error, "No se pudo guardar el estado del sidebar.");
-  }
 }
 function waitForECharts(callback, retries) {
   const remaining = typeof retries === "number" ? retries : 30;
@@ -1376,7 +1208,20 @@ function renderHeaderContext() {
   const titleElement = document.getElementById("dashboardTitle");
   if (titleElement) titleElement.textContent = title;
   const header = document.getElementById("headerContext");
-  if (header) header.innerHTML = '<span class="badge badge-muted">' + escapeHtml(context.badge) + '</span>';
+  if (!header) return;
+  const items = [];
+  const periods = state.analyses && state.analyses.periods || [];
+  const selectedClients = getSelectedFilterValues(state.filters, "Cliente SAP - Clave");
+  if (periods.length) {
+    const first = periods[0].label, last = periods[periods.length - 1].label;
+    items.push("Período: " + (first === last ? first : first + " a " + last));
+  }
+  if (selectedClients.length === 1) items.push("Cliente: " + selectedClients[0]);
+  const activeCount = Object.keys(normalizeFilters(state.filters)).length;
+  if (activeCount > 2) items.push(formatInteger(activeCount) + " filtros activos");
+  header.innerHTML = items.slice(0, 3).map(function (item) {
+    return '<span class="badge badge-muted">' + escapeHtml(item) + '</span>';
+  }).join("");
 }
 function getRegionContext(rows) {
   const regions = getUniqueOptions(rows, "Región SAP");
@@ -2359,12 +2204,13 @@ function renderActiveFilters() {
   const active = Object.keys(normalized);
   const element = document.getElementById("activeFilters");
   if (!element) return;
-  element.innerHTML = active.length ? active.map(function (field) {
+  const visible = active.slice(0, 2);
+  element.innerHTML = active.length ? visible.map(function (field) {
     const values = normalized[field];
     const label = getFilterDisplayLabel(field, values.length > 1);
     const valueText = values.length === 1 ? values[0] : formatInteger(values.length);
     return "<button class=\\"filter-chip\\" type=\\"button\\" data-filter-chip-field=\\"" + escapeHtml(field) + "\\" aria-label=\\"Quitar filtro " + escapeHtml(label) + "\\"><span>" + escapeHtml(label) + ": " + escapeHtml(valueText) + "</span><span class=\\"filter-chip-remove\\" aria-hidden=\\"true\\">×</span></button>";
-  }).join("") : "<span class=\\"badge badge-muted\\">Sin filtros activos</span>";
+  }).join("") + (active.length > visible.length ? "<span class=\\"badge badge-muted\\" title=\\"" + escapeHtml(active.map(function (field) { return getFilterDisplayLabel(field, normalized[field].length > 1); }).join(", ")) + "\\">" + formatInteger(active.length) + " filtros activos</span>" : "") : "<span class=\\"badge badge-muted\\">Sin filtros aplicados</span>";
 }
 function getFilterDisplayLabel(field, plural) {
   if (field === "ID Actividad") return plural ? "Actividades" : "Actividad";
@@ -2539,7 +2385,7 @@ function renderKpis(rows, negotiationUsageAnalysis, analyses) {
     const status = item.status ? "<span class=\\"kpi-status\\">" + escapeHtml(item.status) + "</span>" : "";
     const icon = resolveKpiIcon(item.icon);
     const actionAttrs = (item.action ? " data-kpi-action=\\\"" + escapeHtml(item.action) + "\\\" role=\\\"button\\\" tabindex=\\\"0\\\" aria-label=\\\"" + escapeHtml(item.actionLabel || item.title) + "\\\"" : "") + (item.tooltip ? " title=\\\"" + escapeHtml(item.tooltip) + "\\\"" : "");
-    return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span><span class=\\"badge badge-muted\\">" + escapeHtml(model.filterBadge) + "</span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
+    return "<article class=\\"" + className + "\\" data-kpi-id=\\"" + escapeHtml(item.id) + "\\"" + actionAttrs + "><div class=\\"kpi-top\\"><span class=\\"kpi-icon\\"><i data-kpi-icon=\\"" + icon + "\\"></i><span class=\\"kpi-icon-fallback\\" aria-hidden=\\"true\\">•</span></span></div><span class=\\"kpi-label\\">" + escapeHtml(item.title) + "</span><strong class=\\"kpi-value\\">" + escapeHtml(item.value) + "</strong>" + status + "<p class=\\"kpi-description\\">" + escapeHtml(item.description) + "</p></article>";
   }).join("");
   refreshIcons(container, "data-kpi-icon");
 }
@@ -2562,10 +2408,10 @@ function buildContextualKpiModel(analysis, filters) {
   else if (context.type === "CLIENT_MULTIPLE_ACTIVITIES") items = buildMultipleActivitiesClientKpis(context);
   else if (context.type === "MULTIPLE_ACTIVITIES") items = buildMultipleActivitiesKpis(context);
   else items = buildExecutiveKpis(context);
+  items = applySingleClientContextKpi(items, context);
   return {
     contextType: context.type,
     context: context,
-    filterBadge: hasActiveFilters(filters) ? "Filtros activos" : "Vista general",
     items: items.filter(function (item) { return !item.shouldRender || item.shouldRender(context); }).map(function (item) {
       return Object.assign({}, item, { icon: resolveKpiIcon(item.icon) });
     })
@@ -2585,12 +2431,94 @@ function resolveKpiContext(analysis, filters) {
   return {
     type: type,
     kpis: k,
+    analysis: analysis,
     filters: filters || {},
     activity: activity,
     isContractOnly: Boolean(activity && !k.selectedActivity),
     isActivityNotStarted: Boolean(activity && activity.status === "ACTIVIDAD_AUN_NO_INICIADA"),
     selectedContribution: k.selectedContributions.length === 1 ? k.selectedContributions[0] : null
   };
+}
+function applySingleClientContextKpi(items, context) {
+  const selectedClientIds = context.kpis.selectedClientIds || [];
+  if (selectedClientIds.length !== 1) return items;
+  const clientId = selectedClientIds[0];
+  const selectedActivityIds = context.kpis.selectedActivityIds || [];
+  const relations = (context.analysis.clientActivitySummary || []).filter(function (row) {
+    return normalizeText(row.clientSap) === clientId && (!selectedActivityIds.length || selectedActivityIds.indexOf(normalizeText(row.activityId)) !== -1);
+  });
+  const uniqueRelations = Array.from(new Map(relations.map(function (row) { return [normalizeText(row.activityId), row]; })).values());
+  const contextual = buildClientNegotiationContextKpi(uniqueRelations, context);
+  const replacementIds = context.type === "CLIENT_MULTIPLE_ACTIVITIES"
+    ? ["relatedClients", "selectedActivities"]
+    : ["clientsWithoutMonthlySales", "activityStatus"];
+  const index = items.findIndex(function (item) { return replacementIds.indexOf(item.id) !== -1; });
+  if (index === -1) return items.concat([contextual]).slice(0, 8);
+  return items.map(function (item, itemIndex) { return itemIndex === index ? contextual : item; });
+}
+function buildClientNegotiationContextKpi(relations, context) {
+  if (!relations.length && context.activity) relations = [{
+    activityId: context.activity.activityId,
+    startDate: context.activity.startDate,
+    endDate: context.activity.endDate,
+    dateStatus: context.activity.dateStatus,
+    selectedStatusPeriod: context.activity.period
+  }];
+  if (!relations.length) {
+    return {
+      id: "clientNegotiationContext", icon: "circle-help", title: "Estado de la negociación",
+      value: "Sin negociación asociada", description: "No hay negociaciones disponibles para los filtros actuales.",
+      className: "kpi-neutral kpi-secondary"
+    };
+  }
+  if (relations.length > 1) {
+    const counts = { VIGENTE: 0, POR_INICIAR: 0, FINALIZADA: 0, NO_EVALUABLE: 0, REVISAR_FECHAS: 0 };
+    relations.forEach(function (row) { counts[resolveClientNegotiationDisplayState(row).status] += 1; });
+    const summary = [
+      formatInteger(counts.VIGENTE) + " vigente" + (counts.VIGENTE === 1 ? "" : "s"),
+      formatInteger(counts.POR_INICIAR) + " por iniciar",
+      formatInteger(counts.FINALIZADA) + " finalizada" + (counts.FINALIZADA === 1 ? "" : "s")
+    ];
+    if (counts.REVISAR_FECHAS || counts.NO_EVALUABLE) summary.push(formatInteger(counts.REVISAR_FECHAS + counts.NO_EVALUABLE) + " por revisar");
+    return {
+      id: "clientNegotiationContext", icon: "clipboard-list", title: "Negociaciones del cliente",
+      value: formatInteger(relations.length), description: summary.join(" · "), className: "kpi-secondary"
+    };
+  }
+  const display = resolveClientNegotiationDisplayState(relations[0]);
+  return {
+    id: "clientNegotiationContext", icon: display.icon, title: "Estado de la negociación",
+    value: display.value, description: display.description, className: display.className
+  };
+}
+function resolveClientNegotiationDisplayState(row) {
+  if (!row || row.dateStatus !== "OK") {
+    return row && row.dateStatus === "FECHAS_CONFLICTIVAS"
+      ? { status: "REVISAR_FECHAS", value: "Revisar fechas", description: "La vigencia no puede determinarse.", icon: "circle-help", className: "kpi-attention kpi-secondary" }
+      : { status: "NO_EVALUABLE", value: "No evaluable", description: "No hay fechas válidas para evaluar.", icon: "circle-help", className: "kpi-neutral kpi-secondary" };
+  }
+  const startPeriod = periodFromIsoDate(row.startDate), endPeriod = periodFromIsoDate(row.endDate);
+  const referencePeriod = Number(row.selectedStatusPeriod) || Number(contextPeriodFromClientModel()) || null;
+  if (!startPeriod || !endPeriod || !referencePeriod) {
+    return { status: "NO_EVALUABLE", value: "No evaluable", description: "No hay fechas válidas para evaluar.", icon: "circle-help", className: "kpi-neutral kpi-secondary" };
+  }
+  if (referencePeriod < startPeriod) {
+    return { status: "POR_INICIAR", value: "Por iniciar", description: "Inicia el " + formatExecutiveDate(row.startDate), icon: "calendar-days", className: "kpi-attention kpi-secondary" };
+  }
+  if (referencePeriod > endPeriod) {
+    return { status: "FINALIZADA", value: "Finalizada", description: "Finalizó el " + formatExecutiveDate(row.endDate), icon: "calendar-check", className: "kpi-neutral kpi-secondary" };
+  }
+  return { status: "VIGENTE", value: "Vigente", description: "Vigente hasta el " + formatExecutiveDate(row.endDate), icon: "calendar-check", className: "kpi-positive kpi-secondary" };
+}
+function contextPeriodFromClientModel() {
+  const model = state.analyses && state.analyses.clientNegotiationModels;
+  return model && model.selectedStatusPeriod;
+}
+function formatExecutiveDate(value) {
+  const date = dateOnly(value);
+  if (!date) return "fecha no disponible";
+  const months = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
+  return date.getDate() + " " + months[date.getMonth()] + " " + date.getFullYear();
 }
 function buildSharedActivityKpis(context) {
   const k = context.kpis, activity = context.activity;
@@ -2709,27 +2637,32 @@ function buildObjectiveKpi(activity, clientContext) {
   };
 }
 function getObjectiveDisplay(activity) {
-  if (!activity || activity.objectiveStatus === "SIN_OBJETIVO") return { value: "No disponible", description: "No hay un objetivo mensual válido en cajas físicas.", className: "kpi-neutral" };
-  if (activity.objectiveStatus === "OBJETIVO_CONFLICTIVO") return { value: "Revisar", description: "Hay más de un objetivo mensual en cajas físicas.", className: "kpi-attention" };
+  if (!activity || activity.objectiveStatus === "SIN_OBJETIVO") return { value: "Sin objetivo", description: "No hay una meta registrada.", className: "kpi-neutral" };
+  if (activity.objectiveStatus === "OBJETIVO_CONFLICTIVO") return { value: "Revisar objetivo", description: "Hay más de un objetivo mensual registrado.", className: "kpi-attention" };
   if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return { value: formatAvailableMetric(activity.objectiveMonthly), description: "Objetivo contractual en cajas físicas, aún no comparable.", className: "kpi-secondary" };
   return { value: formatAvailableMetric(activity.objectiveMonthly), description: "", className: "" };
 }
 function buildComplianceKpi(activity, title, description) {
   const state = getComplianceState(activity.achievement, activity.objectiveStatus === "OK" ? "OK" : "OBJETIVO_AUSENTE");
-  return { id: "activityCompliance", icon: "gauge", title: title, value: formatAvailablePercent(activity.achievement), description: isFiniteNumber(activity.achievement) ? description : getNonComparableDescription(activity), className: state.className, status: state.label };
+  const unavailable = getNonComparableDisplay(activity);
+  return { id: "activityCompliance", icon: "gauge", title: title, value: isFiniteNumber(activity.achievement) ? formatAvailablePercent(activity.achievement) : unavailable.value, description: isFiniteNumber(activity.achievement) ? description : unavailable.description, className: isFiniteNumber(activity.achievement) ? state.className : unavailable.className, status: isFiniteNumber(activity.achievement) ? state.label : "" };
 }
 function buildDifferenceKpi(activity) {
   const state = getObjectiveDifferenceState(activity.gap);
-  return { id: "activityDifference", icon: state.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : "No disponible", description: isFiniteNumber(activity.gap) ? getObjectiveGapDescription(activity.gap) : getNonComparableDescription(activity), className: state.className, status: state.label };
+  const unavailable = getNonComparableDisplay(activity);
+  return { id: "activityDifference", icon: isFiniteNumber(activity.gap) ? state.icon : unavailable.icon, title: UI_COPY.kpis.global.objectiveGap.title, value: isFiniteNumber(activity.gap) ? formatSignedNumber(activity.gap) : unavailable.value, description: isFiniteNumber(activity.gap) ? getObjectiveGapDescription(activity.gap) : unavailable.description, className: isFiniteNumber(activity.gap) ? state.className : unavailable.className, status: isFiniteNumber(activity.gap) ? state.label : "" };
+}
+function getNonComparableDisplay(activity) {
+  if (!activity) return { value: "No evaluable", description: "No hay una negociación comparable.", className: "kpi-neutral", icon: "circle-help" };
+  if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return { value: "Aún no evaluable", description: "La negociación inicia el " + formatExecutiveDate(activity.startDate) + ".", className: "kpi-attention", icon: "calendar-days" };
+  if (activity.status === "SIN_OBJETIVO" || activity.objectiveStatus === "SIN_OBJETIVO") return { value: "Sin objetivo", description: "No hay una meta registrada.", className: "kpi-neutral", icon: "circle-help" };
+  if (activity.status === "OBJETIVO_CONFLICTIVO" || activity.objectiveStatus === "OBJETIVO_CONFLICTIVO") return { value: "Revisar objetivo", description: "Se encontraron metas mensuales inconsistentes.", className: "kpi-attention", icon: "circle-help" };
+  if (activity.status === "FECHAS_CONFLICTIVAS" || activity.dateStatus === "FECHAS_CONFLICTIVAS") return { value: "Revisar fechas", description: "La vigencia no puede determinarse.", className: "kpi-attention", icon: "calendar-days" };
+  if (["VENTA_CONFLICTIVA", "VENTA_ACTIVIDAD_AMBIGUA", "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD"].indexOf(activity.status) !== -1) return { value: "Revisar ventas", description: "Se encontraron valores que no pueden atribuirse con certeza.", className: "kpi-attention", icon: "circle-help" };
+  return { value: "Fuera del período", description: "No estuvo vigente en el rango seleccionado.", className: "kpi-neutral", icon: "calendar-days" };
 }
 function getNonComparableDescription(activity) {
-  if (!activity) return "No existe una actividad comparable en el período.";
-  if (activity.status === "ACTIVIDAD_AUN_NO_INICIADA") return "La actividad aún no había iniciado en el período analizado.";
-  if (activity.status === "OBJETIVO_CONFLICTIVO") return "No se calcula porque el objetivo mensual es conflictivo.";
-  if (activity.status === "SIN_OBJETIVO") return "No se calcula porque falta un objetivo mensual válido.";
-  if (activity.status === "REQUIERE_DISTRIBUCION_MULTIACTIVIDAD") return "No se calcula por actividad porque la venta total del cliente requiere una regla verificable de distribución.";
-  if (activity.status === "VENTA_ACTIVIDAD_AMBIGUA") return "No se calcula porque la venta atribuible de la actividad es ambigua.";
-  return "La actividad no es comparable con la información disponible.";
+  return getNonComparableDisplay(activity).description;
 }
 function buildPresentationsKpi(k) {
   return { id: "negotiatedPresentations", icon: "boxes", title: UI_COPY.kpis.shared.presentations, value: formatInteger(k.negotiatedPresentations), description: "Presentaciones incluidas en la negociación.", className: "kpi-secondary" };
@@ -3176,23 +3109,18 @@ function renderContextStrip(analysis) {
     return;
   }
   const items = [];
-  if (analysis.periods.length) {
-    const first = analysis.periods[0].label;
-    const last = analysis.periods[analysis.periods.length - 1].label;
-    items.push(["Período", first === last ? first : first + " a " + last]);
-  }
   if (analysis.kpis && analysis.kpis.selectedActivity) {
     items.push(["Actividad", analysis.kpis.selectedActivity.activityId]);
     items.push(["Tipo", analysis.kpis.selectedActivity.isSharedActivity ? "Compartida entre " + analysis.kpis.selectedActivity.associatedClientCount + " clientes" : "Individual"]);
   }
   [
-    ["Cliente", "Cliente SAP - Clave"], ["Región", "Región SAP"], ["Canal", "Canal"], ["CEDI", "Cedi"]
+    ["Canal", "Canal"], ["CEDI", "Cedi"]
   ].forEach(function (item) {
     const dimension = analysis.dimensions[item[1]];
     if (dimension && dimension.count === 1) items.push([item[0], dimension.values[0]]);
   });
   items.push(["Registros", formatInteger(analysis.rowCount)]);
-  element.innerHTML = items.map(function (item) {
+  element.innerHTML = items.slice(0, 4).map(function (item) {
     return '<span class="context-item"><span>' + escapeHtml(item[0]) + '</span><strong>' + escapeHtml(item[1]) + '</strong></span>';
   }).join("");
 }
@@ -4815,6 +4743,19 @@ function renderClientTrackingDetail() {
     { label: "Participación", value: formatAvailablePercent(participation) },
     { label: "Resultado de la negociación", value: formatClientTrackingMonthlyStatus(row.selectedMonthlyStatus) }
   ] : [];
+  const generalAndComparableAreEqual = isFiniteNumber(row.accumulatedGeneralSales)
+    && isFiniteNumber(row.accumulatedComparableSales)
+    && Math.abs(row.accumulatedGeneralSales - row.accumulatedComparableSales) < 1e-9;
+  const totalSalesNote = !generalAndComparableAreEqual && isFiniteNumber(row.accumulatedGeneralSales)
+    ? "Ventas totales acumuladas: " + formatAvailableMetric(row.accumulatedGeneralSales)
+    : "";
+  const gapNote = isFiniteNumber(row.totalDifference)
+    ? row.totalDifference < 0
+      ? "Faltan " + formatNumber(Math.abs(row.totalDifference)) + " cajas"
+      : row.totalDifference > 0
+        ? "Supera el objetivo en " + formatNumber(row.totalDifference) + " cajas"
+        : "Objetivo alcanzado sin brecha"
+    : "";
   const sections = [
     { title: UI_COPY.modal.clientLocation, fields: [
       { label: "Cliente SAP", value: row.clientSap }, { label: "Nombre", value: row.clientName || "No disponible" }, { label: "NIT", value: row.clientNit || "No disponible" },
@@ -4828,23 +4769,23 @@ function renderClientTrackingDetail() {
       { label: "% de inversión", value: formatAvailablePercent(row.investmentPercentage) }, { label: "% descuento negociación", value: formatNegotiationDiscountSummary(row.negotiationDiscount) },
       { label: "Estado descuento", value: formatClientTrackingWarning(row.negotiationDiscountStatus) }
     ] },
-    { title: UI_COPY.modal.accumulated, fields: sharedFields.concat([
-      { label: "Ventas generales acumuladas", value: formatAvailableMetric(row.accumulatedGeneralSales) },
-      { label: "Venta de presentaciones negociadas acumulada", value: formatAvailableMetric(row.accumulatedAttributableSales) },
-      { label: "Numerador comparable acumulado", value: formatAvailableMetric(row.accumulatedComparableSales) },
+    { title: UI_COPY.modal.accumulated, fields: [
+      { label: "Ventas comparables acumuladas", value: formatAvailableMetric(row.accumulatedComparableSales), note: totalSalesNote },
+      { label: "Ventas negociadas acumuladas", value: formatAvailableMetric(row.accumulatedAttributableSales) },
       { label: "Objetivo total", value: formatAvailableMetric(row.totalObjective) }, { label: "Avance objetivo total", value: formatAvailablePercent(row.totalProgress) },
-      { label: "Diferencia frente al objetivo total", value: isFiniteNumber(row.totalDifference) ? formatSignedNumber(row.totalDifference) : "No disponible" },
+      { label: "Brecha total", value: isFiniteNumber(row.totalDifference) ? formatSignedNumber(row.totalDifference) : "No disponible", note: gapNote },
       { label: "Estado objetivo total", value: formatClientTrackingTotalStatus(row.totalObjectiveStatus) }
-    ]) }
+    ] }
   ];
-  const renderSection = function (section) { return "<section class=\\"detail-section\\"><h3>" + escapeHtml(section.title) + "</h3><div class=\\"detail-fields\\">" + section.fields.map(function (field) { return "<article class=\\"detail-field\\"><span>" + escapeHtml(field.label) + "</span><strong>" + escapeHtml(field.value) + "</strong></article>"; }).join("") + "</div></section>"; };
+  const renderSection = function (section) { return "<section class=\\"detail-section\\"><h3>" + escapeHtml(section.title) + "</h3><div class=\\"detail-fields\\">" + section.fields.map(function (field) { return "<article class=\\"detail-field\\"><span>" + escapeHtml(field.label) + "</span><strong>" + escapeHtml(field.value) + "</strong>" + (field.note ? "<small>" + escapeHtml(field.note) + "</small>" : "") + "</article>"; }).join("") + "</div></section>"; };
   const identificationMarkup = sections.slice(0, 2).map(renderSection).join("");
   const accumulatedMarkup = renderSection(sections[2]);
+  const sharedMarkup = sharedFields.length ? renderSection({ title: "Actividad compartida", fields: sharedFields }) : "";
   const sharedAction = row.isSharedActivity ? "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-open-contribution\\"><i data-lucide=\\"users\\"></i> " + UI_COPY.actions.contribution + "</button>" : "";
   const renderMonthlyHeaders = function (labels) { return labels.map(function (label) { return "<th scope=\\"col\\">" + escapeHtml(label) + "</th>"; }).join(""); };
   const sharedHeaders = row.isSharedActivity ? "<th scope=\\"col\\">Venta conjunta</th><th scope=\\"col\\">Venta negociada conjunta</th><th scope=\\"col\\">Venta no negociada conjunta</th><th scope=\\"col\\">Aporte del cliente</th><th scope=\\"col\\">Participación</th>" : "";
   const monthlyHeaders = renderMonthlyHeaders(UI_COPY.tables.monthly.slice(0, 5)) + sharedHeaders + renderMonthlyHeaders(UI_COPY.tables.monthly.slice(5));
-  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\">" + escapeHtml(UI_COPY.tooltips.monthlyCompliance) + "</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> " + UI_COPY.actions.client + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> " + UI_COPY.actions.negotiation + "</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> " + UI_COPY.actions.downloadCsv + "</button></div>" + identificationMarkup + "<section class=\\"detail-section\\"><h3>" + UI_COPY.modal.monthlyResult + "</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr>" + monthlyHeaders + "</tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
+  body.innerHTML = "<div class=\\"presentation-detail client-tracking-detail\\"><p class=\\"client-tracking-detail-note\\">" + escapeHtml(UI_COPY.tooltips.monthlyCompliance) + "</p><div class=\\"tracking-detail-actions\\"><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-client\\"><i data-lucide=\\"user-round\\"></i> " + UI_COPY.actions.client + "</button><button class=\\"button button-primary\\" type=\\"button\\" data-detail-action=\\"tracking-view-activity\\"><i data-lucide=\\"briefcase-business\\"></i> " + UI_COPY.actions.negotiation + "</button>" + sharedAction + "<button class=\\"button button-ghost\\" type=\\"button\\" data-detail-action=\\"tracking-detail-csv\\"><i data-lucide=\\"download\\"></i> " + UI_COPY.actions.downloadCsv + "</button></div>" + identificationMarkup + sharedMarkup + "<section class=\\"detail-section\\"><h3>" + UI_COPY.modal.monthlyResult + "</h3><div class=\\"detail-table-wrap\\"><table class=\\"detail-table tracking-period-table\\"><thead><tr>" + monthlyHeaders + "</tr></thead><tbody>" + monthlyRows + "</tbody></table></div></section>" + accumulatedMarkup + warnings + "</div>";
 }
 function navigateFromClientTrackingDetail(action) {
   const row = state.detailExplorer.config && state.detailExplorer.config.trackingRow;

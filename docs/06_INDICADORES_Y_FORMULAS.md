@@ -71,6 +71,14 @@ El objetivo y las fórmulas también quedan no disponibles con objetivo ausente/
 
 ## KPI contextuales
 
+En vista general se conserva **Clientes negociados sin ventas**. Con exactamente un cliente seleccionado, esa información global se sustituye por:
+
+- **Estado de la negociación** si existe una sola actividad efectiva: Vigente, Por iniciar, Finalizada, No evaluable o Revisar fechas;
+- **Negociaciones del cliente** si existen varias: cuenta cada `ID Actividad` una sola vez y resume vigentes, futuras y finalizadas;
+- **Sin negociación asociada** cuando el modelo preparado no contiene relaciones válidas para los filtros.
+
+La tarjeta consume `clientActivitySummary`; no vuelve a recorrer el workbook. Los códigos técnicos permanecen en diagnósticos y el texto visible explica la causa.
+
 ### Varias actividades
 
 - Ventas atribuibles de las actividades.
@@ -97,6 +105,12 @@ No se agrega otra tarjeta llamada ventas comparables porque duplicaría ventas c
 - **Ventas de la actividad:** venta atribuible comparable del único cliente.
 - **Objetivo mensual:** objetivo único.
 - **Cumplimiento y diferencia:** mismas fórmulas.
+
+## Avance acumulado en el detalle
+
+**Ventas comparables acumuladas** representa las ventas utilizadas para medir el avance total. Se mantiene separada de **Ventas totales acumuladas** y **Ventas negociadas acumuladas**. Si venta total y comparable son iguales, la interfaz consolida ambas en una tarjeta; si difieren, la venta total aparece como contexto secundario. El CSV conserva todos los campos.
+
+La tarjeta **Brecha total** muestra `ventas comparables acumuladas - objetivo total` y acompaña el valor con “Faltan X cajas” o “Supera el objetivo en X cajas”.
 
 No se agrega contribución 100 % ni posición 1 de 1.
 

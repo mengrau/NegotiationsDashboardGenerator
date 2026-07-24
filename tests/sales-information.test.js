@@ -733,6 +733,7 @@ function runSyntheticTests() {
   assert.strictEqual(individualClientModel.contextType, "SINGLE_CLIENT_INDIVIDUAL_ACTIVITY");
   assert.strictEqual(individualClientModel.items[0].title, "Ventas del cliente");
   assert(individualClientModel.items.some((item) => item.title === "Objetivo mensual"));
+  assert(individualClientModel.items.some((item) => item.title === "Estado de la negociación" && item.value === "Vigente"));
   assert(!individualClientModel.items.some((item) => /Contribución|Posición|Ventas conjuntas|Clientes asociados/.test(item.title)));
   assert.strictEqual(individualClientModel.items.filter((item) => /Ventas del cliente|Ventas del mes/.test(item.title)).length, 1);
 
@@ -746,6 +747,21 @@ function runSyntheticTests() {
   assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateCompliance").value, dashboard.formatRatioPercent(1 / 3));
   assert.strictEqual(multiClientModel.items.find((item) => item.id === "aggregateDifference").value, "-200");
   assert(!multiClientModel.items.some((item) => /Contribución|Posición/.test(item.title)));
+  const futureClientContext = dashboard.buildClientNegotiationContextKpi([{
+    clientSap: "C-FUTURE", activityId: "A-FUTURE", dateStatus: "OK",
+    startDate: "2026-07-01", endDate: "2027-04-22", selectedStatusPeriod: 202606
+  }], {});
+  assert.strictEqual(futureClientContext.title, "Estado de la negociación");
+  assert.strictEqual(futureClientContext.value, "Por iniciar");
+  assert.strictEqual(futureClientContext.description, "Inicia el 1 JUL 2026");
+  const multipleClientContext = dashboard.buildClientNegotiationContextKpi([
+    { activityId: "A-1", dateStatus: "OK", startDate: "2026-01-01", endDate: "2026-12-31", selectedStatusPeriod: 202606 },
+    { activityId: "A-2", dateStatus: "OK", startDate: "2026-07-01", endDate: "2026-12-31", selectedStatusPeriod: 202606 },
+    { activityId: "A-3", dateStatus: "OK", startDate: "2025-01-01", endDate: "2026-05-31", selectedStatusPeriod: 202606 }
+  ], {});
+  assert.strictEqual(multipleClientContext.title, "Negociaciones del cliente");
+  assert.strictEqual(multipleClientContext.value, "3");
+  assert(multipleClientContext.description.includes("1 vigente") && multipleClientContext.description.includes("1 por iniciar") && multipleClientContext.description.includes("1 finalizada"));
 
   const notStartedRows = [
     normalizeActivityRow({ activityId: "A-FUTURE", clientId: "C-FUTURE", totalSales: "25", objectiveMonth: "150", startDate: "2026-08-01", endDate: "2026-12-31" })
@@ -757,8 +773,8 @@ function runSyntheticTests() {
   const notStartedModel = dashboard.buildContextualKpiModel(notStartedAnalysis, { "ID Actividad": "A-FUTURE" });
   assert.strictEqual(notStartedModel.context.isActivityNotStarted, true);
   assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityObjective").value, "150");
-  assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityCompliance").value, "No disponible");
-  assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityDifference").value, "No disponible");
+  assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityCompliance").value, "Aún no evaluable");
+  assert.strictEqual(notStartedModel.items.find((item) => item.id === "activityDifference").value, "Aún no evaluable");
   assert(notStartedModel.items.some((item) => item.title === "Ventas históricas"));
 
   const conflictRows = [
@@ -770,8 +786,8 @@ function runSyntheticTests() {
     filters: { "ID Actividad": "A-CONFLICT-KPI" }
   });
   const conflictModel = dashboard.buildContextualKpiModel(conflictAnalysis, { "ID Actividad": "A-CONFLICT-KPI" });
-  assert.strictEqual(conflictModel.items.find((item) => item.id === "activityObjective").value, "Revisar");
-  assert.strictEqual(conflictModel.items.find((item) => item.id === "activityCompliance").value, "No disponible");
+  assert.strictEqual(conflictModel.items.find((item) => item.id === "activityObjective").value, "Revisar objetivo");
+  assert.strictEqual(conflictModel.items.find((item) => item.id === "activityCompliance").value, "Revisar objetivo");
 
   const missingObjectiveRows = [
     normalizeActivityRow({ activityId: "A-MISSING-KPI", clientId: "C-MISSING", totalSales: "10", objectiveMonth: "" })
@@ -781,7 +797,7 @@ function runSyntheticTests() {
     filters: { "ID Actividad": "A-MISSING-KPI" }
   });
   const missingObjectiveModel = dashboard.buildContextualKpiModel(missingObjectiveAnalysis, { "ID Actividad": "A-MISSING-KPI" });
-  assert.strictEqual(missingObjectiveModel.items.find((item) => item.id === "activityObjective").value, "No disponible");
+  assert.strictEqual(missingObjectiveModel.items.find((item) => item.id === "activityObjective").value, "Sin objetivo");
   const missingObjectiveGlobalAnalysis = dashboard.buildDashboardAnalyses(missingObjectiveRows, dashboard.getNoSalesAnalysis(missingObjectiveRows), { scopeRows: missingObjectiveRows, filters: {} });
   const missingObjectiveGlobalModel = dashboard.buildContextualKpiModel(missingObjectiveGlobalAnalysis, {});
   assert.strictEqual(missingObjectiveGlobalModel.items.find((item) => item.id === "comparableSales").value, "No disponible");
@@ -792,7 +808,7 @@ function runSyntheticTests() {
     filters: { "ID Actividad": "A-AMB-2" }
   });
   const ambiguousModel = dashboard.buildContextualKpiModel(ambiguousAnalysisForKpi, { "ID Actividad": "A-AMB-2" });
-  assert.strictEqual(ambiguousModel.items.find((item) => item.id === "activityCompliance").value, "No disponible");
+  assert.strictEqual(ambiguousModel.items.find((item) => item.id === "activityCompliance").value, "Revisar ventas");
   assert.strictEqual(dashboard.resolveKpiIcon("icono-inexistente"), "circle-dot");
   const analysisWithoutRowsAccess = Object.assign({}, individualActivityAnalysis);
   Object.defineProperty(analysisWithoutRowsAccess, "rows", { get() { throw new Error("El selector KPI no debe recorrer filas"); } });
@@ -1047,7 +1063,7 @@ function runSyntheticTests() {
   dashboard.clearFilters();
   assert.deepStrictEqual(plain(dashboard.getDashboardFilterState()), {});
   withDashboardElement("activeFilters", activeFilterElement, () => dashboard.renderActiveFilters());
-  assert(activeFilterElement.innerHTML.includes("Sin filtros activos"));
+  assert(activeFilterElement.innerHTML.includes("Sin filtros aplicados"));
   assert(dashboard.getDashboardPerformanceSnapshot().counters.rendersScheduled >= filterRenderBefore + 4);
   dashboard.cancelPendingDashboardRender();
   dashboard.window.requestAnimationFrame = originalRequestAnimationFrame;
@@ -1551,7 +1567,12 @@ function runSyntheticTests() {
   assert(html.includes("Buscar o seleccionar clientes"));
   assert(html.includes(".filter-control-wide { grid-column: span 6; }"));
   assert(html.includes("--content-max-width: 1640px"));
-  assert(html.includes(".dashboard-content { width: min(100%, var(--content-max-width))"));
+  assert(html.includes(".dashboard-shell { width: min(100%, var(--content-max-width))"));
+  assert(!html.includes('<aside class="sidebar">'));
+  assert(!html.includes('id="sidebarToggle"'));
+  assert(!html.includes("sidebar-collapsed"));
+  assert(!html.includes("Las gráficas usan librerías visuales por CDN"));
+  assert(!html.includes('<span class="active-filters-label">Filtros activos</span>'));
   assert(html.includes(".chart-featured"));
   assert(html.includes(".chart-standard"));
   assert(html.includes(".chart-compact"));
@@ -1582,7 +1603,13 @@ function runSyntheticTests() {
   assert(templateSource.includes("function assignAdaptiveFilterLayout"));
   assert(templateSource.includes("function getKpiGridLayoutMetadata"));
   assert(!templateSource.includes("body { overflow-x: hidden"));
-  assert(!templateSource.includes("dashboard-shell"));
+  assert(templateSource.includes("dashboard-shell"));
+  assert(!templateSource.includes("function initSidebar"));
+  assert(!templateSource.includes("negotiationsSidebarCollapsed"));
+  assert(!templateSource.includes('escapeHtml(model.filterBadge)'));
+  assert(!templateSource.includes("Numerador comparable acumulado"));
+  assert(templateSource.includes("Ventas comparables acumuladas"));
+  assert(!templateSource.includes("Venta negociada comparable"));
   assert(!templateSource.includes("kpiGrid"));
 }
 
@@ -1746,6 +1773,20 @@ function runClientTrackingTableTests() {
   assert.strictEqual(detailModelCold.periods.length, 2);
   assert.strictEqual(detailModelCold.periods[1].monthlyDiscount, 0.09);
   assert.strictEqual(dashboard.buildClientTrackingDetailConfig(detailModelCold).type, "clientTrackingDetail");
+  const detailElements = makeDetailExplorerElements();
+  withDashboardElements(detailElements, () => {
+    dashboard.openDetailExplorer(dashboard.buildClientTrackingDetailConfig(dashboard.getClientTrackingDetailModel(base, periods)), null);
+    assert(detailElements.detailExplorerBody.innerHTML.includes("Ventas comparables acumuladas"));
+    assert(detailElements.detailExplorerBody.innerHTML.includes("Ventas totales acumuladas: 260"));
+    assert(detailElements.detailExplorerBody.innerHTML.includes("Ventas negociadas acumuladas"));
+    assert(detailElements.detailExplorerBody.innerHTML.includes("Brecha total"));
+    dashboard.closeDetailExplorer({ restoreFocus: false });
+    const consolidated = Object.assign({}, base, { clientSap: "C-CONSOLIDATED", activityId: "A-CONSOLIDATED", accumulatedGeneralSales: 200, accumulatedComparableSales: 200 });
+    dashboard.openDetailExplorer(dashboard.buildClientTrackingDetailConfig(dashboard.getClientTrackingDetailModel(consolidated, periods)), null);
+    assert(!detailElements.detailExplorerBody.innerHTML.includes("Ventas totales acumuladas:"));
+    assert.strictEqual((detailElements.detailExplorerBody.innerHTML.match(/Ventas comparables acumuladas/g) || []).length, 1);
+    dashboard.closeDetailExplorer({ restoreFocus: false });
+  });
   const csv = dashboard.buildClientTrackingSummaryCsv([base, shared], periods, periods[1]);
   assert(csv.startsWith("\uFEFF"));
   assert(csv.includes("Venta total MAY 2026") && csv.includes("Venta negociada MAY 2026") && csv.includes("% negociada MAY 2026"));
@@ -2066,7 +2107,6 @@ function runAttachedWorkbookValidation() {
   const workbookRules = Object.fromEntries(dashboard.getChartRegistry().map((definition) => [definition.id, definition.shouldRender(workbookAnalysis)]));
   assert.deepStrictEqual(plain(workbookRules), {
     negotiationTimeline: true,
-    salesTarget: false,
     activityContribution: false,
     activityPerformance: false,
     presentationStatus: true,
@@ -2427,7 +2467,7 @@ function runSharedWorkbookValidation() {
     assert.strictEqual(model.diagnostics.clients, new Set(rows.map((row) => row.clientSap).filter(Boolean)).size);
     assert.strictEqual(model.diagnostics.activities, new Set(rows.map((row) => row.activityId).filter(Boolean)).size);
     assert(model.availablePeriods.length > 0);
-    assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 4);
+    assert.strictEqual(model.summaryTableColumns.length, 17 + model.availablePeriods.length * 8);
     assert(model.clientActivitySummary.length >= model.clientSummary.length);
     assert(model.clientActivitySummary.every((row) => row.navigation.clientSap === row.clientSap && row.navigation.activityId === row.activityId));
     assert(model.clientActivitySummary.every((row) => ["CUMPLE_MES", "NO_CUMPLE_MES", "NO_EVALUABLE_MES"].includes(row.selectedMonthlyStatus)));

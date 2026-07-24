@@ -49,6 +49,8 @@ flowchart LR
 - `buildNegotiationTimelineAnalysis()` construye el modelo temporal;
 - el explorador y las exportaciones CSV viven dentro del mismo script generado.
 
+La interfaz se organiza dentro de `.dashboard-shell`, una columna central de hasta 1.640 px. No existe sidebar, estado de colapso ni listeners de navegación lateral. El encabezado resume período, cliente y cantidad de filtros; filtros y contexto siguen usando el estado central.
+
 ## Componentes y conexiones
 
 ```mermaid
@@ -81,6 +83,8 @@ En el dashboard generado, `state` conserva filtros, filas de alcance, filas filt
 `buildIndexes()` crea mapas por campos de filtro, actividad, cliente, período y relaciones. `buildActivityAnalytics()` resuelve objetivos, relaciones y desempeño. `buildDashboardAnalyses()` integra KPI, dimensiones, presentaciones, categorías y timeline.
 
 El nuevo KPI usa `kpis.comparableSales`, que ya proviene de `aggregateActivityPerformance()`. No abre un recorrido adicional sobre las filas.
+
+Cuando hay un solo cliente, `buildContextualKpiModel()` reutiliza `clientActivitySummary` para presentar el estado contractual de una negociación o contar actividades únicas. La resolución compara fechas válidas contra el período ya proyectado; no consulta el DOM ni las filas crudas.
 
 ## Render y ciclo de vida
 

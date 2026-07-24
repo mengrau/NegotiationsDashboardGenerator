@@ -8,6 +8,8 @@ En actividades compartidas el resultado es conjunto. En multiactividad no se dup
 
 El indicador **Clientes negociados sin ventas** identifica clientes cuyos registros reportan `TotalVentaMes = 0` explícitamente. Esas filas no informan Año, Mes ni Año Mes, de modo que el dashboard no inventa un período y el filtro Mes no las elimina. Cada cliente cuenta una sola vez, aunque tenga varias negociaciones o presentaciones.
 
+La interfaz se presenta en una columna central sin menú lateral. En la vista general conserva indicadores agregados; al seleccionar un cliente, reemplaza el indicador global de clientes sin ventas por el estado de su negociación o el número de negociaciones únicas. **Ventas comparables acumuladas** es el valor usado para medir el avance total.
+
 ## Mensaje central
 
 El dashboard no suma columnas repetidas: respeta la granularidad de venta, objetivo y actividad. Distingue venta general de venta atribuible comparable para que cumplimiento y diferencia sean explicables.

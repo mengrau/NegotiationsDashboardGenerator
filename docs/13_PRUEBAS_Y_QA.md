@@ -99,7 +99,9 @@ Repetir con temas claro y oscuro y zoom 80 %, 100 % y 125 %:
 | 768 × 1024 | una columna de gráficas, modal funcional |
 | 390 × 844 | sin scroll general, controles táctiles y timeline legible |
 
-Comprobar encabezado, sidebar, ocho KPI globales, ausencia de hueco, timeline, donut, treemap, lollipop, modal, dropdown, contraste, foco y `scrollWidth <= innerWidth`.
+Comprobar encabezado compacto, ausencia de sidebar y de espacio lateral reservado, ocho KPI globales, KPI contextual de cliente, ausencia de huecos, timeline, donut, treemap, lollipop, modal, dropdown, contraste, foco y `scrollWidth <= innerWidth`.
+
+La suite también valida que no existan listeners ni persistencia del sidebar, que `Filtros activos` no se repita por KPI, que una negociación futura se presente como **Por iniciar**, que varias actividades se dedupliquen y que el bloque acumulado use **Ventas comparables acumuladas** sin duplicar métricas iguales.
 
 ## Estado honesto
 

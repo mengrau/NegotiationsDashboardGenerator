@@ -94,7 +94,7 @@ El índice [docs/00_INDICE.md](docs/00_INDICE.md) enlaza arquitectura, modelo de
 
 ## Layout y responsive
 
-El contenido ejecutivo está centrado dentro de `.dashboard-content`, con un ancho máximo de 1.640 px y espaciado controlado mediante variables CSS. La sidebar permanece fuera de este límite, mientras modal y dropdowns conservan posicionamiento respecto del viewport.
+La interfaz usa una sola columna central dentro de `.dashboard-shell`, con un ancho máximo de 1.640 px y espaciado lateral adaptable. No existe navegación lateral ni espacio reservado a la izquierda; modal y dropdowns siguen posicionándose respecto del viewport.
 
 La grilla KPI usa doce columnas lógicas: normalmente presenta cuatro tarjetas por fila y redistribuye la última fila como una tarjeta centrada, dos mitades o tres tercios. A 1.180 px pasa a dos columnas y, si la cantidad es impar, la última completa la fila; a 390 px utiliza una columna. Los KPI secundarios conservan menor peso visual y no se crean nodos invisibles de relleno.
 
@@ -102,7 +102,9 @@ Cada visualización declara metadatos de presentación `compact`, `standard`, `f
 
 Los filtros usan una grilla de doce columnas: Actividad y Cliente tienen mayor ancho y los controles restantes redistribuyen su última fila. Contexto derivado y filtros removibles mantienen tratamientos visuales diferentes. Tablas, Gantt y listas con ancho propio contienen su desplazamiento internamente; el layout no recurre a ocultar globalmente el desbordamiento horizontal.
 
-Los breakpoints principales son 1.180, 820, 560 y 390 px. Ajustan navegación, encabezado, filtros, KPI, gráficas, timeline y modal sin duplicar representaciones ni análisis. Los mismos tokens de panel, texto, borde, estados semánticos y foco se reutilizan en modo claro y oscuro.
+Los breakpoints principales son 1.180, 820, 560 y 390 px. Ajustan encabezado, filtros, KPI, gráficas, timeline y modal sin duplicar representaciones ni análisis. Los mismos tokens de panel, texto, borde, estados semánticos y foco se reutilizan en modo claro y oscuro.
+
+Los KPI cambian según el contexto. En vista general se conserva **Clientes negociados sin ventas**; con un único cliente, la tarjeta secundaria presenta el estado de su negociación o el total de negociaciones únicas. Las causas no evaluables se expresan como **Por iniciar**, **Sin objetivo**, **Revisar fechas** o **Revisar ventas**, sin exponer códigos internos.
 
 Filtros disponibles en el dashboard compartido:
 

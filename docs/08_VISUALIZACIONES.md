@@ -51,6 +51,8 @@ Cada contenedor tiene `role="img"` y `aria-label`. Los fallbacks nativos usan bo
 
 La validación automática comprueba estructura y fallbacks. La pintura en 1440, 1024, 768 y 390 px permanece en la matriz manual cuando no hay navegador disponible.
 
+La interfaz principal no usa navegación lateral. `.dashboard-shell` centra encabezado, filtros, KPI, seguimiento y visualizaciones; las gráficas mantienen título, un subtítulo breve y la visualización, mientras las reglas técnicas quedan en tooltips, modales y documentación.
+
 ## Tabla de seguimiento
 
 Aunque no es una gráfica, funciona como visualización ejecutiva de entrada. En escritorio usa tabla compacta con encabezado fijo y scroll horizontal interno; hasta 820 px renderiza únicamente tarjetas de la página activa. Los badges combinan icono, texto y tono. El modal presenta períodos dinámicos y separa venta general, aporte del cliente y venta conjunta.
